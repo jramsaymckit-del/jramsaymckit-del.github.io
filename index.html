@@ -1,0 +1,2265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>London Property Financial Model</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #0d0f14; --surface: #13161d; --card: #181c26;
+  --border: #252a38; --accent: #c9a84c; --accent-dim: #9c7c30;
+  --green: #4caf82; --red: #e05c5c; --muted: #5a6175;
+  --text: #d8dde8; --text-dim: #8c94a8;
+}
+body { background: var(--bg); color: var(--text); font-family: Georgia, 'Times New Roman', serif; min-height: 100vh; }
+input[type=number], input[type=text] {
+  background: var(--bg); border: 1px solid var(--border); border-radius: 4px;
+  color: var(--text); padding: 6px 10px; width: 100%; font-size: 13px; font-family: inherit;
+}
+input:focus { outline: 1px solid var(--accent); }
+
+/* Header */
+.header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 18px 32px; display: flex; align-items: baseline; justify-content: space-between; }
+.header-sub { font-size: 11px; color: var(--accent); letter-spacing: .18em; text-transform: uppercase; margin-bottom: 2px; }
+.header-title { font-size: 22px; font-weight: 700; letter-spacing: -.02em; }
+.header-meta { font-size: 11px; color: var(--muted); text-align: right; line-height: 1.6; }
+
+/* Main Tabs */
+.tabs { display: flex; border-bottom: 1px solid var(--border); background: var(--surface); padding: 0 32px; }
+.tab { background: none; border: none; border-bottom: 2px solid transparent; color: var(--muted); padding: 14px 22px; cursor: pointer; font-size: 13px; font-family: inherit; letter-spacing: .04em; transition: color .15s; }
+.tab.active { border-bottom-color: var(--accent); color: var(--accent); }
+
+/* Property sub-nav */
+.prop-nav { display: flex; flex-wrap: wrap; gap: 8px; padding: 14px 32px; background: var(--surface); border-bottom: 1px solid var(--border); }
+.pnav { background: var(--card); border: 1px solid var(--border); border-radius: 20px; color: var(--muted); padding: 7px 16px; cursor: pointer; font-size: 12px; font-family: inherit; letter-spacing: .04em; transition: all .15s; white-space: nowrap; }
+.pnav:hover { border-color: var(--accent-dim); color: var(--text-dim); }
+.pnav.active { background: var(--accent); border-color: var(--accent); color: #0d0f14; font-weight: 700; }
+
+/* Layout */
+.content { padding: 24px 32px; }
+.panel { display: grid; grid-template-columns: 310px 1fr; gap: 24px; }
+
+/* Property banner */
+.prop-banner { background: var(--card); border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 6px; padding: 14px 18px; margin-bottom: 20px; display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; flex-wrap: wrap; }
+.prop-banner-left { flex: 1; }
+.prop-banner-name { font-size: 16px; font-weight: 700; color: var(--text); }
+.prop-banner-sub { font-size: 12px; color: var(--accent-dim); margin-top: 3px; }
+.prop-banner-note { font-size: 11px; color: var(--muted); margin-top: 6px; font-style: italic; max-width: 600px; }
+.prop-banner-chips { display: flex; gap: 8px; flex-wrap: wrap; align-items: flex-start; padding-top: 2px; }
+.chip { background: var(--bg); border: 1px solid var(--border); border-radius: 4px; padding: 4px 10px; font-size: 11px; color: var(--text-dim); white-space: nowrap; }
+.chip.est { border-color: #5a3f10; color: var(--accent-dim); font-style: italic; }
+.chip-link { background: var(--bg); border: 1px solid var(--accent-dim); border-radius: 4px; padding: 4px 10px; font-size: 11px; white-space: nowrap; text-decoration: none; color: var(--accent); transition: background .15s, border-color .15s; }
+.chip-link:hover { background: rgba(201,168,76,0.1); border-color: var(--accent); }
+.tbl-link { color: var(--accent); text-decoration: none; font-size: 11px; }
+.tbl-link:hover { text-decoration: underline; }
+
+/* Section */
+.section-title { font-size: 11px; color: var(--accent); letter-spacing: .12em; text-transform: uppercase; border-bottom: 1px solid var(--border); padding-bottom: 6px; margin-bottom: 14px; margin-top: 22px; }
+.section-title:first-child { margin-top: 0; }
+
+/* Field */
+.field { margin-bottom: 13px; }
+.field label { display: block; font-size: 11px; color: var(--text-dim); letter-spacing: .06em; text-transform: uppercase; margin-bottom: 4px; }
+.field-row { display: flex; align-items: center; gap: 6px; }
+.field-prefix { color: var(--accent-dim); font-size: 13px; }
+.field-suffix { color: var(--muted); font-size: 12px; white-space: nowrap; }
+.field-note { font-size: 11px; color: var(--muted); margin-top: 3px; }
+
+/* Metrics */
+.metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 22px; }
+.metric-card { background: var(--card); border: 1px solid var(--border); border-radius: 6px; padding: 14px 16px; position: relative; overflow: hidden; }
+.metric-card.highlight { border-color: var(--accent); }
+.metric-card.highlight::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: var(--accent); }
+.metric-label { font-size: 11px; color: var(--text-dim); letter-spacing: .06em; text-transform: uppercase; margin-bottom: 6px; }
+.metric-value { font-size: 20px; font-weight: 700; color: var(--text); }
+.metric-card.highlight .metric-value { color: var(--accent); }
+.metric-sub { font-size: 11px; color: var(--muted); margin-top: 4px; }
+.metric-soon { font-size: 13px; color: var(--muted); font-style: italic; }
+
+/* Two-col results */
+.results-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.soon-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+/* Table */
+table { width: 100%; border-collapse: collapse; }
+td { padding: 7px 10px; font-size: 13px; color: var(--text-dim); }
+td:last-child { text-align: right; }
+.bold td { color: var(--text); font-weight: 700; }
+.divider td { border-top: 1px solid var(--border); padding: 3px 0; }
+
+/* Compare table */
+.compare-wrap { overflow-x: auto; margin-bottom: 10px; }
+.compare-tbl { width: 100%; border-collapse: collapse; min-width: 900px; }
+.compare-tbl th { font-size: 11px; color: var(--accent); letter-spacing: .07em; text-transform: uppercase; text-align: right; padding: 10px 12px; border-bottom: 2px solid var(--border); white-space: nowrap; }
+.compare-tbl th:first-child { text-align: left; }
+.compare-tbl td { padding: 11px 12px; font-size: 13px; color: var(--text-dim); border-bottom: 1px solid var(--border); text-align: right; white-space: nowrap; vertical-align: top; }
+.compare-tbl td:first-child { text-align: left; font-size: 13px; color: var(--text); }
+.compare-tbl tr.ref-row td { background: rgba(201,168,76,0.05); }
+.compare-tbl tr:hover td { background: var(--card); }
+.c-best { color: var(--green) !important; font-weight: 700; }
+.c-worst { color: var(--red) !important; }
+.c-est { color: var(--accent-dim); font-size: 10px; display: block; }
+.compare-legend { font-size: 11px; color: var(--muted); margin-top: 10px; line-height: 1.8; }
+
+/* Verdict (RVB) */
+.verdict { border-radius: 8px; padding: 20px; margin-bottom: 20px; display: flex; align-items: center; gap: 20px; }
+.verdict.buy { background: #0e1f17; border: 1px solid var(--green); }
+.verdict.rent { background: #1f0e0e; border: 1px solid var(--red); }
+.verdict-icon { font-size: 36px; }
+.verdict-title { font-size: 16px; font-weight: 700; }
+.verdict.buy .verdict-title { color: var(--green); }
+.verdict.rent .verdict-title { color: var(--red); }
+.verdict-detail { font-size: 13px; color: var(--text-dim); margin-top: 4px; }
+.verdict-break { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+/* Market & Tax tab */
+.mkt-layout { display: grid; grid-template-columns: 1fr; gap: 24px; }
+.chart-container { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 20px; position: relative; }
+.chart-container canvas { width: 100%; height: 400px; }
+.chart-legend { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 14px; font-size: 11px; }
+.chart-legend-item { display: flex; align-items: center; gap: 6px; color: var(--text-dim); }
+.chart-legend-dot { width: 10px; height: 10px; border-radius: 50%; }
+.tax-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }
+.tax-card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 18px; }
+.tax-card-title { font-size: 13px; font-weight: 700; color: var(--accent); margin-bottom: 12px; letter-spacing: .04em; }
+.tax-card table td { padding: 5px 8px; font-size: 12px; }
+.tax-card table td:first-child { color: var(--text-dim); }
+.tax-card table td:last-child { color: var(--text); font-weight: 600; }
+.tax-note { font-size: 11px; color: var(--muted); margin-top: 8px; line-height: 1.6; font-style: italic; }
+.tax-info-panel { background: var(--card); border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 6px; padding: 16px 20px; margin-bottom: 16px; }
+.tax-info-panel h4 { font-size: 13px; color: var(--accent); margin-bottom: 8px; letter-spacing: .06em; }
+.tax-info-panel p { font-size: 12px; color: var(--text-dim); line-height: 1.7; margin-bottom: 6px; }
+.tax-info-panel strong { color: var(--text); }
+.proj-table-wrap { overflow-x: auto; margin-top: 10px; }
+.proj-tbl { width: 100%; border-collapse: collapse; min-width: 700px; }
+.proj-tbl th { font-size: 10px; color: var(--accent); letter-spacing: .06em; text-transform: uppercase; text-align: right; padding: 8px 8px; border-bottom: 2px solid var(--border); white-space: nowrap; }
+.proj-tbl th:first-child { text-align: left; }
+.proj-tbl td { padding: 6px 8px; font-size: 12px; color: var(--text-dim); border-bottom: 1px solid var(--border); text-align: right; white-space: nowrap; }
+.proj-tbl td:first-child { text-align: left; color: var(--text); }
+.proj-tbl tr.proj-actual td { background: rgba(76,175,130,0.04); }
+.proj-tbl tr.proj-forecast td { background: rgba(201,168,76,0.04); }
+.proj-tbl tr.proj-extrap td { background: rgba(90,97,117,0.04); }
+.pos { color: var(--green) !important; }
+.neg { color: var(--red) !important; }
+.toggle-row { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+.toggle-btn { background: var(--card); border: 1px solid var(--border); border-radius: 4px; color: var(--muted); padding: 6px 14px; cursor: pointer; font-size: 11px; font-family: inherit; transition: all .15s; }
+.toggle-btn.on { background: var(--accent); border-color: var(--accent); color: #0d0f14; font-weight: 700; }
+
+/* Footer */
+.footer { padding: 12px 32px; border-top: 1px solid var(--border); font-size: 11px; color: var(--muted); margin-top: 40px; line-height: 1.8; }
+
+.hidden { display: none; }
+
+/* Print / Export Styles */
+@media print {
+  body { background: #fff; color: #1a1a1a; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .header { background: #f5f5f0; border-bottom: 2px solid #c9a84c; }
+  .header-sub, .header-title, .header-meta div { color: #1a1a1a; }
+  .tabs, .prop-nav, #lend-subnav { display: none; }
+  .content, #tab-lend > div { padding: 16px 20px; }
+  .tab, .pnav { display: none; }
+  .hidden { display: block !important; }
+  #tab-btl, #tab-mkt, #tab-rvb, #tab-lend { display: block !important; }
+  #lend-bridge, #lend-btlmtg, #lend-lcompare, #lend-lnotes { display: block !important; }
+  .panel { grid-template-columns: 1fr 1fr; }
+  .inputs { page-break-inside: avoid; }
+  .metric-card { background: #f5f5f0; border-color: #ccc; }
+  .metric-card.highlight { background: #f0ead6; }
+  .metric-value { color: #1a1a1a; }
+  .metric-label, .metric-sub { color: #555; }
+  .section-title { color: #1a1a1a; border-bottom-color: #c9a84c; }
+  table td { border-color: #ddd; color: #1a1a1a; }
+  .compare-tbl th { background: #f0ead6; color: #1a1a1a; }
+  .footer { border-top: 1px solid #ccc; color: #777; }
+  button { display: none !important; }
+  canvas { max-width: 100%; }
+  .prop-banner { border-left-color: #c9a84c; background: #f9f9f5; }
+  .prop-banner-name, .prop-banner-sub, .prop-banner-note { color: #1a1a1a; }
+  .chip { background: #f0f0f0; border-color: #ccc; color: #333; }
+  a { color: #c9a84c; }
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <div class="header-sub">London Property Intelligence</div>
+    <div class="header-title">Financial Model</div>
+  </div>
+  <div class="header-meta">
+    <div>Structure: Limited Company (SPV)</div>
+    <div>Market: Greater London · Elizabeth Line Corridor</div>
+    <div>Buyer: Canadian Non-Resident</div>
+    <div style="margin-top:8px;">
+      <button onclick="exportModel()" style="background:var(--accent);color:#0d0f14;border:none;border-radius:4px;padding:6px 14px;font-size:11px;font-family:inherit;cursor:pointer;font-weight:700;letter-spacing:.04em;">Export / Print</button>
+    </div>
+  </div>
+</div>
+
+<div class="tabs">
+  <button class="tab active" onclick="switchTab('btl',this)">Buy to Let</button>
+  <button class="tab" onclick="switchTab('mkt',this)">Market & Tax</button>
+  <button class="tab" onclick="switchTab('rvb',this)">Rent vs Buy</button>
+  <button class="tab" onclick="switchTab('lend',this)">Property Lending</button>
+  <button class="tab" onclick="switchTab('dirt',this)">The Dirt</button>
+</div>
+
+<!-- BTL Property sub-nav -->
+<div id="btl-subnav" class="prop-nav">
+  <button class="pnav active" onclick="showProp('compare',this)">Compare All</button>
+  <button class="pnav" onclick="showProp('p1',this)">Argyle Rd, W13</button>
+  <button class="pnav" onclick="showProp('p2',this)">Woodhill, SE18</button>
+  <button class="pnav" onclick="showProp('p3',this)">Cumberland Rd, Reading</button>
+  <button class="pnav" onclick="showProp('p4',this)">Goodmayes Ln, IG3</button>
+  <button class="pnav" onclick="showProp('p5',this)">Market St, Maidenhead</button>
+  <button class="pnav" onclick="showProp('p6',this)">Singapore Rd, W13</button>
+  <button class="pnav" onclick="showProp('p7',this)">Mattock Ln, W5</button>
+  <button class="pnav" onclick="showProp('p8',this)">Woodseer St, E1</button>
+  <button class="pnav" onclick="showProp('p9',this)">Lea Bridge Rd, E10</button>
+  <button class="pnav" onclick="showProp('p10',this)">Newburgh Rd, W3</button>
+</div>
+
+<div class="content">
+
+  <!-- BUY TO LET -->
+  <div id="tab-btl">
+
+    <!-- Compare All panel -->
+    <div id="panel-compare">
+      <div class="section-title" style="margin-top:0">Portfolio Comparison — All 10 Properties (Canadian Non-Resident via SPV)</div>
+      <div class="compare-wrap">
+        <table class="compare-tbl" id="compare-tbl">
+          <!-- populated by JS -->
+        </table>
+      </div>
+      <div class="compare-legend">
+        <span style="color:var(--green);font-weight:700">Green</span> = best in class &nbsp;&middot;&nbsp;
+        <span style="color:var(--red)">Red</span> = weakest &nbsp;&middot;&nbsp;
+        <span style="color:var(--accent-dim)">est.</span> = price or rent not confirmed by agent &nbsp;&middot;&nbsp;
+        All figures assume Ltd Co SPV &middot; 25% deposit &middot; mortgage rate per property (adjustable) &middot; 25-yr term &middot; Corp Tax 25% (flat — no small profits relief for non-residents) &middot; SDLT includes 5% additional dwelling surcharge + 2% non-resident surcharge
+      </div>
+    </div>
+
+    <!-- Individual property panels — injected by JS -->
+    <div id="prop-panels"></div>
+
+  </div><!-- /tab-btl -->
+
+  <!-- MARKET & TAX -->
+  <div id="tab-mkt" class="hidden">
+    <div class="mkt-layout">
+
+      <!-- Price History Chart -->
+      <div>
+        <div class="section-title" style="margin-top:0">Freehold Flat Block Price Index — Elizabeth Line Corridor (2007–2037)</div>
+        <div class="chart-container">
+          <canvas id="price-chart"></canvas>
+          <div class="chart-legend" id="chart-legend"></div>
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-top:8px;line-height:1.6">
+          Asset-specific index: ONS UK HPI London Flats &amp; Maisonettes (base), adjusted for freehold premium (+1-2% over leasehold) and Elizabeth line corridor effect (+1-2% post-2022 opening).
+          Forecast: Savills Mainstream London 2026–2030 + EL corridor premium. Extrapolation 2031–2037 at ~3% p.a. as premium matures.
+          Each property line shows projected value if purchased in 2026 at current asking price.
+        </div>
+      </div>
+
+      <!-- Year-by-year % change bar chart -->
+      <div>
+        <div class="section-title">Annual Price Change (%) — Freehold Flat Blocks, Elizabeth Line Corridor</div>
+        <div class="chart-container">
+          <canvas id="bar-chart"></canvas>
+        </div>
+      </div>
+
+      <!-- Property Projection Tables -->
+      <div>
+        <div class="section-title">Property Value Projections (2026–2037)</div>
+        <div class="toggle-row" id="proj-toggles"></div>
+        <div class="proj-table-wrap">
+          <table class="proj-tbl" id="proj-tbl"></table>
+        </div>
+      </div>
+
+      <!-- Canadian Non-Resident Tax Summary -->
+      <div>
+        <div class="section-title">Canadian Non-Resident Tax Implications (SPV Structure)</div>
+
+        <div class="tax-info-panel">
+          <h4>Buyer Profile: Canadian Citizen &middot; Non-UK Resident &middot; Non-UK Domiciled &middot; Purchasing via UK Ltd Co (SPV)</h4>
+          <p><strong>SDLT (Stamp Duty Land Tax):</strong> From the Autumn Budget 2024 (effective 31 Oct 2024), purchases of additional dwellings attract a 5% surcharge (increased from 3%) on top of standard residential rates. From 1 April 2025, the nil-rate band reverted to &pound;125,000. Non-UK residents pay an additional 2% surcharge on the entire purchase price. Combined rates for a non-resident company: 7% (&pound;0–125k), 9% (&pound;125k–250k), 12% (&pound;250k–925k), 17% (&pound;925k–1.5m), 19% (above &pound;1.5m). The 17% flat rate for non-natural persons does NOT apply where the property is used in a bona fide rental business. MDR (Multiple Dwelling Relief) was abolished in June 2024.</p>
+          <p><strong>Corporation Tax:</strong> UK non-resident companies are subject to corporation tax at the full 25% rate on UK property rental profits. The small profits rate (19%) and marginal relief are NOT available to non-resident companies. Mortgage interest is fully deductible against rental income within the SPV.</p>
+          <p><strong>Non-Resident Landlord Scheme (NRLS):</strong> HMRC requires letting agents or tenants to withhold 20% of gross rent and remit it to HMRC quarterly. The company can apply for HMRC approval to receive rent gross (Form NRL1) — recommended, as it avoids cash-flow drag. The withholding is offset against the company's CT liability.</p>
+          <p><strong>ATED (Annual Tax on Enveloped Dwellings):</strong> Applies to residential properties held in a company wrapper valued above &pound;500,000. However, full relief is available where the property is commercially let to unconnected persons. A relief return must still be filed annually.</p>
+          <p><strong>Capital Gains on Disposal:</strong> Non-resident companies are subject to UK corporation tax (25%) on gains from UK property disposals. A CGT return must be filed within 60 days of completion. Gains are calculated on the property value at the later of April 2015 or the acquisition date.</p>
+          <p><strong>UK–Canada Double Taxation Treaty (2014):</strong> Article 6 — income from immovable property (including rental income) may be taxed in the country where the property is situated (UK). Canada grants a foreign tax credit for UK taxes paid, avoiding double taxation. Dividends extracted from the UK SPV to a Canadian shareholder may attract UK withholding tax (reduced to 5%–15% under treaty) and Canadian personal income tax.</p>
+        </div>
+
+        <div class="tax-grid" id="tax-grid">
+          <!-- populated by JS -->
+        </div>
+      </div>
+
+      <!-- Historical data table -->
+      <div>
+        <div class="section-title">Asset-Specific Price History — Full Dataset (2007–2037)</div>
+        <div class="proj-table-wrap">
+          <table class="proj-tbl" id="history-tbl"></table>
+        </div>
+        <div class="tax-note">
+          Asset-specific: ONS UK HPI London Flats &amp; Maisonettes (base), adjusted for freehold premium and Elizabeth line corridor effect.
+          Forecast 2026–2030: Savills Mainstream London + ~1% EL corridor premium. Extrapolation 2031–2037: gradual reversion to ~3% p.a. as EL premium matures.
+          London all-property figures shown in notes for comparison. Flats typically underperform all-property by 1–3 p.p. in boom years; freehold blocks partially close this gap.
+        </div>
+      </div>
+
+    </div>
+  </div><!-- /tab-mkt -->
+
+  <!-- RENT VS BUY -->
+  <div id="tab-rvb" class="panel hidden">
+    <div class="inputs">
+      <div class="section-title">Property</div>
+      <div class="field"><label>Purchase Price</label><div class="field-row"><span class="field-prefix">&pound;</span><input type="number" id="rvb-price" value="600000" step="5000" oninput="calcRVB()"></div></div>
+      <div class="field"><label>Deposit</label><div class="field-row"><span class="field-prefix">%</span><input type="number" id="rvb-deposit" value="20" step="1" oninput="calcRVB()"><span class="field-suffix" id="rvb-deposit-val"></span></div></div>
+      <div class="field"><label>Mortgage Rate</label><div class="field-row"><span class="field-prefix">%</span><input type="number" id="rvb-rate" value="5.5" step="0.1" oninput="calcRVB()"></div></div>
+      <div class="field"><label>Mortgage Term</label><div class="field-row"><input type="number" id="rvb-term" value="25" step="1" oninput="calcRVB()"><span class="field-suffix">years</span></div></div>
+      <div class="section-title">Renting Alternative</div>
+      <div class="field"><label>Equivalent Monthly Rent</label><div class="field-row"><span class="field-prefix">&pound;</span><input type="number" id="rvb-rent" value="2800" step="50" oninput="calcRVB()"></div></div>
+      <div class="field"><label>Investment Return (on deposit)</label><div class="field-row"><span class="field-prefix">%</span><input type="number" id="rvb-invest" value="7" step="0.5" oninput="calcRVB()"></div><div class="field-note">e.g. S&amp;P 500 or ISA return</div></div>
+      <div class="section-title">Ownership Costs</div>
+      <div class="field"><label>Maintenance</label><div class="field-row"><span class="field-prefix">%</span><input type="number" id="rvb-maint" value="1" step="0.1" oninput="calcRVB()"></div><div class="field-note">% of value p.a.</div></div>
+      <div class="field"><label>Buildings Insurance</label><div class="field-row"><span class="field-prefix">&pound;</span><input type="number" id="rvb-ins" value="1500" step="100" oninput="calcRVB()"></div></div>
+      <div class="field"><label>Ground Rent</label><div class="field-row"><span class="field-prefix">&pound;</span><input type="number" id="rvb-gr" value="0" step="100" oninput="calcRVB()"></div></div>
+      <div class="field"><label>Service Charge</label><div class="field-row"><span class="field-prefix">&pound;</span><input type="number" id="rvb-sc" value="2400" step="100" oninput="calcRVB()"></div></div>
+      <div class="field"><label>Legal Fees</label><div class="field-row"><span class="field-prefix">&pound;</span><input type="number" id="rvb-legal" value="3000" step="100" oninput="calcRVB()"></div></div>
+      <div class="field"><label>Survey</label><div class="field-row"><span class="field-prefix">&pound;</span><input type="number" id="rvb-survey" value="800" step="100" oninput="calcRVB()"></div></div>
+      <div class="section-title">Assumptions</div>
+      <div class="field"><label>Capital Growth p.a.</label><div class="field-row"><span class="field-prefix">%</span><input type="number" id="rvb-growth" value="3" step="0.5" oninput="calcRVB()"></div></div>
+      <div class="field"><label>Comparison Period</label><div class="field-row"><input type="number" id="rvb-hold" value="10" step="1" oninput="calcRVB()"><span class="field-suffix">years</span></div></div>
+    </div>
+    <div class="results">
+      <div class="section-title" style="margin-top:0">Verdict</div>
+      <div class="verdict" id="rvb-verdict">
+        <div class="verdict-icon" id="rvb-icon">&#127968;</div>
+        <div>
+          <div class="verdict-title" id="rvb-title">&mdash;</div>
+          <div class="verdict-detail" id="rvb-detail">&mdash;</div>
+          <div class="verdict-break" id="rvb-break">&mdash;</div>
+        </div>
+      </div>
+      <div class="metrics">
+        <div class="metric-card"><div class="metric-label">Monthly Mortgage</div><div class="metric-value" id="rvb-m-mtg">&mdash;</div><div class="metric-sub">P&amp;I</div></div>
+        <div class="metric-card"><div class="metric-label">Monthly Rent</div><div class="metric-value" id="rvb-m-rent">&mdash;</div><div class="metric-sub">equivalent property</div></div>
+        <div class="metric-card highlight"><div class="metric-label">Break-even Year</div><div class="metric-value" id="rvb-m-be">&mdash;</div></div>
+      </div>
+      <div class="results-grid">
+        <div>
+          <div class="section-title">Total Cost of Buying</div>
+          <table>
+            <tr><td>Acquisition Costs</td><td id="rvb-t-acq">&mdash;</td></tr>
+            <tr><td>Mortgage Payments</td><td id="rvb-t-mtg">&mdash;</td></tr>
+            <tr><td>Maintenance &amp; Running</td><td id="rvb-t-run">&mdash;</td></tr>
+            <tr class="divider"><td colspan="2"></td></tr>
+            <tr class="bold"><td>Gross Cost</td><td id="rvb-t-gross">&mdash;</td></tr>
+            <tr><td>Capital Gain</td><td id="rvb-t-cg">&mdash;</td></tr>
+            <tr class="divider"><td colspan="2"></td></tr>
+            <tr class="bold"><td>Net Cost of Buying</td><td id="rvb-t-netbuy">&mdash;</td></tr>
+          </table>
+        </div>
+        <div>
+          <div class="section-title">Total Cost of Renting</div>
+          <table>
+            <tr><td>Total Rent Paid</td><td id="rvb-t-rent">&mdash;</td></tr>
+            <tr class="divider"><td colspan="2"></td></tr>
+            <tr class="bold"><td>Gross Cost</td><td id="rvb-t-rgross">&mdash;</td></tr>
+            <tr><td>Investment Return on Deposit</td><td id="rvb-t-inv">&mdash;</td></tr>
+            <tr class="divider"><td colspan="2"></td></tr>
+            <tr class="bold"><td>Net Cost of Renting</td><td id="rvb-t-netrent">&mdash;</td></tr>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div><!-- /tab-rvb -->
+
+  <!-- PROPERTY LENDING — You as Private Lender -->
+  <div id="tab-lend" class="hidden" style="padding:0;">
+
+    <!-- Lending sub-nav -->
+    <div class="prop-nav" id="lend-subnav">
+      <button class="pnav active" onclick="showLendTab('single',this)">Single Loan</button>
+      <button class="pnav" onclick="showLendTab('portfolio',this)">Portfolio</button>
+      <button class="pnav" onclick="showLendTab('lnotes',this)">Market Rate Guide</button>
+    </div>
+
+    <div style="padding:24px 32px;">
+
+    <!-- SINGLE LOAN — Lender's Return -->
+    <div id="lend-single" class="panel">
+      <div class="inputs">
+        <div class="section-title">Loan Structure (You as Lender)</div>
+        <div class="field"><label>Property Value (security)</label><div class="field-row"><span class="field-prefix">&pound;</span><input type="number" id="pl-propval" value="1500000" step="50000" oninput="calcPrivLend()"></div></div>
+        <div class="field"><label>LTV</label><div class="field-row"><span class="field-prefix">%</span><input type="number" id="pl-ltv" value="65" step="1" oninput="calcPrivLend()"></div><div class="field-note" id="pl-loan-note"></div></div>
+        <div class="field"><label>Interest Rate You Charge (p.a.)</label><div class="field-row"><span class="field-prefix">%</span><input type="number" id="pl-rate" value="9.5" step="0.25" oninput="calcPrivLend()"></div><div class="field-note" id="pl-rate-mo"></div></div>
+        <div class="field"><label>Loan Term</label><div class="field-row"><input type="number" id="pl-term" value="12" step="1" oninput="calcPrivLend()"><span class="field-suffix">months</span></div></div>
+        <div class="section-title">Fee Income (% of loan)</div>
+        <div class="field"><label>Arrangement Fee</label><div class="field-row"><span class="field-prefix">%</span><input type="number" id="pl-arr" value="1.0" step="0.25" oninput="calcPrivLend()"></div><div class="field-note" id="pl-arr-note"></div></div>
+        <div class="field"><label>Exit Fee</label><div class="field-row"><span class="field-prefix">%</span><input type="number" id="pl-exit" value="1.0" step="0.25" oninput="calcPrivLend()"></div><div class="field-note" id="pl-exit-note"></div></div>
+        <div class="section-title">Your Costs</div>
+        <div class="field"><label>Cost of Funds (p.a.)</label><div class="field-row"><span class="field-prefix">%</span><input type="number" id="pl-cof" value="5.0" step="0.25" oninput="calcPrivLend()"></div><div class="field-note">Your borrowing / opportunity cost</div></div>
+        <div class="field"><label>Admin / Servicing (p.a.)</label><div class="field-row"><span class="field-prefix">&pound;</span><input type="number" id="pl-admin" value="5000" step="500" oninput="calcPrivLend()"></div></div>
+        <div class="field"><label>Legal (your solicitor)</label><div class="field-row"><span class="field-prefix">&pound;</span><input type="number" id="pl-legal" value="2500" step="250" oninput="calcPrivLend()"></div></div>
+        <div class="section-title">Risk Provision</div>
+        <div class="field"><label>Probability of Default</label><div class="field-row"><span class="field-prefix">%</span><input type="number" id="pl-pd" value="2.0" step="0.5" oninput="calcPrivLend()"></div><div class="field-note">% of loans that default</div></div>
+        <div class="field"><label>Loss Given Default</label><div class="field-row"><span class="field-prefix">%</span><input type="number" id="pl-lgd" value="20" step="5" oninput="calcPrivLend()"></div><div class="field-note">% of loan lost after recovery</div></div>
+      </div>
+      <div class="results">
+        <div class="section-title" style="margin-top:0">Lender Returns — Single Loan</div>
+        <div class="metrics">
+          <div class="metric-card highlight"><div class="metric-label">Gross Yield</div><div class="metric-value" id="pl-m-grossyield">&mdash;</div><div class="metric-sub">interest + fees (ann.)</div></div>
+          <div class="metric-card highlight"><div class="metric-label">Net Yield</div><div class="metric-value" id="pl-m-netyield">&mdash;</div><div class="metric-sub">after costs, before loss</div></div>
+          <div class="metric-card highlight"><div class="metric-label">Risk-Adj. Yield</div><div class="metric-value" id="pl-m-riskyield">&mdash;</div><div class="metric-sub">after expected loss</div></div>
+          <div class="metric-card"><div class="metric-label">Net Profit (term)</div><div class="metric-value" id="pl-m-netprofit">&mdash;</div></div>
+          <div class="metric-card"><div class="metric-label">Capital Deployed</div><div class="metric-value" id="pl-m-capital">&mdash;</div><div class="metric-sub" id="pl-m-ltvsub">&mdash;</div></div>
+          <div class="metric-card"><div class="metric-label">Equity Buffer</div><div class="metric-value" id="pl-m-buffer">&mdash;</div><div class="metric-sub">borrower's equity at risk first</div></div>
+        </div>
+        <div class="results-grid">
+          <div>
+            <div class="section-title">Revenue (What You Earn)</div>
+            <table>
+              <tr><td>Gross Interest Income</td><td id="pl-r-int">&mdash;</td></tr>
+              <tr><td>Arrangement Fee</td><td id="pl-r-arr">&mdash;</td></tr>
+              <tr><td>Exit Fee</td><td id="pl-r-exit">&mdash;</td></tr>
+              <tr class="divider"><td colspan="2"></td></tr>
+              <tr class="bold"><td>Total Gross Revenue</td><td id="pl-r-total">&mdash;</td></tr>
+              <tr class="bold"><td>Gross Yield (annualised)</td><td id="pl-r-grossyield">&mdash;</td></tr>
+            </table>
+            <div class="section-title" style="margin-top:16px">Costs (What You Pay)</div>
+            <table>
+              <tr><td>Cost of Funds</td><td id="pl-c-cof">&mdash;</td></tr>
+              <tr><td>Admin / Servicing</td><td id="pl-c-admin">&mdash;</td></tr>
+              <tr><td>Legal Costs</td><td id="pl-c-legal">&mdash;</td></tr>
+              <tr class="divider"><td colspan="2"></td></tr>
+              <tr class="bold"><td>Total Costs</td><td id="pl-c-total">&mdash;</td></tr>
+            </table>
+          </div>
+          <div>
+            <div class="section-title">Profit &amp; Risk</div>
+            <table>
+              <tr class="bold"><td colspan="2" style="color:var(--accent)">Profit Before Provisions</td></tr>
+              <tr><td>Gross Revenue</td><td id="pl-p-rev">&mdash;</td></tr>
+              <tr><td>Less: Costs</td><td id="pl-p-costs">&mdash;</td></tr>
+              <tr class="divider"><td colspan="2"></td></tr>
+              <tr class="bold"><td>Net Profit (pre-loss)</td><td id="pl-p-preloss">&mdash;</td></tr>
+              <tr><td>Net Yield (annualised)</td><td id="pl-p-netyield">&mdash;</td></tr>
+              <tr class="divider"><td colspan="2"></td></tr>
+              <tr class="bold"><td colspan="2" style="color:var(--accent)">Expected Loss Provision</td></tr>
+              <tr><td>Probability of Default (PD)</td><td id="pl-p-pd">&mdash;</td></tr>
+              <tr><td>Loss Given Default (LGD)</td><td id="pl-p-lgd">&mdash;</td></tr>
+              <tr><td>Expected Loss = PD &times; LGD &times; Loan</td><td id="pl-p-el">&mdash;</td></tr>
+              <tr class="divider"><td colspan="2"></td></tr>
+              <tr class="bold"><td>Net Profit (after provisions)</td><td id="pl-p-net">&mdash;</td></tr>
+              <tr class="bold"><td>Risk-Adjusted Yield (ann.)</td><td id="pl-p-riskyield">&mdash;</td></tr>
+              <tr class="divider"><td colspan="2"></td></tr>
+              <tr class="bold"><td colspan="2" style="color:var(--accent)">Net Interest Margin</td></tr>
+              <tr><td>Interest earned</td><td id="pl-p-intearned">&mdash;</td></tr>
+              <tr><td>Less: cost of funds</td><td id="pl-p-cofcost">&mdash;</td></tr>
+              <tr class="bold"><td>NIM (annualised)</td><td id="pl-p-nim">&mdash;</td></tr>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PORTFOLIO -->
+    <div id="lend-portfolio" class="hidden">
+      <div class="section-title" style="margin-top:0">Portfolio Deployment Model</div>
+      <div style="display:grid;grid-template-columns:280px 1fr;gap:24px;">
+        <div class="inputs">
+          <div class="field"><label>Total Capital to Deploy</label><div class="field-row"><span class="field-prefix">&pound;</span><input type="number" id="pf-capital" value="5000000" step="500000" oninput="calcPortfolio()"></div></div>
+          <div class="field"><label>Avg Loan Size</label><div class="field-row"><span class="field-prefix">&pound;</span><input type="number" id="pf-avgloan" value="975000" step="25000" oninput="calcPortfolio()"></div></div>
+          <div class="field"><label>Avg Interest Rate (p.a.)</label><div class="field-row"><span class="field-prefix">%</span><input type="number" id="pf-rate" value="9.5" step="0.25" oninput="calcPortfolio()"></div></div>
+          <div class="field"><label>Avg Term</label><div class="field-row"><input type="number" id="pf-term" value="12" step="1" oninput="calcPortfolio()"><span class="field-suffix">months</span></div></div>
+          <div class="field"><label>Avg Arrangement Fee</label><div class="field-row"><span class="field-prefix">%</span><input type="number" id="pf-arr" value="1.0" step="0.25" oninput="calcPortfolio()"></div></div>
+          <div class="field"><label>Avg Exit Fee</label><div class="field-row"><span class="field-prefix">%</span><input type="number" id="pf-exit" value="1.0" step="0.25" oninput="calcPortfolio()"></div></div>
+          <div class="field"><label>Cost of Funds (p.a.)</label><div class="field-row"><span class="field-prefix">%</span><input type="number" id="pf-cof" value="5.0" step="0.25" oninput="calcPortfolio()"></div></div>
+          <div class="field"><label>PD (portfolio avg)</label><div class="field-row"><span class="field-prefix">%</span><input type="number" id="pf-pd" value="2.0" step="0.5" oninput="calcPortfolio()"></div></div>
+          <div class="field"><label>LGD (portfolio avg)</label><div class="field-row"><span class="field-prefix">%</span><input type="number" id="pf-lgd" value="20" step="5" oninput="calcPortfolio()"></div></div>
+          <div class="field"><label>Annual Overhead</label><div class="field-row"><span class="field-prefix">&pound;</span><input type="number" id="pf-overhead" value="50000" step="5000" oninput="calcPortfolio()"></div></div>
+        </div>
+        <div class="results">
+          <div class="metrics">
+            <div class="metric-card highlight"><div class="metric-label">Number of Loans</div><div class="metric-value" id="pf-m-loans">&mdash;</div></div>
+            <div class="metric-card highlight"><div class="metric-label">Annual Gross Revenue</div><div class="metric-value" id="pf-m-rev">&mdash;</div></div>
+            <div class="metric-card highlight"><div class="metric-label">Annual Net Profit</div><div class="metric-value" id="pf-m-net">&mdash;</div></div>
+            <div class="metric-card"><div class="metric-label">Gross Yield</div><div class="metric-value" id="pf-m-grossyield">&mdash;</div></div>
+            <div class="metric-card"><div class="metric-label">Risk-Adj. Yield</div><div class="metric-value" id="pf-m-riskyield">&mdash;</div></div>
+            <div class="metric-card"><div class="metric-label">Annual Exp. Loss</div><div class="metric-value" id="pf-m-loss">&mdash;</div></div>
+          </div>
+          <div class="results-grid">
+            <div>
+              <div class="section-title">Annual P&amp;L (assuming full deployment)</div>
+              <table>
+                <tr class="bold"><td colspan="2" style="color:var(--accent)">Revenue</td></tr>
+                <tr><td>Interest Income</td><td id="pf-t-int">&mdash;</td></tr>
+                <tr><td>Arrangement Fees (recycled)</td><td id="pf-t-arr">&mdash;</td></tr>
+                <tr><td>Exit Fees (recycled)</td><td id="pf-t-exit">&mdash;</td></tr>
+                <tr class="bold"><td>Total Gross Revenue</td><td id="pf-t-rev">&mdash;</td></tr>
+                <tr class="divider"><td colspan="2"></td></tr>
+                <tr class="bold"><td colspan="2" style="color:var(--accent)">Costs</td></tr>
+                <tr><td>Cost of Funds</td><td id="pf-t-cof">&mdash;</td></tr>
+                <tr><td>Overhead / Admin</td><td id="pf-t-overhead">&mdash;</td></tr>
+                <tr class="bold"><td>Total Costs</td><td id="pf-t-costs">&mdash;</td></tr>
+                <tr class="divider"><td colspan="2"></td></tr>
+                <tr class="bold"><td>EBITDA</td><td id="pf-t-ebitda">&mdash;</td></tr>
+                <tr><td>Expected Loss Provision</td><td id="pf-t-loss">&mdash;</td></tr>
+                <tr class="divider"><td colspan="2"></td></tr>
+                <tr class="bold"><td>Net Profit (risk-adjusted)</td><td id="pf-t-net">&mdash;</td></tr>
+              </table>
+            </div>
+            <div>
+              <div class="section-title">Capital Recycling (12-month cycle)</div>
+              <table>
+                <tr><td>Capital deployed</td><td id="pf-c-deployed">&mdash;</td></tr>
+                <tr><td>Avg loan term</td><td id="pf-c-term">&mdash;</td></tr>
+                <tr><td>Turns per year</td><td id="pf-c-turns">&mdash;</td></tr>
+                <tr><td>Gross capital cycled p.a.</td><td id="pf-c-cycled">&mdash;</td></tr>
+                <tr class="divider"><td colspan="2"></td></tr>
+                <tr><td colspan="2" style="font-size:11px;color:var(--muted);line-height:1.5">
+                  Capital recycling: as loans repay, capital is redeployed into new loans.
+                  With a 12-month avg term, you get ~1 turn/year. Shorter terms (6mo) let you cycle capital faster, boosting fee income.
+                </td></tr>
+              </table>
+              <div class="section-title" style="margin-top:16px">Risk Concentration</div>
+              <table>
+                <tr><td>Max single-loan exposure</td><td id="pf-c-maxexposure">&mdash;</td></tr>
+                <tr><td>Concentration limit (25%)</td><td id="pf-c-conclimit">&mdash;</td></tr>
+                <tr><td>Min loans for diversification</td><td id="pf-c-minloans">&mdash;</td></tr>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MARKET RATE GUIDE -->
+    <div id="lend-lnotes" class="hidden">
+      <div class="section-title" style="margin-top:0">UK Private Lending — Market Rate Guide (Apr 2026)</div>
+      <div class="results-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:24px;">
+        <div>
+          <div class="section-title">Bridging Loan Market</div>
+          <table>
+            <tr class="bold"><td colspan="2" style="color:var(--accent)">Typical Rate Structures</td></tr>
+            <tr><td>Monthly Interest Rate</td><td>0.55% – 1.25%</td></tr>
+            <tr><td>Annualised Rate</td><td>6.6% – 15.0%</td></tr>
+            <tr><td>Arrangement Fee</td><td>1% – 3% of loan</td></tr>
+            <tr><td>Exit Fee</td><td>0% – 2% of loan</td></tr>
+            <tr><td>Max LTV (standard)</td><td>65% – 75%</td></tr>
+            <tr><td>Term</td><td>6 – 24 months</td></tr>
+            <tr class="divider"><td colspan="2"></td></tr>
+            <tr class="bold"><td colspan="2" style="color:var(--accent)">Gross Yield to Lender (examples)</td></tr>
+            <tr><td>9.5% + 1% arr + 1% exit (12mo)</td><td style="font-weight:700">11.5% gross</td></tr>
+            <tr><td>9.5% + 2% arr + 1% exit (12mo)</td><td style="font-weight:700">12.5% gross</td></tr>
+            <tr><td>9.5% + 2% arr + 1% exit (6mo)</td><td style="font-weight:700">15.5% gross</td></tr>
+            <tr><td>12% + 2% arr + 1% exit (12mo)</td><td style="font-weight:700">15.0% gross</td></tr>
+            <tr class="divider"><td colspan="2"></td></tr>
+            <tr class="bold"><td colspan="2" style="color:var(--accent)">Interest Treatment Options</td></tr>
+            <tr><td colspan="2" style="font-size:11px;color:var(--muted);line-height:1.5">
+              <strong>Rolled up:</strong> Interest accrues &amp; is repaid at exit with principal. Borrower pays no monthly. Higher total revenue for lender but more risk concentration at exit.<br>
+              <strong>Serviced:</strong> Borrower pays interest monthly. Lender receives regular cashflow. Lower default risk as you monitor payments.<br>
+              <strong>Retained:</strong> Interest deducted from advance upfront. Lender's net capital out is lower. Guaranteed interest income regardless of default timing.
+            </td></tr>
+          </table>
+        </div>
+        <div>
+          <div class="section-title">Lender Risk &amp; Due Diligence</div>
+          <table>
+            <tr class="bold"><td colspan="2" style="color:var(--accent)">Default &amp; Recovery</td></tr>
+            <tr><td>UK bridging default rate</td><td>1% – 3%</td></tr>
+            <tr><td>Typical recovery (1st charge)</td><td>75% – 95%</td></tr>
+            <tr><td>Loss given default (net)</td><td>10% – 25%</td></tr>
+            <tr><td>Expected loss (PD &times; LGD)</td><td>0.2% – 0.6%</td></tr>
+            <tr class="divider"><td colspan="2"></td></tr>
+            <tr class="bold"><td colspan="2" style="color:var(--accent)">Security Requirements</td></tr>
+            <tr><td>Charge type</td><td>1st legal charge</td></tr>
+            <tr><td>Independent valuation</td><td>RICS Red Book</td></tr>
+            <tr><td>Title insurance</td><td>Required</td></tr>
+            <tr><td>Buildings insurance</td><td>Lender noted interest</td></tr>
+            <tr class="divider"><td colspan="2"></td></tr>
+            <tr class="bold"><td colspan="2" style="color:var(--accent)">Regulatory</td></tr>
+            <tr><td colspan="2" style="font-size:11px;color:var(--muted);line-height:1.5">
+              Unregulated bridging (investment / commercial) does not require FCA authorisation.
+              Regulated bridging (borrower's own home) requires FCA permissions.
+              Private lending to SPVs / investment borrowers = unregulated.
+              AML / KYC obligations still apply. Consider a nominee or trustee structure for multi-loan deployment.
+            </td></tr>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    </div><!-- /padding wrapper -->
+  </div><!-- /tab-lend -->
+
+  <!-- THE DIRT — Homesteading Research -->
+  <div id="tab-dirt" class="hidden" style="padding:0;">
+
+    <!-- Dirt sub-nav -->
+    <div class="prop-nav" id="dirt-subnav">
+      <button class="pnav active" onclick="showDirt('overview',this)">Regional Ranking</button>
+      <button class="pnav" onclick="showDirt('okanagan',this)">Okanagan / Sicamous</button>
+      <button class="pnav" onclick="showDirt('voices',this)">Community Voices</button>
+      <button class="pnav" onclick="showDirt('risks',this)">Risks & Regulation</button>
+      <button class="pnav" onclick="showDirt('sources',this)">Sources</button>
+    </div>
+
+    <div style="padding:24px 32px;">
+
+      <!-- Framing banner -->
+      <div class="prop-banner">
+        <div class="prop-banner-left">
+          <div class="prop-banner-name">The Dirt — Canadian Homesteading Research</div>
+          <div class="prop-banner-sub">Parallel thesis to the London BTL portfolio &middot; land, climate, water, regulation</div>
+          <div class="prop-banner-note">Working brief: where in Canada does a homestead actually pencil out for us? Balancing climate stability, water, soil fertility, growing season, land affordability, and regulatory friction. This tab consolidates agent, blog, and community research — it is NOT financial modelling.</div>
+        </div>
+        <div class="prop-banner-chips">
+          <span class="chip">Thesis: diversify UK rental exposure with CAD hard asset</span>
+        </div>
+      </div>
+
+      <!-- ================= OVERVIEW ================= -->
+      <div id="dirt-overview">
+        <div class="section-title" style="margin-top:0">Regional Ranking — Top Canadian Homestead Regions</div>
+        <div class="compare-wrap">
+          <table class="compare-tbl">
+            <thead>
+              <tr>
+                <th style="text-align:left;">Region</th>
+                <th style="text-align:left;">Climate</th>
+                <th style="text-align:left;">Water</th>
+                <th style="text-align:left;">Soil / Growing Season</th>
+                <th style="text-align:left;">Land Price</th>
+                <th style="text-align:left;">Tier</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="ref-row">
+                <td>Okanagan Valley, BC<br><span style="color:var(--muted);font-size:11px;">Sicamous, Vernon, Penticton, Osoyoos</span></td>
+                <td style="text-align:left;">Mild, semi-arid; hot summers, mild winters</td>
+                <td style="text-align:left;">Lakes + irrigation; drought risk rising</td>
+                <td style="text-align:left;">Fertile, fruit belt; long season</td>
+                <td style="text-align:left;">High &mdash; <span class="c-worst">premium</span></td>
+                <td style="text-align:left;"><span class="c-best">S &mdash; best all-round</span></td>
+              </tr>
+              <tr>
+                <td>Annapolis Valley, Nova Scotia</td>
+                <td style="text-align:left;">Maritime, moderate; Fundy moderates temps</td>
+                <td style="text-align:left;"><span class="c-best">Excellent</span>; top source-water protection</td>
+                <td style="text-align:left;">Very fertile, ocean-moderated</td>
+                <td style="text-align:left;">Reasonable</td>
+                <td style="text-align:left;"><span class="c-best">S &mdash; best balance</span></td>
+              </tr>
+              <tr>
+                <td>Southern New Brunswick (Fundy shore)</td>
+                <td style="text-align:left;">Cool summers, mild wet winters, humid; bugs</td>
+                <td style="text-align:left;">Abundant; coastal access</td>
+                <td style="text-align:left;">Variable &mdash; inland NB often soil-poor</td>
+                <td style="text-align:left;"><span class="c-best">Most affordable in CA</span></td>
+                <td style="text-align:left;">A &mdash; best affordability</td>
+              </tr>
+              <tr>
+                <td>Southern Vancouver Island, BC</td>
+                <td style="text-align:left;">Mildest winters in Canada; near-year-round growing</td>
+                <td style="text-align:left;">Excellent</td>
+                <td style="text-align:left;">Fertile; long season</td>
+                <td style="text-align:left;">Very high; accessible parcels scarce</td>
+                <td style="text-align:left;">A &mdash; lifestyle pick</td>
+              </tr>
+              <tr>
+                <td>PEI / Newfoundland</td>
+                <td style="text-align:left;">Gulf Stream moderated; mild</td>
+                <td style="text-align:left;">Abundant; island access</td>
+                <td style="text-align:left;">Fertile (PEI especially); warm growing</td>
+                <td style="text-align:left;">Reasonable</td>
+                <td style="text-align:left;">A &mdash; recent PEI bylaw friction</td>
+              </tr>
+              <tr>
+                <td>Southern Ontario (Norfolk, Niagara, SW)</td>
+                <td style="text-align:left;">Long growing season; summers hot</td>
+                <td style="text-align:left;"><span class="c-best">Great Lakes &mdash; unmatched access</span></td>
+                <td style="text-align:left;"><span class="c-best">Most fertile farmland in CA</span></td>
+                <td style="text-align:left;"><span class="c-worst">Outrageous</span></td>
+                <td style="text-align:left;">B &mdash; priced out</td>
+              </tr>
+              <tr>
+                <td>Eastern Ontario / Ottawa Valley<br><span style="color:var(--muted);font-size:11px;">NW of Peterborough, Belleville</span></td>
+                <td style="text-align:left;">Moderate; 401 corridor moderates isolation</td>
+                <td style="text-align:left;">Good rivers &amp; lakes</td>
+                <td style="text-align:left;">Decent; shorter than SW ON</td>
+                <td style="text-align:left;">Moderate</td>
+                <td style="text-align:left;">B &mdash; infra + affordability</td>
+              </tr>
+              <tr>
+                <td>Alberta Foothills (Calgary&ndash;Edmonton corridor)</td>
+                <td style="text-align:left;">Rain-shadow drought; polar vortex</td>
+                <td style="text-align:left;">Variable; drought-prone</td>
+                <td style="text-align:left;">Fertile where watered; short season</td>
+                <td style="text-align:left;">Moderate &mdash; rising</td>
+                <td style="text-align:left;">B &mdash; fire + drought risk</td>
+              </tr>
+              <tr>
+                <td>Northern-ish Alberta</td>
+                <td style="text-align:left;">Long cold winters; wetter than foothills</td>
+                <td style="text-align:left;">Good; pond / dugout common</td>
+                <td style="text-align:left;">Zone 3a; short season but workable</td>
+                <td style="text-align:left;"><span class="c-best">Cheap</span></td>
+                <td style="text-align:left;">B &mdash; value play</td>
+              </tr>
+              <tr>
+                <td>Southern Manitoba / Saskatchewan</td>
+                <td style="text-align:left;">Extreme temps; Prairie winds</td>
+                <td style="text-align:left;">Variable; drought risk</td>
+                <td style="text-align:left;">Excellent Prairie soil; short season</td>
+                <td style="text-align:left;"><span class="c-best">Lowest in CA</span></td>
+                <td style="text-align:left;">C &mdash; climate tough</td>
+              </tr>
+              <tr>
+                <td>Rural Quebec</td>
+                <td style="text-align:left;">Cold winters; moderate summers</td>
+                <td style="text-align:left;">Abundant</td>
+                <td style="text-align:left;">Decent in hills/mountains</td>
+                <td style="text-align:left;">Reasonable</td>
+                <td style="text-align:left;">C &mdash; French required</td>
+              </tr>
+              <tr>
+                <td>Whitehorse / Yukon / Territories</td>
+                <td style="text-align:left;"><span class="c-worst">Extreme; long bleak winters</span></td>
+                <td style="text-align:left;">Available but frozen much of year</td>
+                <td style="text-align:left;">Very short season</td>
+                <td style="text-align:left;">Cheap; free Yukon land after 1yr residency</td>
+                <td style="text-align:left;">D &mdash; for the committed only</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="compare-legend" style="margin-top:14px;">
+          <strong style="color:var(--accent);">Short list (James &amp; Allegra working picks):</strong>
+          Okanagan / Sicamous (S) &middot; Annapolis Valley NS (S) &middot; Southern NB (A &mdash; affordability) &middot; Southern Vancouver Island (A &mdash; climate) &middot; Eastern Ontario (B &mdash; proximity hedge)
+        </div>
+
+        <div class="section-title">Criteria Snapshot</div>
+        <div class="metrics" style="grid-template-columns:repeat(4,1fr);">
+          <div class="metric-card highlight"><div class="metric-label">Best Climate</div><div class="metric-value" style="font-size:16px;">Victoria / S. Van. Is.</div><div class="metric-sub">Okanagan &mdash; best heat+mild winter combo</div></div>
+          <div class="metric-card highlight"><div class="metric-label">Best Water</div><div class="metric-value" style="font-size:16px;">BC &amp; Ontario</div><div class="metric-sub">Great Lakes / BC interior lakes</div></div>
+          <div class="metric-card highlight"><div class="metric-label">Best Soil</div><div class="metric-value" style="font-size:16px;">S. Ontario / NS</div><div class="metric-sub">Norfolk County &middot; Annapolis Valley</div></div>
+          <div class="metric-card highlight"><div class="metric-label">Best Affordability</div><div class="metric-value" style="font-size:16px;">NB &middot; SK/MB</div><div class="metric-sub">NB = freest + cheapest combined</div></div>
+        </div>
+      </div>
+
+      <!-- ================= OKANAGAN / SICAMOUS ================= -->
+      <div id="dirt-okanagan" class="hidden">
+        <div class="section-title" style="margin-top:0">Okanagan Valley &amp; Sicamous Deep Dive</div>
+
+        <div class="panel" style="grid-template-columns:1fr 1fr;">
+          <div>
+            <div class="section-title" style="margin-top:0">Why the Okanagan is the consensus pick</div>
+            <table>
+              <tr><td style="color:var(--text);">Climate</td><td>Mild, semi-arid; hot summers, mild winters</td></tr>
+              <tr><td style="color:var(--text);">Growing season</td><td>Long &mdash; fruit, vineyards, livestock</td></tr>
+              <tr><td style="color:var(--text);">Water</td><td>Lakes everywhere; irrigation infra mature</td></tr>
+              <tr><td style="color:var(--text);">Geology</td><td>Far from Cascadia Subduction Zone &mdash; low earthquake/tsunami exposure</td></tr>
+              <tr><td style="color:var(--text);">Community</td><td>Sicamous, Osoyoos, Penticton, Vernon &mdash; small, real</td></tr>
+              <tr><td style="color:var(--text);">Commerce</td><td>Strong tourism = market for farm-stand, handicrafts, jams</td></tr>
+            </table>
+
+            <div class="section-title">Red Flags</div>
+            <table>
+              <tr><td style="color:var(--red);">Wildfires</td><td>Interior BC has had severe fire seasons; smoke weeks at a time</td></tr>
+              <tr><td style="color:var(--red);">Land price</td><td>"Crazy expensive" &mdash; lot of short-list properties out of reach</td></tr>
+              <tr><td style="color:var(--red);">Access &amp; hydro</td><td>Land without power/road often costs MORE than the land itself</td></tr>
+              <tr><td style="color:var(--red);">Mosquitoes</td><td>Thick 1&ndash;2 weeks a year</td></tr>
+              <tr><td style="color:var(--red);">Mountains</td><td>Pretty to look at, hard to homestead on; adds infra cost</td></tr>
+              <tr><td style="color:var(--red);">Regulation</td><td>BC recently passed anti-homesteading / off-grid restrictions &mdash; verify bylaws on any short-list parcel</td></tr>
+              <tr><td style="color:var(--red);">No free land</td><td>BC does NOT offer homestead land &mdash; private purchase only</td></tr>
+            </table>
+          </div>
+
+          <div>
+            <div class="section-title" style="margin-top:0">Practical Start-Small Playbook</div>
+            <table>
+              <tr><td style="color:var(--text);">Tiny house / cabin first</td><td>Test the lifestyle before committing to full build</td></tr>
+              <tr><td style="color:var(--text);">Parcel with existing power + road</td><td>Non-negotiable unless budget allows for infra separately</td></tr>
+              <tr><td style="color:var(--text);">Community</td><td>Neighbour network matters &mdash; self-reliance is a fantasy anywhere</td></tr>
+              <tr><td style="color:var(--text);">Distance to town</td><td>30-min drive to grocery/hospital typical &amp; acceptable</td></tr>
+              <tr><td style="color:var(--text);">Wildfire mitigation</td><td>Defensible space, metal roof, irrigation pond, FireSmart audit</td></tr>
+              <tr><td style="color:var(--text);">Listings</td><td>LandQuest &mdash; primary BC rural listings source</td></tr>
+            </table>
+
+            <div class="section-title">Starter Crop Priorities</div>
+            <table>
+              <tr><td style="color:var(--text);">Potatoes</td><td>Calorie dense, store &gt; 6 months, self-seeding</td></tr>
+              <tr><td style="color:var(--text);">Winter squash (butternut)</td><td>Stores &sim; 1 year at room temp</td></tr>
+              <tr><td style="color:var(--text);">Beans (green + dried)</td><td>Nitrogen fixers, dual purpose</td></tr>
+              <tr><td style="color:var(--text);">Tomatoes</td><td>Sauce/paste/fresh &mdash; heavy producer</td></tr>
+              <tr><td style="color:var(--text);">Herbs (basil, rosemary)</td><td>Highest grocery mark-up &mdash; biggest savings per m&sup2;</td></tr>
+              <tr><td style="color:var(--text);">Perennials</td><td>Rhubarb, asparagus, fruit &amp; nut trees &mdash; long horizon ROI</td></tr>
+            </table>
+
+            <div class="section-title">Livestock Starter (climate permitting)</div>
+            <table>
+              <tr><td style="color:var(--text);">Chickens + ducks</td><td>Eggs + meat; easiest first livestock</td></tr>
+              <tr><td style="color:var(--text);">Sheep / goats</td><td>Meat + milk; &sim; acre per head rough rule</td></tr>
+              <tr><td style="color:var(--text);">Cows</td><td>Space-hungry; needs pasture + hay setup</td></tr>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ================= COMMUNITY VOICES ================= -->
+      <div id="dirt-voices" class="hidden">
+        <div class="section-title" style="margin-top:0">Community Voices &mdash; Region-by-Region</div>
+        <div style="color:var(--muted);font-size:12px;margin-bottom:16px;font-style:italic;">Curated quotes from r/homestead, r/Homesteading, r/britishcolumbia. Treated as lived-experience signal, not authoritative.</div>
+
+        <div class="section-title">Okanagan / BC Interior</div>
+        <div style="background:var(--card);border-left:3px solid var(--accent);padding:12px 16px;margin-bottom:10px;border-radius:4px;">
+          <div style="color:var(--text);">"My top choice would be the lake country around Sicamous B.C. Surrounded by mountains, climate is mild and wet enough to grow lots of produce, lots of lakes nearby for recreation, and a strong tourism industry means plenty of people coming through who would buy handicrafts/jams from the farm stand as souvenirs."</div>
+          <div style="color:var(--muted);font-size:11px;margin-top:6px;">&mdash; r/homestead, lostINsauce369</div>
+        </div>
+        <div style="background:var(--card);border-left:3px solid var(--red);padding:12px 16px;margin-bottom:10px;border-radius:4px;">
+          <div style="color:var(--text);">"The interior parts of BC are getting hit with some pretty extreme wild fires in the last few years. I had a few times when the smoke was worse than I could ever imagine. I loved the Okanagan area, all the way down into the States. Just take wild fire danger into account."</div>
+          <div style="color:var(--muted);font-size:11px;margin-top:6px;">&mdash; r/homestead, MontEcola (lived in Vernon)</div>
+        </div>
+        <div style="background:var(--card);border-left:3px solid var(--muted);padding:12px 16px;margin-bottom:10px;border-radius:4px;">
+          <div style="color:var(--text);">"I work remotely from a farm in the interior. My closest grocery store and hospital are maybe a half hour drive away max, we have a general store and gas station close by."</div>
+          <div style="color:var(--muted);font-size:11px;margin-top:6px;">&mdash; r/britishcolumbia</div>
+        </div>
+
+        <div class="section-title">Maritimes (NB / NS / PEI)</div>
+        <div style="background:var(--card);border-left:3px solid var(--green);padding:12px 16px;margin-bottom:10px;border-radius:4px;">
+          <div style="color:var(--text);">"NB or NS near the Fundy shore. The ocean acts as a heat sink giving cool summers and mild winters with lots of rain." &mdash; "You don't have to be far inland from shore before the elevation is safe while still benefitting from the localized climate."</div>
+          <div style="color:var(--muted);font-size:11px;margin-top:6px;">&mdash; r/Homesteading, MisterCanoeHead</div>
+        </div>
+        <div style="background:var(--card);border-left:3px solid var(--green);padding:12px 16px;margin-bottom:10px;border-radius:4px;">
+          <div style="color:var(--text);">"NB is the most affordable province when it comes to cost of land compared to local incomes, without being too isolated. It's also the freest province in Canada that I know of when it comes to regulations. Also great scenery that most people never see because the trans Canada highway bypassed all of it. It's got all the beauty of Nova Scotia but you have these special places all to yourself."</div>
+          <div style="color:var(--muted);font-size:11px;margin-top:6px;">&mdash; r/homestead, Choosemyusername</div>
+        </div>
+        <div style="background:var(--card);border-left:3px solid var(--accent);padding:12px 16px;margin-bottom:10px;border-radius:4px;">
+          <div style="color:var(--text);">"Inland NB had less wind but voracious blackflies and no soil to grow food (we're buying and building our own soil.) but there are less ridiculous bylaws here. Gardening in PEI was the best I've had in Canada (lived in five provinces) but the bylaw situation there is becoming atrocious."</div>
+          <div style="color:var(--muted);font-size:11px;margin-top:6px;">&mdash; r/homestead, Stunning-Ad1956 (25 years in Atlantic CA)</div>
+        </div>
+
+        <div class="section-title">Ontario</div>
+        <div style="background:var(--card);border-left:3px solid var(--green);padding:12px 16px;margin-bottom:10px;border-radius:4px;">
+          <div style="color:var(--text);">"I'm currently in SW Ontario. Our location is pretty hard to beat: long growing season, low fire risk, lots of water available, relatively moderate climate, services/supplies readily available and not too far away. On the downside, it is a bit hotter than I'd like in the summer. But the biggest downside is the cost of land. Simply outrageous."</div>
+          <div style="color:var(--muted);font-size:11px;margin-top:6px;">&mdash; r/Homesteading, jollygreengiant1655</div>
+        </div>
+        <div style="background:var(--card);border-left:3px solid var(--accent);padding:12px 16px;margin-bottom:10px;border-radius:4px;">
+          <div style="color:var(--text);">"We are near Belleville. It's a forgotten corner of the province, with access to Toronto and Kingston on the 401, train service and good stores 15 minutes away."</div>
+          <div style="color:var(--muted);font-size:11px;margin-top:6px;">&mdash; r/homestead, FrostyProspector</div>
+        </div>
+        <div style="background:var(--card);border-left:3px solid var(--accent);padding:12px 16px;margin-bottom:10px;border-radius:4px;">
+          <div style="color:var(--text);">"I'm west of Ottawa and you could even go a bit further north for cheaper land and a climate that is tending in a manner (at least temperature wide) that is better for food production."</div>
+          <div style="color:var(--muted);font-size:11px;margin-top:6px;">&mdash; r/Homesteading, Automatic-Bake9847</div>
+        </div>
+
+        <div class="section-title">Alberta</div>
+        <div style="background:var(--card);border-left:3px solid var(--accent);padding:12px 16px;margin-bottom:10px;border-radius:4px;">
+          <div style="color:var(--text);">"We left coastal BC for northern-ish Alberta. Fire season is more spring now here than summer on the coast, but summers are wetter than the coast has become. We never water our grass here and it's green and lush. It's also more affordable. 70 acres of beautiful mixed land &mdash; 30 trees, 15 pasture, 15 hay, 3 saskatoon orchard, 2 mixed fruit orchard."</div>
+          <div style="color:var(--muted);font-size:11px;margin-top:6px;">&mdash; r/Homesteading, Rheila</div>
+        </div>
+        <div style="background:var(--card);border-left:3px solid var(--red);padding:12px 16px;margin-bottom:10px;border-radius:4px;">
+          <div style="color:var(--text);">"Alberta recently introduced a package of laws clamping down on off-gridding/homesteading."</div>
+          <div style="color:var(--muted);font-size:11px;margin-top:6px;">&mdash; r/homestead, Choosemyusername</div>
+        </div>
+
+        <div class="section-title">Climate-Modelling Take</div>
+        <div style="background:var(--card);border-left:3px solid var(--red);padding:12px 16px;margin-bottom:10px;border-radius:4px;">
+          <div style="color:var(--text);">"Do some climate modelling and projections. Alberta through to Quebec are basically fucked because of polar vortex oscillations (-40 one week, +10 the next). Alberta is fucked because of drought (rain shadow of the Rockies). BC is fucked because of fires and drought. That basically leaves the maritimes which will get hurricanes and winter windstorms and drought but overall will have less extreme shifts in your lifetime."</div>
+          <div style="color:var(--muted);font-size:11px;margin-top:6px;">&mdash; r/homestead, Erinaceous</div>
+        </div>
+      </div>
+
+      <!-- ================= RISKS & REGULATION ================= -->
+      <div id="dirt-risks" class="hidden">
+        <div class="section-title" style="margin-top:0">Climate &amp; Geophysical Risks</div>
+        <table>
+          <tr class="bold"><td>Risk</td><td>Where it hits</td></tr>
+          <tr><td style="color:var(--text);">Wildfire</td><td>BC interior (Okanagan), AB foothills. Worsening year-on-year. Demands defensible space, metal roof, firebreak.</td></tr>
+          <tr><td style="color:var(--text);">Polar vortex swing</td><td>AB through QC &mdash; -40&deg;C to +10&deg;C in a week. Brutal for livestock, plumbing, perennials.</td></tr>
+          <tr><td style="color:var(--text);">Drought</td><td>AB rain-shadow of Rockies; BC interior increasingly. Water-storage planning essential.</td></tr>
+          <tr><td style="color:var(--text);">Hurricanes / windstorms</td><td>Maritimes &mdash; manageable, rare, insured.</td></tr>
+          <tr><td style="color:var(--text);">Cascadia earthquake / tsunami</td><td>Coastal BC &amp; Vancouver Island. Okanagan far enough inland to be safe.</td></tr>
+          <tr><td style="color:var(--text);">Humid / bug load</td><td>NB summers; inland NB blackflies voracious.</td></tr>
+        </table>
+
+        <div class="section-title">Regulatory Friction (current as of 2026)</div>
+        <table>
+          <tr class="bold"><td>Province</td><td>Regulatory posture</td></tr>
+          <tr><td style="color:var(--green);">New Brunswick</td><td>Freest province for off-grid / homesteading. Few restrictive bylaws.</td></tr>
+          <tr><td style="color:var(--accent);">PEI</td><td>Gardening great &mdash; but bylaw situation "becoming atrocious" per long-term residents.</td></tr>
+          <tr><td style="color:var(--red);">Nova Scotia</td><td>Recently passed anti off-gridding / homesteading rules.</td></tr>
+          <tr><td style="color:var(--red);">British Columbia</td><td>Recent anti-homesteading / off-grid regulation. No government homestead land &mdash; private purchase only.</td></tr>
+          <tr><td style="color:var(--red);">Alberta</td><td>Recent package of laws clamping down on off-gridding.</td></tr>
+          <tr><td style="color:var(--accent);">Ontario</td><td>Limiting foreign ownership of farmland (aligning with MB/SK). Bylaws vary heavily by municipality.</td></tr>
+          <tr><td style="color:var(--accent);">Manitoba / Saskatchewan</td><td>Foreign-ownership restrictions on agricultural land.</td></tr>
+          <tr><td style="color:var(--accent);">Quebec</td><td>French language required for most services &amp; admin. Affordable rural land.</td></tr>
+          <tr><td style="color:var(--green);">Yukon</td><td>Canadian citizens resident for 1+ year can receive FREE homestead land, subject to farm-it requirement.</td></tr>
+        </table>
+
+        <div class="section-title">Hidden Costs Checklist</div>
+        <table>
+          <tr><td style="color:var(--text);">Road access</td><td>Unpaved parcels: grading, gravel, winter plowing. "Helicopter or boat only" = hard no unless lifestyle match.</td></tr>
+          <tr><td style="color:var(--text);">Hydro connection</td><td>Off-grid parcels: connection can exceed land price. Budget solar + battery if remote.</td></tr>
+          <tr><td style="color:var(--text);">Well + septic</td><td>&pound;15k&ndash;&pound;40k CAD equivalent installation, plus ongoing maintenance.</td></tr>
+          <tr><td style="color:var(--text);">Soil remediation</td><td>Inland NB + rocky BC often need built soil &mdash; years of compost + import.</td></tr>
+          <tr><td style="color:var(--text);">Insurance</td><td>Wildfire zones + flood zones inflate premiums &mdash; or refuse coverage altogether.</td></tr>
+          <tr><td style="color:var(--text);">Distance tax</td><td>Fuel, vet calls, parts delivery &mdash; 30-min-to-town adds up.</td></tr>
+        </table>
+      </div>
+
+      <!-- ================= SOURCES ================= -->
+      <div id="dirt-sources" class="hidden">
+        <div class="section-title" style="margin-top:0">Sources &amp; Further Reading</div>
+
+        <div class="section-title">Agent / Blog</div>
+        <table>
+          <tr>
+            <td style="color:var(--text);">Lucky Penny Homes &mdash; <em>The Best Homesteading Areas in Canada</em></td>
+            <td><a class="tbl-link" href="https://luckypennyhomes.com/blog/f/the-best-homesteading-areas-in-canada" target="_blank" rel="noopener">luckypennyhomes.com &rarr;</a></td>
+          </tr>
+          <tr>
+            <td style="color:var(--text);">LandQuest &mdash; BC rural property listings (recommended by BC homesteaders)</td>
+            <td><a class="tbl-link" href="https://www.landquest.com/" target="_blank" rel="noopener">landquest.com &rarr;</a></td>
+          </tr>
+        </table>
+
+        <div class="section-title">Community Threads</div>
+        <table>
+          <tr>
+            <td style="color:var(--text);">r/homestead &mdash; <em>Where would you build your homestead in Canada?</em></td>
+            <td><a class="tbl-link" href="https://www.reddit.com/r/homestead/" target="_blank" rel="noopener">reddit.com/r/homestead &rarr;</a></td>
+          </tr>
+          <tr>
+            <td style="color:var(--text);">r/Homesteading &mdash; <em>Where is the best place to homestead in Canada?</em></td>
+            <td><a class="tbl-link" href="https://www.reddit.com/r/Homesteading/" target="_blank" rel="noopener">reddit.com/r/Homesteading &rarr;</a></td>
+          </tr>
+          <tr>
+            <td style="color:var(--text);">r/britishcolumbia &mdash; <em>Homesteading in B.C.</em></td>
+            <td><a class="tbl-link" href="https://www.reddit.com/r/britishcolumbia/" target="_blank" rel="noopener">reddit.com/r/britishcolumbia &rarr;</a></td>
+          </tr>
+        </table>
+
+        <div class="section-title">Next Research Steps</div>
+        <table>
+          <tr><td style="color:var(--text);">1. Shortlist 3 regions</td><td>Okanagan vs. Annapolis Valley vs. Southern NB &mdash; get cost-of-land comparables</td></tr>
+          <tr><td style="color:var(--text);">2. Climate modelling</td><td>30-year projections for each shortlist (fire, drought, frost-free days)</td></tr>
+          <tr><td style="color:var(--text);">3. Bylaw audit</td><td>For any specific parcel: livestock allowed? outbuilding permits? off-grid OK?</td></tr>
+          <tr><td style="color:var(--text);">4. Infrastructure cost walk</td><td>Road, hydro, well, septic &mdash; get quotes for a representative parcel</td></tr>
+          <tr><td style="color:var(--text);">5. Tiny-house test</td><td>Rent / build small on candidate region before full commit</td></tr>
+          <tr><td style="color:var(--text);">6. Build the financial tab</td><td>Once shortlist narrows: add a Homestead P&amp;L tab (land + infra + annual food-offset &amp; resale)</td></tr>
+        </table>
+      </div>
+
+    </div><!-- /padding wrapper -->
+  </div><!-- /tab-dirt -->
+
+</div><!-- /content -->
+
+<div class="footer">
+  For indicative modelling only &middot; Not financial advice &middot; SDLT rates reflect additional dwelling 5% surcharge (Oct 2024 Budget) + Non-Resident 2% surcharge &middot; Nil-rate band &pound;125k (from Apr 2025) &middot; MDR abolished June 2024 &middot;
+  Corp Tax 25% flat rate (no small profits relief for non-resident companies) &middot; Prices &amp; rents marked <em>est.</em> are estimates not confirmed by agent &middot;
+  Historical data: ONS UK HPI &middot; Forecasts: Savills &middot; Consult a qualified accountant and solicitor before transacting
+</div>
+
+<script>
+// =====================================================================
+// LONDON PRICE HISTORY — Annual % Change
+// =====================================================================
+// Asset-specific: Freehold residential flat blocks (3-5 units)
+// along the Elizabeth line corridor.
+//
+// Methodology: ONS UK HPI London Flats & Maisonettes as base,
+// adjusted for: (a) freehold premium over leasehold (avoids cladding/
+// ground rent/service charge discount that drags down flat index);
+// (b) Elizabeth line corridor premium (stations opened May 2022,
+// properties within 15 min walk outperformed London avg by 2-4% p.a.).
+//
+// Sources:
+//   Actual base: ONS UK HPI — London, Flats & Maisonettes (Dec y/y)
+//   Flats underperformance: -1.2% Nov 2025, -2.8% Oct 2023 (England)
+//   Elizabeth line effect: Ealing +9% yoy May 2025, corridor +4.4%
+//     since May 2022 opening (Zoopla, Rightmove Hub)
+//   Freehold premium: freehold blocks trade 8-15% above comparable
+//     leasehold due to no ground rent, no service charge risk, and
+//     post-Grenfell cladding exemption
+//   Forecast: Savills Mainstream London 2026-2030 + ~1% Elizabeth
+//     line premium (tapering as effect matures)
+//
+const LONDON_PRICE_DATA = {
+  // ── Actual: Freehold flat blocks, Elizabeth line corridor ──
+  // (ONS London flats base, adjusted +1-2% for freehold/corridor)
+  2007: { pct:  7.0, type: 'actual',  note: 'Pre-crash peak; flats slightly lagged overall London (+8.0%)' },
+  2008: { pct: -8.5, type: 'actual',  note: 'GFC crash; flats held slightly better than houses (-9.1% all-property)' },
+  2009: { pct:  3.0, type: 'actual',  note: 'Recovery began Q2; flats lagged houses in bounce' },
+  2010: { pct:  5.2, type: 'actual',  note: 'Broad recovery; similar across types' },
+  2011: { pct: -1.0, type: 'actual',  note: 'Eurozone crisis drag; flats weaker than all-property (-0.6%)' },
+  2012: { pct:  0.5, type: 'actual',  note: 'Flat market; pre-boom' },
+  2013: { pct: 10.5, type: 'actual',  note: 'Boom begins; Help to Buy. Flats lagged houses slightly (all-property +11.2%)' },
+  2014: { pct: 16.0, type: 'actual',  note: 'Peak London boom; flats underperformed detached (all-property +17.4%)' },
+  2015: { pct:  8.0, type: 'actual',  note: 'Late-cycle growth; flats starting to cool (all-property +9.0%)' },
+  2016: { pct:  5.5, type: 'actual',  note: 'Brexit vote + SDLT 3% surcharge hit investors; Crossrail anticipation offset' },
+  2017: { pct:  1.5, type: 'actual',  note: 'London flats stalled; oversupply of new-build flats dragged index' },
+  2018: { pct: -1.5, type: 'actual',  note: 'London flats fell; freehold blocks held up better than leasehold' },
+  2019: { pct: -0.5, type: 'actual',  note: 'Brexit uncertainty; leasehold reform concerns hit flat market' },
+  2020: { pct:  2.0, type: 'actual',  note: 'COVID "race for space" hit flats hard (+3.5% all-prop); freehold blocks with gardens fared better' },
+  2021: { pct:  4.0, type: 'actual',  note: 'Stamp duty holiday; flats recovered less than houses (all-property +5.5%)' },
+  2022: { pct:  5.5, type: 'actual',  note: 'Elizabeth line opened May 2022; corridor premium emerges. London flats +4.0%, freehold/EL blocks +5.5%' },
+  2023: { pct: -4.0, type: 'actual',  note: 'Rate shock; flats fell further (-5.5%) but freehold/EL corridor held up better' },
+  2024: { pct:  0.5, type: 'actual',  note: 'London flats -0.3% (Jun 2024 ONS); freehold EL blocks slightly positive on corridor demand' },
+  2025: { pct: -0.5, type: 'actual',  note: 'London flats -1.2% (Nov 2025 ONS); freehold premium and EL effect cushions to -0.5%' },
+  // ── Forecast: Savills London base + ~1% Elizabeth line premium ──
+  2026: { pct:  1.0, type: 'forecast', note: 'Savills London 0.0%; EL corridor premium +1% as connectivity matures' },
+  2027: { pct:  3.0, type: 'forecast', note: 'Savills London +2.0%; affordability gap closing drives catch-up in outer zones' },
+  2028: { pct:  4.5, type: 'forecast', note: 'Savills London +3.5%; EL corridor approaching peak premium' },
+  2029: { pct:  5.0, type: 'forecast', note: 'Savills London +4.5%; freehold scarcity value supporting premium' },
+  2030: { pct:  3.5, type: 'forecast', note: 'Savills London +3.0%; EL premium stabilising' },
+  // ── Extrapolation (2031–2037) ──
+  // EL premium tapers to ~0.5% as fully priced in; long-term ~3% p.a.
+  2031: { pct:  3.5, type: 'extrapolation' },
+  2032: { pct:  3.5, type: 'extrapolation' },
+  2033: { pct:  3.0, type: 'extrapolation' },
+  2034: { pct:  3.0, type: 'extrapolation' },
+  2035: { pct:  3.0, type: 'extrapolation' },
+  2036: { pct:  2.5, type: 'extrapolation' },
+  2037: { pct:  2.5, type: 'extrapolation' }
+};
+
+// Build London index (2007 = 100)
+const YEARS = Object.keys(LONDON_PRICE_DATA).map(Number).sort((a,b)=>a-b);
+const LONDON_INDEX = {};
+LONDON_INDEX[2006] = 100; // base
+YEARS.forEach(y => {
+  LONDON_INDEX[y] = LONDON_INDEX[y-1] * (1 + LONDON_PRICE_DATA[y].pct / 100);
+});
+
+// =====================================================================
+// ATED BANDS 2025-26 (properties held in company wrappers)
+// =====================================================================
+function getATEDBand(value) {
+  if (value <= 500000) return 0;
+  if (value <= 1000000) return 4400;
+  if (value <= 2000000) return 9000;
+  if (value <= 5000000) return 30550;
+  if (value <= 10000000) return 71500;
+  if (value <= 20000000) return 143550;
+  return 287550;
+}
+
+// =====================================================================
+// PROPERTY DATA
+// =====================================================================
+const PROPS = [
+  {
+    id: 'p1', badge: '⭐', ref: true,
+    name: 'Argyle Road, West Ealing W13',
+    sub: '4 self-contained flats · West Ealing Elizabeth line · Zone 3',
+    agent_name: 'Savills, Ealing',
+    note: 'Price confirmed on Rightmove (Savills). 4-unit freehold block, walking distance West Ealing Elizabeth line station. Est. £1,500/flat/mo. Refurb allowance for cosmetic updates.',
+    url: 'https://www.rightmove.co.uk/properties/164903600',
+    url_label: 'Rightmove',
+    price: 1650000, dep: 25, rate: 5.5, term: 25,
+    rent: 6000, void_: 1,
+    agent: 10, maint: 1.5, ins: 2400, gr: 0, sc: 0,
+    legal: 3500, survey: 1200, refurb: 15000,
+    growth: 3.5, hold: 10, tax: 25,
+    price_est: false, rent_est: true, units: 4
+  },
+  {
+    id: 'p2', badge: '2', ref: false,
+    name: 'Woodhill, Greenwich SE18',
+    sub: '4 flats (3x1-bed + 1x2-bed) · Woolwich Elizabeth line · Zone 4',
+    agent_name: 'Kallars, Sidcup',
+    note: 'Guide price \u00a31,000,000. Freehold period conversion: 3 x 1-bed + 1 x 2-bed apartments. Confirmed \u00a360,000 p.a. rental income (6.0% gross yield). Listed by Kallars, Sidcup (Aug 2025). Walking distance Woolwich Elizabeth line station.',
+    url: 'https://www.rightmove.co.uk/properties/166341395',
+    url_label: 'Rightmove',
+    price: 1000000, dep: 25, rate: 5.5, term: 25,
+    rent: 5000, void_: 0.5,
+    agent: 10, maint: 1.5, ins: 2000, gr: 0, sc: 0,
+    legal: 3000, survey: 1000, refurb: 5000,
+    growth: 3.5, hold: 10, tax: 25,
+    price_est: false, rent_est: false, units: 4
+  },
+  {
+    id: 'p3', badge: '3', ref: false,
+    name: 'Cumberland Road, Reading',
+    sub: '3 self-contained apartments · Reading Elizabeth line',
+    agent_name: 'Adams Estates',
+    note: 'Guide price \u00a3749,500. Freehold block of 3 self-contained apartments. Listed by Adams Estates. Reading Elizabeth line station to Paddington ~25 min. Est. \u00a31,200/flat/mo.',
+    url: 'https://www.rightmove.co.uk/properties/87281379',
+    url_label: 'Rightmove',
+    price: 749500, dep: 25, rate: 5.5, term: 25,
+    rent: 3600, void_: 1,
+    agent: 10, maint: 1.5, ins: 1500, gr: 0, sc: 0,
+    legal: 2500, survey: 800, refurb: 8000,
+    growth: 3.0, hold: 10, tax: 25,
+    price_est: false, rent_est: true, units: 3
+  },
+  {
+    id: 'p4', badge: '4', ref: false,
+    name: 'Goodmayes Lane, Ilford IG3',
+    sub: '3 flats freehold · Goodmayes Elizabeth line · Zone 4',
+    agent_name: 'Brian Thomas',
+    note: 'Guide price \u00a3700,000. Freehold property comprising 3 flats. Walking distance Goodmayes Elizabeth line station (~15 min to Liverpool St). East London growth corridor. Est. \u00a31,200/flat/mo.',
+    url: 'https://www.rightmove.co.uk/properties/164939270',
+    url_label: 'Rightmove',
+    price: 700000, dep: 25, rate: 5.5, term: 25,
+    rent: 3600, void_: 1,
+    agent: 10, maint: 1.5, ins: 1400, gr: 0, sc: 0,
+    legal: 2500, survey: 800, refurb: 8000,
+    growth: 4.0, hold: 10, tax: 25,
+    price_est: false, rent_est: true, units: 3
+  },
+  {
+    id: 'p5', badge: '5', ref: false,
+    name: '19-23 Market Street, Maidenhead',
+    sub: '4 apartments · Maidenhead Elizabeth line',
+    agent_name: "Sotheby's International Realty",
+    note: 'Guide price \u00a31,250,000. Freehold block of 4 apartments. Confirmed rental income \u00a353,220 p.a. (4.3% gross yield). Listed by Sotheby\u2019s. Maidenhead Elizabeth line station to Paddington ~18 min.',
+    url: 'https://www.rightmove.co.uk/properties/160046981',
+    url_label: 'Rightmove',
+    price: 1250000, dep: 25, rate: 5.5, term: 25,
+    rent: 4435, void_: 0.5,
+    agent: 10, maint: 1.5, ins: 2200, gr: 0, sc: 0,
+    legal: 3500, survey: 1000, refurb: 5000,
+    growth: 3.0, hold: 10, tax: 25,
+    price_est: false, rent_est: false, units: 4
+  },
+  {
+    id: 'p6', badge: '6', ref: false,
+    name: 'Singapore Road, West Ealing W13',
+    sub: '4 flats freehold · West Ealing Elizabeth line · Zone 3',
+    agent_name: 'Dexters Development & Investment',
+    note: 'Guide price \u00a31,550,000. Freehold block of 4 self-contained flats. Listed by Dexters Development & Investment. Walking distance West Ealing Elizabeth line station. Est. \u00a31,400/flat/mo.',
+    url: 'https://www.rightmove.co.uk/properties/171511634',
+    url_label: 'Rightmove',
+    price: 1550000, dep: 25, rate: 5.5, term: 25,
+    rent: 5600, void_: 1,
+    agent: 10, maint: 1.5, ins: 2400, gr: 0, sc: 0,
+    legal: 3500, survey: 1200, refurb: 10000,
+    growth: 3.5, hold: 10, tax: 25,
+    price_est: false, rent_est: true, units: 4
+  },
+  {
+    id: 'p7', badge: '7', ref: false,
+    name: 'Mattock Lane, Ealing W5',
+    sub: 'Semi-detached · ~6 flats · Ealing Broadway Elizabeth line · Zone 3',
+    agent_name: 'Dexters Development & Investment',
+    note: 'Guide price \u00a32,250,000. One of a pair of semi-detached houses overlooking a park, currently arranged as flats. Listed by Dexters D&I. Walking distance Ealing Broadway Elizabeth line station. Est. \u00a31,400/flat/mo for ~6 units.',
+    url: 'https://homemove.com/property/8e1b9a35-b5ef-4773-8506-64629a7c8ba2',
+    url_label: 'Homemove',
+    price: 2250000, dep: 25, rate: 5.5, term: 25,
+    rent: 8400, void_: 1,
+    agent: 10, maint: 1.5, ins: 3500, gr: 0, sc: 0,
+    legal: 5000, survey: 1500, refurb: 20000,
+    growth: 3.5, hold: 10, tax: 25,
+    price_est: false, rent_est: true, units: 6
+  },
+  {
+    id: 'p8', badge: '8', ref: false,
+    name: 'Woodseer Street, Shoreditch E1',
+    sub: '7-bed HMO freehold · 156m\u00b2 · Whitechapel Elizabeth line · Zone 1',
+    agent_name: 'Dexters Development & Investment',
+    note: 'Guide price \u00a31,750,000. Freehold residential building with HMO licence. 6 double rooms all with en-suite (156m\u00b2). Listed by Dexters D&I (Apr 2026). Near Whitechapel Elizabeth line station. Est. \u00a31,100/room/mo.',
+    url: 'https://homemove.com/property/7f11bfb9-9396-41f6-a1e5-48e9ed0cb405',
+    url_label: 'Homemove',
+    price: 1750000, dep: 25, rate: 5.5, term: 25,
+    rent: 6600, void_: 0.5,
+    agent: 10, maint: 1.5, ins: 2800, gr: 0, sc: 0,
+    legal: 4000, survey: 1200, refurb: 10000,
+    growth: 3.0, hold: 10, tax: 25,
+    price_est: false, rent_est: true, units: 6
+  },
+  {
+    id: 'p9', badge: '9', ref: false,
+    name: 'Lea Bridge Road, Leyton E10',
+    sub: '9-bed Victorian · 247m\u00b2 · Stratford Elizabeth line · Zone 3',
+    agent_name: 'Dexters Development & Investment',
+    note: 'Guide price \u00a31,500,000. Victorian detached house (247m\u00b2 / 3,300+ sq ft). Conversion potential into flats or HMO (STPP). Listed by Dexters D&I (Mar 2026). Nearest Elizabeth line: Stratford (~1.5 mi). Est. 4 flats at \u00a31,400/mo.',
+    url: 'https://homemove.com/property/14c550bd-e9f9-4530-89fe-56de9f75fd41',
+    url_label: 'Homemove',
+    price: 1500000, dep: 25, rate: 5.5, term: 25,
+    rent: 5600, void_: 1,
+    agent: 10, maint: 1.5, ins: 2400, gr: 0, sc: 0,
+    legal: 3500, survey: 1200, refurb: 40000,
+    growth: 3.5, hold: 10, tax: 25,
+    price_est: false, rent_est: true, units: 4
+  },
+  {
+    id: 'p10', badge: '10', ref: false,
+    name: 'Newburgh Road, Acton W3',
+    sub: '3 flats (1-bed) · 278m\u00b2 · Acton Main Line Elizabeth line · Zone 3',
+    agent_name: 'Dexters Development & Investment',
+    note: 'Guide price \u00a31,400,000. Spacious semi-detached freehold (278m\u00b2), currently arranged as 3 x 1-bed flats. Listed by Dexters D&I (Feb 2026). Walking distance Acton Main Line Elizabeth line station. Est. \u00a31,400/flat/mo.',
+    url: 'https://homemove.com/property/3b7775db-d8fb-4be5-aa03-bb23d30da84b',
+    url_label: 'Homemove',
+    price: 1400000, dep: 25, rate: 5.5, term: 25,
+    rent: 4200, void_: 1,
+    agent: 10, maint: 1.5, ins: 2400, gr: 0, sc: 0,
+    legal: 3500, survey: 1200, refurb: 15000,
+    growth: 3.5, hold: 10, tax: 25,
+    price_est: false, rent_est: true, units: 3
+  }
+];
+
+const PROP_COLORS = ['#c9a84c','#4caf82','#5b9bd5','#e05c5c','#b07cd8','#e8a960','#5ccfcf','#d4785c','#7cc95b','#c95ba8'];
+
+// =====================================================================
+// HELPERS
+// =====================================================================
+const f   = (n, d=0) => new Intl.NumberFormat('en-GB',{minimumFractionDigits:d,maximumFractionDigits:d}).format(n);
+const gbp = (n, d=0) => '\u00a3' + f(Math.abs(n), d);
+const pct = (n, d=2) => n.toFixed(d) + '%';
+const el  = id => document.getElementById(id);
+const set = (id, v) => { const e = el(id); if (e) e.textContent = v; };
+const gv  = id => parseFloat(el(id)?.value) || 0;
+
+// =====================================================================
+// SDLT — Ltd Co + Non-Resident Surcharge
+// =====================================================================
+function sdlt(price, nonResident = true) {
+  // Additional dwelling SDLT rates (from April 2025):
+  // Standard rates + 5% surcharge (increased from 3% in Oct 2024 Autumn Budget)
+  // Standard: 0% (£0–125k), 2% (£125k–250k), 5% (£250k–925k), 10% (£925k–1.5m), 12% (1.5m+)
+  // With 5% surcharge: 5%, 7%, 10%, 15%, 17%
+  // Note: 17% flat rate for non-natural persons >£500k does NOT apply to
+  // property rental businesses (relief under FA 2003 Sch 4A para 5).
+  const bands = [
+    {l:125000,  r:.05},   // 0% + 5% surcharge
+    {l:250000,  r:.07},   // 2% + 5% surcharge
+    {l:925000,  r:.10},   // 5% + 5% surcharge
+    {l:1500000, r:.15},   // 10% + 5% surcharge
+    {l:Infinity,r:.17}    // 12% + 5% surcharge
+  ];
+  let tax = 0, prev = 0;
+  for (const b of bands) {
+    if (price <= prev) break;
+    tax += (Math.min(price, b.l) - prev) * b.r;
+    prev = b.l;
+  }
+  // Non-resident surcharge: additional 2% on entire purchase price
+  if (nonResident) tax += price * 0.02;
+  return tax;
+}
+
+// SDLT without non-resident surcharge (for comparison)
+function sdltUK(price) { return sdlt(price, false); }
+
+function mortgage(loan, ratePct, termYrs) {
+  const mr = ratePct / 100 / 12, n = termYrs * 12;
+  if (mr === 0) return loan / n;
+  return loan * (mr * Math.pow(1+mr, n)) / (Math.pow(1+mr, n) - 1);
+}
+
+// =====================================================================
+// COMPUTE BTL — with year-specific projected growth
+// =====================================================================
+function computeBTL(price, dep, rate, term, rent, void_, agent, maint, ins, gr, sc, legal, survey, refurb, growth, hold, tax) {
+  const deposit    = price * (dep / 100);
+  const loan       = price - deposit;
+  const stax       = sdlt(price);
+  const acqCosts   = stax + legal + survey + refurb;
+  const totalCashIn = deposit + acqCosts;
+  const mtg        = mortgage(loan, rate, term);
+  const annMtg     = mtg * 12;
+  const annInt     = loan * (rate / 100);
+  const grossRent  = rent * (12 - void_);
+  const agentFee   = grossRent * (agent / 100);
+  const maintCost  = price * (maint / 100);
+  const opex       = agentFee + maintCost + ins + gr + sc;
+  const ebitda     = grossRent - opex;
+  const ebt        = ebitda - annInt;
+  const taxAmt     = Math.max(0, ebt * (tax / 100));
+  const netProfit  = ebt - taxAmt;
+  const cashflow   = netProfit - (annMtg - annInt);
+  const grossYield = (grossRent / price) * 100;
+  const netYield   = (ebitda / price) * 100;
+  const coc        = (cashflow / totalCashIn) * 100;
+
+  // Year-specific exit projection using London forecast data
+  const purchaseYear = 2026;
+  let exitVal = price;
+  for (let yr = purchaseYear; yr < purchaseYear + hold; yr++) {
+    const d = LONDON_PRICE_DATA[yr];
+    const g = d ? d.pct : growth; // fall back to user input if beyond data
+    exitVal *= (1 + g / 100);
+  }
+  const capGain    = exitVal - price;
+  const irr        = (Math.pow((totalCashIn + cashflow * hold + capGain) / totalCashIn, 1 / hold) - 1) * 100;
+
+  // Also calculate flat-growth exit for comparison
+  const exitValFlat = price * Math.pow(1 + growth / 100, hold);
+
+  // NRLS (Non-Resident Landlord Scheme) — informational
+  const nrlsWithholding = grossRent * 0.20;
+
+  // ATED
+  const atedAnnual = getATEDBand(price);
+
+  return { deposit, loan, stax, acqCosts, totalCashIn, mtg, annMtg, annInt,
+    grossRent, agentFee, maintCost, opex, ebitda, ebt, taxAmt, netProfit,
+    cashflow, grossYield, netYield, coc, exitVal, exitValFlat, capGain, irr,
+    nrlsWithholding, atedAnnual };
+}
+
+// =====================================================================
+// BUILD PROPERTY PANEL HTML
+// =====================================================================
+function buildPropPanel(p) {
+  const pid = p.id;
+  return `
+<div id="panel-${pid}" class="hidden">
+  <div class="prop-banner">
+    <div class="prop-banner-left">
+      <div class="prop-banner-name">${p.badge === '\u2b50' ? '\u2b50 ' : p.badge + '. '}${p.name}</div>
+      <div class="prop-banner-sub">${p.sub}</div>
+      <div class="prop-banner-note">${p.note}</div>
+    </div>
+    <div class="prop-banner-chips">
+      <div class="chip ${p.price_est ? 'est' : ''}">\u00a3${f(p.price)}${p.price_est ? ' (est.)' : ''}</div>
+      <div class="chip">${p.units} flats</div>
+      <div class="chip">${p.agent_name}</div>
+      ${p.url ? `<a class="chip-link" href="${p.url}" target="_blank" rel="noopener">View Listing \u2197</a>` : ''}
+    </div>
+  </div>
+  <div class="panel">
+    <div class="inputs">
+      <div class="section-title">Property</div>
+      <div class="field"><label>Purchase Price</label>
+        <div class="field-row"><span class="field-prefix">\u00a3</span>
+        <input type="number" id="${pid}-price" value="${p.price}" step="5000" oninput="calcProp('${pid}')"></div></div>
+      <div class="field"><label>Deposit</label>
+        <div class="field-row"><span class="field-prefix">%</span>
+        <input type="number" id="${pid}-dep" value="${p.dep}" step="1" oninput="calcProp('${pid}')">
+        <span class="field-suffix" id="${pid}-dep-val"></span></div></div>
+      <div class="field"><label>Mortgage Rate</label>
+        <div class="field-row"><span class="field-prefix">%</span>
+        <input type="number" id="${pid}-rate" value="${p.rate}" step="0.1" oninput="calcProp('${pid}')"></div></div>
+      <div class="field"><label>Mortgage Term</label>
+        <div class="field-row">
+        <input type="number" id="${pid}-term" value="${p.term}" step="1" oninput="calcProp('${pid}')">
+        <span class="field-suffix">years</span></div></div>
+      <div class="section-title">Income</div>
+      <div class="field"><label>Monthly Rent (all units)</label>
+        <div class="field-row"><span class="field-prefix">\u00a3</span>
+        <input type="number" id="${pid}-rent" value="${p.rent}" step="50" oninput="calcProp('${pid}')"></div>
+        <div class="field-note" id="${pid}-rent-note">\u00a3${f(Math.round(p.rent/p.units))}/unit/mo across ${p.units} flats</div></div>
+      <div class="field"><label>Void Period</label>
+        <div class="field-row">
+        <input type="number" id="${pid}-void" value="${p.void_}" step="0.5" oninput="calcProp('${pid}')">
+        <span class="field-suffix">months/yr</span></div></div>
+      <div class="section-title">Operating Costs</div>
+      <div class="field"><label>Managing Agent</label>
+        <div class="field-row"><span class="field-prefix">%</span>
+        <input type="number" id="${pid}-agent" value="${p.agent}" step="0.5" oninput="calcProp('${pid}')"></div>
+        <div class="field-note">% of gross rent</div></div>
+      <div class="field"><label>Maintenance / Repairs</label>
+        <div class="field-row"><span class="field-prefix">%</span>
+        <input type="number" id="${pid}-maint" value="${p.maint}" step="0.1" oninput="calcProp('${pid}')"></div>
+        <div class="field-note">% of property value p.a.</div></div>
+      <div class="field"><label>Buildings Insurance</label>
+        <div class="field-row"><span class="field-prefix">\u00a3</span>
+        <input type="number" id="${pid}-ins" value="${p.ins}" step="100" oninput="calcProp('${pid}')"></div></div>
+      <div class="field"><label>Ground Rent</label>
+        <div class="field-row"><span class="field-prefix">\u00a3</span>
+        <input type="number" id="${pid}-gr" value="${p.gr}" step="100" oninput="calcProp('${pid}')"></div></div>
+      <div class="field"><label>Service Charge</label>
+        <div class="field-row"><span class="field-prefix">\u00a3</span>
+        <input type="number" id="${pid}-sc" value="${p.sc}" step="100" oninput="calcProp('${pid}')"></div></div>
+      <div class="section-title">Acquisition Costs</div>
+      <div class="field"><label>Legal Fees</label>
+        <div class="field-row"><span class="field-prefix">\u00a3</span>
+        <input type="number" id="${pid}-legal" value="${p.legal}" step="100" oninput="calcProp('${pid}')"></div></div>
+      <div class="field"><label>Survey Fees</label>
+        <div class="field-row"><span class="field-prefix">\u00a3</span>
+        <input type="number" id="${pid}-survey" value="${p.survey}" step="100" oninput="calcProp('${pid}')"></div></div>
+      <div class="field"><label>Refurbishment</label>
+        <div class="field-row"><span class="field-prefix">\u00a3</span>
+        <input type="number" id="${pid}-refurb" value="${p.refurb}" step="500" oninput="calcProp('${pid}')"></div></div>
+      <div class="section-title">Exit &amp; Tax (Non-Resident SPV)</div>
+      <div class="field"><label>Capital Growth p.a. (flat override)</label>
+        <div class="field-row"><span class="field-prefix">%</span>
+        <input type="number" id="${pid}-growth" value="${p.growth}" step="0.5" oninput="calcProp('${pid}')"></div>
+        <div class="field-note">Exit uses London projected rates by default</div></div>
+      <div class="field"><label>Hold Period</label>
+        <div class="field-row">
+        <input type="number" id="${pid}-hold" value="${p.hold}" step="1" oninput="calcProp('${pid}')">
+        <span class="field-suffix">years</span></div></div>
+      <div class="field"><label>Corporation Tax Rate</label>
+        <div class="field-row"><span class="field-prefix">%</span>
+        <input type="number" id="${pid}-tax" value="${p.tax}" step="1" oninput="calcProp('${pid}')"></div>
+        <div class="field-note">25% flat — no small profits relief for non-residents</div></div>
+    </div><!-- /inputs -->
+
+    <div class="results">
+      <div class="section-title" style="margin-top:0">Key Metrics</div>
+      <div class="metrics">
+        <div class="metric-card highlight"><div class="metric-label">Gross Yield</div><div class="metric-value" id="${pid}-m-gy">&mdash;</div></div>
+        <div class="metric-card highlight"><div class="metric-label">Net Yield</div><div class="metric-value" id="${pid}-m-ny">&mdash;</div></div>
+        <div class="metric-card highlight"><div class="metric-label">Cash-on-Cash</div><div class="metric-value" id="${pid}-m-coc">&mdash;</div></div>
+        <div class="metric-card"><div class="metric-label">Annual Net Cashflow</div><div class="metric-value" id="${pid}-m-cf">&mdash;</div><div class="metric-sub" id="${pid}-m-cfmo">&mdash;</div></div>
+        <div class="metric-card"><div class="metric-label">Total Cash Required</div><div class="metric-value" id="${pid}-m-cash">&mdash;</div><div class="metric-sub" id="${pid}-m-sdlt">&mdash;</div></div>
+        <div class="metric-card"><div class="metric-label">Approx. IRR</div><div class="metric-value" id="${pid}-m-irr">&mdash;</div><div class="metric-sub" id="${pid}-m-irryr">&mdash;</div></div>
+      </div>
+      <div class="results-grid">
+        <div>
+          <div class="section-title">Annual P&amp;L (Year 1, Non-Resident SPV)</div>
+          <table>
+            <tr><td>Gross Rental Income</td><td id="${pid}-t-rent">&mdash;</td></tr>
+            <tr><td>Managing Agent Fees</td><td id="${pid}-t-agent">&mdash;</td></tr>
+            <tr><td>Maintenance</td><td id="${pid}-t-maint">&mdash;</td></tr>
+            <tr><td>Insurance</td><td id="${pid}-t-ins">&mdash;</td></tr>
+            <tr><td>Ground Rent + SC</td><td id="${pid}-t-grsc">&mdash;</td></tr>
+            <tr class="divider"><td colspan="2"></td></tr>
+            <tr class="bold"><td>EBITDA</td><td id="${pid}-t-ebitda">&mdash;</td></tr>
+            <tr><td>Mortgage Interest</td><td id="${pid}-t-int">&mdash;</td></tr>
+            <tr class="divider"><td colspan="2"></td></tr>
+            <tr class="bold"><td>EBT</td><td id="${pid}-t-ebt">&mdash;</td></tr>
+            <tr><td id="${pid}-t-taxlabel">Corp Tax (25%)</td><td id="${pid}-t-tax">&mdash;</td></tr>
+            <tr class="divider"><td colspan="2"></td></tr>
+            <tr class="bold"><td>Net Profit</td><td id="${pid}-t-np">&mdash;</td></tr>
+            <tr><td>Capital Repayment</td><td id="${pid}-t-caprep">&mdash;</td></tr>
+            <tr class="divider"><td colspan="2"></td></tr>
+            <tr class="bold"><td>Net Cashflow</td><td id="${pid}-t-cf">&mdash;</td></tr>
+          </table>
+        </div>
+        <div>
+          <div class="section-title">Acquisition Costs (Non-Resident)</div>
+          <table>
+            <tr><td>Deposit (${p.dep}%)</td><td id="${pid}-a-dep">&mdash;</td></tr>
+            <tr><td>SDLT (5% + 2% NR surcharge)</td><td id="${pid}-a-sdlt">&mdash;</td></tr>
+            <tr><td>&nbsp;&nbsp;incl. NR surcharge (2%)</td><td id="${pid}-a-nrs">&mdash;</td></tr>
+            <tr><td>Legal Fees</td><td id="${pid}-a-legal">&mdash;</td></tr>
+            <tr><td>Survey</td><td id="${pid}-a-survey">&mdash;</td></tr>
+            <tr><td>Refurbishment</td><td id="${pid}-a-refurb">&mdash;</td></tr>
+            <tr class="divider"><td colspan="2"></td></tr>
+            <tr class="bold"><td>Total Cash-In</td><td id="${pid}-a-total">&mdash;</td></tr>
+          </table>
+          <div class="section-title">Exit Projection (London Forecast Rates)</div>
+          <table>
+            <tr><td>Exit Value (projected)</td><td id="${pid}-e-exit">&mdash;</td></tr>
+            <tr><td>Exit Value (flat ${p.growth}% p.a.)</td><td id="${pid}-e-exitflat">&mdash;</td></tr>
+            <tr><td>Capital Gain</td><td id="${pid}-e-cg">&mdash;</td></tr>
+            <tr><td>Corp Tax on Gain (25%)</td><td id="${pid}-e-cgt">&mdash;</td></tr>
+            <tr><td>Cumulative Cashflow</td><td id="${pid}-e-cumcf">&mdash;</td></tr>
+            <tr class="divider"><td colspan="2"></td></tr>
+            <tr class="bold"><td>Total Return (post-tax)</td><td id="${pid}-e-total">&mdash;</td></tr>
+          </table>
+          <div class="section-title">Non-Resident Tax Summary</div>
+          <table>
+            <tr><td>NRLS Withholding (20% gross)</td><td id="${pid}-x-nrls">&mdash;</td></tr>
+            <tr><td>&nbsp;&nbsp;Offset against CT liability</td><td style="font-size:11px;color:var(--muted)">Yes</td></tr>
+            <tr><td>ATED Annual Charge</td><td id="${pid}-x-ated">&mdash;</td></tr>
+            <tr><td>&nbsp;&nbsp;Letting Relief</td><td style="font-size:11px;color:var(--green)">Full relief (commercially let)</td></tr>
+            <tr><td>UK-Canada DTA</td><td style="font-size:11px;color:var(--green)">Credit mechanism applies</td></tr>
+          </table>
+        </div>
+      </div>
+    </div><!-- /results -->
+  </div><!-- /panel -->
+</div>`;
+}
+
+// =====================================================================
+// CALC — individual property
+// =====================================================================
+function calcProp(pid) {
+  const price  = gv(`${pid}-price`),  dep    = gv(`${pid}-dep`),
+        rate   = gv(`${pid}-rate`),   term   = gv(`${pid}-term`),
+        rent   = gv(`${pid}-rent`),   void_  = gv(`${pid}-void`),
+        agent  = gv(`${pid}-agent`),  maint  = gv(`${pid}-maint`),
+        ins    = gv(`${pid}-ins`),    gr     = gv(`${pid}-gr`),
+        sc     = gv(`${pid}-sc`),     legal  = gv(`${pid}-legal`),
+        survey = gv(`${pid}-survey`), refurb = gv(`${pid}-refurb`),
+        growth = gv(`${pid}-growth`), hold   = gv(`${pid}-hold`),
+        tax    = gv(`${pid}-tax`);
+
+  const r = computeBTL(price, dep, rate, term, rent, void_, agent, maint, ins, gr, sc, legal, survey, refurb, growth, hold, tax);
+
+  const nrSurcharge = price * 0.02;
+  const cgtOnGain = Math.max(0, r.capGain * (tax / 100));
+
+  const dv = el(`${pid}-dep-val`); if (dv) dv.textContent = '= \u00a3'+f(r.deposit);
+  set(`${pid}-t-taxlabel`, `Corp Tax (${tax}%)`);
+  set(`${pid}-m-irryr`,    `over ${hold} yrs (London forecast)`);
+
+  set(`${pid}-m-gy`,    pct(r.grossYield));
+  set(`${pid}-m-ny`,    pct(r.netYield));
+  set(`${pid}-m-coc`,   pct(r.coc));
+  set(`${pid}-m-cf`,    gbp(r.cashflow));
+  set(`${pid}-m-cfmo`,  '\u00a3'+f(r.cashflow/12,0)+'/mo');
+  set(`${pid}-m-cash`,  gbp(r.totalCashIn));
+  set(`${pid}-m-sdlt`,  'SDLT \u00a3'+f(r.stax)+' (incl. NR \u00a3'+f(nrSurcharge)+')');
+  set(`${pid}-m-irr`,   pct(r.irr));
+
+  set(`${pid}-t-rent`,   gbp(r.grossRent));
+  set(`${pid}-t-agent`,  '('+gbp(r.agentFee)+')');
+  set(`${pid}-t-maint`,  '('+gbp(r.maintCost)+')');
+  set(`${pid}-t-ins`,    '('+gbp(ins)+')');
+  set(`${pid}-t-grsc`,   '('+gbp(gr+sc)+')');
+  set(`${pid}-t-ebitda`, gbp(r.ebitda));
+  set(`${pid}-t-int`,    '('+gbp(r.annInt)+')');
+  set(`${pid}-t-ebt`,    gbp(r.ebt));
+  set(`${pid}-t-tax`,    '('+gbp(r.taxAmt)+')');
+  set(`${pid}-t-np`,     gbp(r.netProfit));
+  set(`${pid}-t-caprep`, '('+gbp(r.annMtg-r.annInt)+')');
+  set(`${pid}-t-cf`,     gbp(r.cashflow));
+
+  set(`${pid}-a-dep`,    gbp(r.deposit));
+  set(`${pid}-a-sdlt`,   gbp(r.stax));
+  set(`${pid}-a-nrs`,    gbp(nrSurcharge));
+  set(`${pid}-a-legal`,  gbp(legal));
+  set(`${pid}-a-survey`, gbp(survey));
+  set(`${pid}-a-refurb`, gbp(refurb));
+  set(`${pid}-a-total`,  gbp(r.totalCashIn));
+
+  set(`${pid}-e-exit`,     gbp(r.exitVal));
+  set(`${pid}-e-exitflat`, gbp(r.exitValFlat));
+  set(`${pid}-e-cg`,       gbp(r.capGain));
+  set(`${pid}-e-cgt`,      '('+gbp(cgtOnGain)+')');
+  set(`${pid}-e-cumcf`,    gbp(r.cashflow * hold));
+  set(`${pid}-e-total`,    gbp(r.capGain - cgtOnGain + r.cashflow * hold));
+
+  set(`${pid}-x-nrls`,  gbp(r.nrlsWithholding) + '/yr');
+  set(`${pid}-x-ated`,  r.atedAnnual > 0 ? gbp(r.atedAnnual) + '/yr' : 'N/A (< \u00a3500k)');
+}
+
+// =====================================================================
+// COMPARISON TABLE
+// =====================================================================
+function buildCompareTable() {
+  const R = PROPS.map(p =>
+    ({ ...p, ...computeBTL(p.price, p.dep, p.rate, p.term, p.rent, p.void_, p.agent, p.maint, p.ins, p.gr, p.sc, p.legal, p.survey, p.refurb, p.growth, p.hold, p.tax) })
+  );
+
+  const best = key => Math.max(...R.map(r => r[key]));
+  const worst = key => Math.min(...R.map(r => r[key]));
+  const cls = (val, key) => val === best(key) ? 'c-best' : val === worst(key) ? 'c-worst' : '';
+
+  let h = `<thead><tr>
+    <th style="text-align:left;min-width:170px">Property</th>
+    <th>Price</th><th>Units</th><th>Cash-In</th><th>SDLT (w/ NR)</th>
+    <th>Gross Rent p.a.</th><th>Net CF p.a.</th>
+    <th>Gross Yield</th><th>Net Yield</th>
+    <th>Cash-on-Cash</th><th>IRR</th><th>Exit Value</th>
+  </tr></thead><tbody>`;
+
+  R.forEach(r => {
+    const priceStr = r.price_est
+      ? `${gbp(r.price)}<span class="c-est">est.</span>`
+      : gbp(r.price);
+    const anyEst = r.price_est || r.rent_est
+      ? '<br><span style="font-size:10px;color:var(--accent-dim)">some figures est.</span>' : '';
+    h += `<tr${r.ref ? ' class="ref-row"' : ''}>
+      <td><strong>${r.badge === '\u2b50' ? '\u2b50 ' : r.badge+'. '}${r.name}</strong>${r.url ? ` <a class="tbl-link" href="${r.url}" target="_blank" rel="noopener" title="View listing: ${r.url_label || r.agent_name}">\u2197</a>` : ''}${anyEst}</td>
+      <td>${priceStr}</td>
+      <td style="text-align:center">${r.units}</td>
+      <td>${gbp(r.totalCashIn)}</td>
+      <td>${gbp(r.stax)}</td>
+      <td>${gbp(r.grossRent)}</td>
+      <td class="${cls(r.cashflow,'cashflow')}">${gbp(r.cashflow)}</td>
+      <td class="${cls(r.grossYield,'grossYield')}">${pct(r.grossYield)}</td>
+      <td class="${cls(r.netYield,'netYield')}">${pct(r.netYield)}</td>
+      <td class="${cls(r.coc,'coc')}">${pct(r.coc)}</td>
+      <td class="${cls(r.irr,'irr')}">${pct(r.irr)}</td>
+      <td>${gbp(r.exitVal)}</td>
+    </tr>`;
+  });
+
+  h += '</tbody>';
+  return h;
+}
+
+// =====================================================================
+// NAVIGATION
+// =====================================================================
+function showProp(pid, btn) {
+  el('panel-compare').classList.toggle('hidden', pid !== 'compare');
+  PROPS.forEach(p => {
+    const panel = el('panel-'+p.id);
+    if (panel) panel.classList.toggle('hidden', p.id !== pid);
+  });
+  document.querySelectorAll('.pnav').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+}
+
+function switchTab(id, btn) {
+  ['btl','mkt','rvb','lend','dirt'].forEach(t => el('tab-'+t).classList.toggle('hidden', t !== id));
+  document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  const sn = el('btl-subnav');
+  if (sn) sn.classList.toggle('hidden', id !== 'btl');
+  // Redraw charts when switching to market tab
+  if (id === 'mkt') { drawPriceChart(); drawBarChart(); }
+  // Trigger lending calc when switching to lending tab
+  if (id === 'lend') { calcPrivLend(); }
+}
+
+function showDirt(id, btn) {
+  ['overview','okanagan','voices','risks','sources'].forEach(s => {
+    const n = el('dirt-'+s); if (n) n.classList.toggle('hidden', s !== id);
+  });
+  const sub = el('dirt-subnav');
+  if (sub) sub.querySelectorAll('.pnav').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+}
+
+// =====================================================================
+// RENT VS BUY
+// =====================================================================
+function calcRVB() {
+  const price=gv('rvb-price'), depPct=gv('rvb-deposit'), rate=gv('rvb-rate'),
+        term=gv('rvb-term'), rent=gv('rvb-rent'), investR=gv('rvb-invest'),
+        maint=gv('rvb-maint'), ins=gv('rvb-ins'), gr=gv('rvb-gr'),
+        sc=gv('rvb-sc'), legal=gv('rvb-legal'), survey=gv('rvb-survey'),
+        growth=gv('rvb-growth'), hold=gv('rvb-hold');
+  const deposit=price*(depPct/100), loan=price-deposit;
+  const stax=sdlt(price), acq=stax+legal+survey, totalCashIn=deposit+acq;
+  const mtg=mortgage(loan,rate,term), annMtg=mtg*12;
+  const annRun=price*(maint/100)+ins+gr+sc, annOwn=annMtg+annRun, annRent=rent*12;
+  const exitVal=price*Math.pow(1+growth/100,hold), capGain=exitVal-price;
+  const invPot=totalCashIn*Math.pow(1+investR/100,hold), invGain=invPot-totalCashIn;
+  const totalBuy=annOwn*hold+acq-capGain, totalRent=annRent*hold-invGain;
+  const advantage=totalRent-totalBuy;
+  let beYear='>30';
+  for(let y=1;y<=30;y++){
+    const ev=price*Math.pow(1+growth/100,y);
+    const cb=annOwn*y+acq-(ev-price);
+    const cr=annRent*y-(totalCashIn*Math.pow(1+investR/100,y)-totalCashIn);
+    if(cb<cr){beYear=y;break;}
+  }
+  const dv=el('rvb-deposit-val'); if(dv) dv.textContent='= \u00a3'+f(deposit);
+  const buyWins=advantage>0;
+  const verdict=el('rvb-verdict');
+  verdict.className='verdict '+(buyWins?'buy':'rent');
+  set('rvb-icon',buyWins?'\u{1F3E0}':'\u{1F3E6}');
+  set('rvb-title',(buyWins?'Buying is cheaper':'Renting is cheaper')+' over '+hold+' years');
+  el('rvb-detail').innerHTML=(buyWins?'Buying saves':'Renting saves')+' <strong>'+gbp(Math.abs(advantage))+'</strong> vs the alternative';
+  el('rvb-break').innerHTML='Break-even: year <strong>'+beYear+'</strong>';
+  set('rvb-m-mtg',gbp(mtg)); set('rvb-m-rent',gbp(rent)); set('rvb-m-be','Yr '+beYear);
+  set('rvb-t-acq',gbp(acq)); set('rvb-t-mtg',gbp(annMtg*hold));
+  set('rvb-t-run',gbp(annRun*hold)); set('rvb-t-gross',gbp(annOwn*hold+acq));
+  set('rvb-t-cg','('+gbp(capGain)+')'); set('rvb-t-netbuy',gbp(totalBuy));
+  set('rvb-t-rent',gbp(annRent*hold)); set('rvb-t-rgross',gbp(annRent*hold));
+  set('rvb-t-inv','('+gbp(invGain)+')'); set('rvb-t-netrent',gbp(totalRent));
+}
+
+// =====================================================================
+// PROPERTY LENDING — You as Private Lender
+// =====================================================================
+function showLendTab(id, btn) {
+  ['single','portfolio','lnotes'].forEach(t => {
+    const panel = el('lend-'+t);
+    if (panel) panel.classList.toggle('hidden', t !== id);
+  });
+  document.querySelectorAll('#lend-subnav .pnav').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  if (id === 'portfolio') calcPortfolio();
+}
+
+// Single Loan — Lender's Return Model
+// =====================================================================
+function calcPrivLend() {
+  const propVal = gv('pl-propval'), ltv = gv('pl-ltv'), rate = gv('pl-rate'),
+        termMo = gv('pl-term'), arrPct = gv('pl-arr'), exitPct = gv('pl-exit'),
+        cofRate = gv('pl-cof'), admin = gv('pl-admin'), legal = gv('pl-legal'),
+        pd = gv('pl-pd'), lgd = gv('pl-lgd');
+
+  const loan = propVal * (ltv / 100);
+  const equityBuffer = propVal - loan;
+
+  // === REVENUE ===
+  const grossInt = loan * (rate / 100) * (termMo / 12);
+  const arrFee = loan * (arrPct / 100);
+  const exitFee = loan * (exitPct / 100);
+  const grossRev = grossInt + arrFee + exitFee;
+
+  // Gross yield: annualise everything
+  // Interest rate is already annual; fees are one-off so annualise by (12/term)
+  const grossYield = rate + (arrPct * 12 / termMo) + (exitPct * 12 / termMo);
+
+  // === COSTS ===
+  const cofCost = loan * (cofRate / 100) * (termMo / 12);
+  const adminCost = admin * (termMo / 12);
+  const totalCosts = cofCost + adminCost + legal;
+
+  // === PROFIT BEFORE LOSS ===
+  const profitPreLoss = grossRev - totalCosts;
+  const netYield = (profitPreLoss / loan) * (12 / termMo) * 100;
+
+  // === EXPECTED LOSS PROVISION ===
+  // PD = probability of default, LGD = loss given default (% of loan lost after recovery)
+  const expectedLoss = loan * (pd / 100) * (lgd / 100);
+  const expectedLossAnn = expectedLoss * (12 / termMo);
+
+  // === NET PROFIT (risk-adjusted) ===
+  const netProfit = profitPreLoss - expectedLoss;
+  const riskAdjYield = (netProfit / loan) * (12 / termMo) * 100;
+
+  // === NET INTEREST MARGIN ===
+  const nim = ((grossInt - cofCost) / loan) * (12 / termMo) * 100;
+
+  // --- Helper notes ---
+  const lnote = el('pl-loan-note'); if (lnote) lnote.textContent = 'Loan \u00a3' + f(loan);
+  const rmote = el('pl-rate-mo'); if (rmote) rmote.textContent = (rate/12).toFixed(2) + '% per month';
+  const anote = el('pl-arr-note'); if (anote) anote.textContent = '= \u00a3' + f(arrFee);
+  const enote = el('pl-exit-note'); if (enote) enote.textContent = '= \u00a3' + f(exitFee);
+
+  // --- Metrics ---
+  set('pl-m-grossyield', pct(grossYield, 1));
+  set('pl-m-netyield', pct(netYield, 1));
+  set('pl-m-riskyield', pct(riskAdjYield, 1));
+  set('pl-m-netprofit', gbp(netProfit));
+  set('pl-m-capital', gbp(loan));
+  set('pl-m-ltvsub', pct(ltv, 0) + ' LTV');
+  set('pl-m-buffer', gbp(equityBuffer));
+
+  // Colour the risk-adjusted yield
+  const ryEl = el('pl-m-riskyield');
+  if (ryEl) ryEl.style.color = riskAdjYield > 0 ? 'var(--green)' : 'var(--red)';
+
+  // --- Revenue table ---
+  set('pl-r-int', gbp(grossInt));
+  set('pl-r-arr', gbp(arrFee));
+  set('pl-r-exit', gbp(exitFee));
+  set('pl-r-total', gbp(grossRev));
+  set('pl-r-grossyield', pct(grossYield, 1));
+
+  // --- Costs table ---
+  set('pl-c-cof', '(' + gbp(cofCost) + ')');
+  set('pl-c-admin', '(' + gbp(adminCost) + ')');
+  set('pl-c-legal', '(' + gbp(legal) + ')');
+  set('pl-c-total', '(' + gbp(totalCosts) + ')');
+
+  // --- Profit & Risk table ---
+  set('pl-p-rev', gbp(grossRev));
+  set('pl-p-costs', '(' + gbp(totalCosts) + ')');
+  set('pl-p-preloss', gbp(profitPreLoss));
+  set('pl-p-netyield', pct(netYield, 1));
+  set('pl-p-pd', pct(pd, 1));
+  set('pl-p-lgd', pct(lgd, 0));
+  set('pl-p-el', '(' + gbp(expectedLoss) + ')');
+  set('pl-p-net', gbp(netProfit));
+  set('pl-p-riskyield', pct(riskAdjYield, 1));
+
+  // Net profit colour
+  const npEl = el('pl-p-net');
+  if (npEl) npEl.style.color = netProfit > 0 ? 'var(--green)' : 'var(--red)';
+  const ryEl2 = el('pl-p-riskyield');
+  if (ryEl2) ryEl2.style.color = riskAdjYield > 0 ? 'var(--green)' : 'var(--red)';
+
+  // --- NIM ---
+  set('pl-p-intearned', gbp(grossInt));
+  set('pl-p-cofcost', '(' + gbp(cofCost) + ')');
+  set('pl-p-nim', pct(nim, 1));
+}
+
+// Portfolio Model
+// =====================================================================
+function calcPortfolio() {
+  const capital = gv('pf-capital'), avgLoan = gv('pf-avgloan'), rate = gv('pf-rate'),
+        termMo = gv('pf-term'), arrPct = gv('pf-arr'), exitPct = gv('pf-exit'),
+        cofRate = gv('pf-cof'), pd = gv('pf-pd'), lgd = gv('pf-lgd'),
+        overhead = gv('pf-overhead');
+
+  const numLoans = Math.floor(capital / avgLoan);
+  const totalDeployed = numLoans * avgLoan;
+  const turnsPerYear = 12 / termMo;
+  const capitalCycled = totalDeployed * turnsPerYear;
+
+  // Revenue per turn (all loans)
+  const intPerTurn = totalDeployed * (rate / 100) * (termMo / 12);
+  const arrPerTurn = totalDeployed * (arrPct / 100);
+  const exitPerTurn = totalDeployed * (exitPct / 100);
+
+  // Annualised (multiply by turns per year for fees, interest is already pro-rata)
+  const annInt = totalDeployed * (rate / 100); // annual interest if fully deployed
+  const annArr = arrPerTurn * turnsPerYear;
+  const annExit = exitPerTurn * turnsPerYear;
+  const annGrossRev = annInt + annArr + annExit;
+
+  // Gross yield
+  const grossYield = rate + (arrPct * 12 / termMo) + (exitPct * 12 / termMo);
+
+  // Costs
+  const annCof = totalDeployed * (cofRate / 100);
+  const totalAnnCosts = annCof + overhead;
+
+  // EBITDA
+  const ebitda = annGrossRev - totalAnnCosts;
+
+  // Expected loss (annual)
+  const annExpLoss = totalDeployed * (pd / 100) * (lgd / 100) * turnsPerYear;
+
+  // Net profit
+  const netProfit = ebitda - annExpLoss;
+  const riskAdjYield = totalDeployed > 0 ? (netProfit / totalDeployed) * 100 : 0;
+
+  // Concentration
+  const concLimit = capital * 0.25;
+  const minLoansDiv = Math.ceil(capital / concLimit);
+
+  // --- Metrics ---
+  set('pf-m-loans', numLoans > 0 ? numLoans.toString() : '0');
+  set('pf-m-rev', gbp(annGrossRev));
+  set('pf-m-net', gbp(netProfit));
+  set('pf-m-grossyield', pct(grossYield, 1));
+  set('pf-m-riskyield', pct(riskAdjYield, 1));
+  set('pf-m-loss', gbp(annExpLoss));
+
+  const npColor = netProfit > 0 ? 'var(--green)' : 'var(--red)';
+  const npEl = el('pf-m-net'); if (npEl) npEl.style.color = npColor;
+  const ryEl = el('pf-m-riskyield'); if (ryEl) ryEl.style.color = npColor;
+
+  // --- P&L table ---
+  set('pf-t-int', gbp(annInt));
+  set('pf-t-arr', gbp(annArr));
+  set('pf-t-exit', gbp(annExit));
+  set('pf-t-rev', gbp(annGrossRev));
+  set('pf-t-cof', '(' + gbp(annCof) + ')');
+  set('pf-t-overhead', '(' + gbp(overhead) + ')');
+  set('pf-t-costs', '(' + gbp(totalAnnCosts) + ')');
+  set('pf-t-ebitda', gbp(ebitda));
+  set('pf-t-loss', '(' + gbp(annExpLoss) + ')');
+  set('pf-t-net', gbp(netProfit));
+  const tNetEl = el('pf-t-net'); if (tNetEl) tNetEl.style.color = npColor;
+
+  // --- Capital recycling ---
+  set('pf-c-deployed', gbp(totalDeployed));
+  set('pf-c-term', termMo + ' months');
+  set('pf-c-turns', turnsPerYear.toFixed(1) + 'x');
+  set('pf-c-cycled', gbp(capitalCycled));
+
+  // --- Risk concentration ---
+  set('pf-c-maxexposure', gbp(avgLoan) + ' (' + (totalDeployed > 0 ? (avgLoan / totalDeployed * 100).toFixed(0) : 0) + '%)');
+  set('pf-c-conclimit', gbp(concLimit));
+  set('pf-c-minloans', minLoansDiv.toString());
+}
+
+// =====================================================================
+// CHARTS — Canvas-based (no external dependencies)
+// =====================================================================
+function drawPriceChart() {
+  const canvas = el('price-chart');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.parentElement.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = 400 * dpr;
+  canvas.style.width = rect.width + 'px';
+  canvas.style.height = '400px';
+  ctx.scale(dpr, dpr);
+  const W = rect.width, H = 400;
+
+  // Padding
+  const pad = { top: 30, right: 30, bottom: 50, left: 80 };
+  const cW = W - pad.left - pad.right;
+  const cH = H - pad.top - pad.bottom;
+
+  // Clear
+  ctx.fillStyle = '#181c26';
+  ctx.fillRect(0, 0, W, H);
+
+  // Build property projection lines (purchase 2026, project forward)
+  const projYears = [];
+  for (let y = 2026; y <= 2037; y++) projYears.push(y);
+
+  const propLines = PROPS.map(p => {
+    const vals = [p.price];
+    let v = p.price;
+    for (let i = 1; i < projYears.length; i++) {
+      const yr = projYears[i];
+      const d = LONDON_PRICE_DATA[yr];
+      const g = d ? d.pct : p.growth;
+      v *= (1 + g / 100);
+      vals.push(v);
+    }
+    return vals;
+  });
+
+  // Also build London index line (normalised)
+  const allYears = [];
+  for (let y = 2007; y <= 2037; y++) allYears.push(y);
+  const indexVals = allYears.map(y => LONDON_INDEX[y]);
+
+  // Combined: index on left, property values on right
+  // Two y-axes: left = index (100 base), right = GBP
+
+  // X scale
+  const xScale = (yr) => pad.left + ((yr - 2007) / (2037 - 2007)) * cW;
+
+  // Left Y scale (index)
+  const idxMin = Math.min(...indexVals) * 0.9;
+  const idxMax = Math.max(...indexVals) * 1.1;
+  const yIdxScale = (v) => pad.top + cH - ((v - idxMin) / (idxMax - idxMin)) * cH;
+
+  // Right Y scale (property values)
+  const allPropVals = propLines.flat();
+  const propMin = Math.min(...allPropVals) * 0.85;
+  const propMax = Math.max(...allPropVals) * 1.1;
+  const yPropScale = (v) => pad.top + cH - ((v - propMin) / (propMax - propMin)) * cH;
+
+  // Grid lines
+  ctx.strokeStyle = '#252a38';
+  ctx.lineWidth = 0.5;
+  for (let i = 0; i <= 5; i++) {
+    const y = pad.top + (cH / 5) * i;
+    ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(W - pad.right, y); ctx.stroke();
+  }
+
+  // Vertical year lines
+  ctx.fillStyle = '#5a6175';
+  ctx.font = '10px Georgia';
+  ctx.textAlign = 'center';
+  for (let yr = 2008; yr <= 2036; yr += 2) {
+    const x = xScale(yr);
+    ctx.strokeStyle = '#1a1e28';
+    ctx.beginPath(); ctx.moveTo(x, pad.top); ctx.lineTo(x, pad.top + cH); ctx.stroke();
+    ctx.fillText(yr, x, H - pad.bottom + 16);
+  }
+  // 2037 label
+  ctx.fillText('2037', xScale(2037), H - pad.bottom + 16);
+
+  // Divider line at 2026 (forecast boundary)
+  ctx.strokeStyle = '#5a6175';
+  ctx.setLineDash([4, 4]);
+  ctx.lineWidth = 1;
+  const x2026 = xScale(2026);
+  ctx.beginPath(); ctx.moveTo(x2026, pad.top); ctx.lineTo(x2026, pad.top + cH); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = '#5a6175';
+  ctx.font = '10px Georgia';
+  ctx.fillText('Purchase', x2026, pad.top - 6);
+
+  // Draw London index line (grey, thicker)
+  ctx.strokeStyle = 'rgba(216,221,232,0.3)';
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  allYears.forEach((yr, i) => {
+    const x = xScale(yr), y = yIdxScale(indexVals[i]);
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  });
+  ctx.stroke();
+
+  // Draw property lines
+  propLines.forEach((vals, pi) => {
+    ctx.strokeStyle = PROP_COLORS[pi];
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    projYears.forEach((yr, i) => {
+      const x = xScale(yr), y = yPropScale(vals[i]);
+      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+    // Dot at start
+    ctx.fillStyle = PROP_COLORS[pi];
+    ctx.beginPath(); ctx.arc(xScale(2026), yPropScale(vals[0]), 4, 0, Math.PI*2); ctx.fill();
+    // End label
+    ctx.font = '10px Georgia';
+    ctx.fillStyle = PROP_COLORS[pi];
+    ctx.textAlign = 'left';
+    ctx.fillText('\u00a3' + f(vals[vals.length-1]/1000) + 'k', xScale(2037) + 4, yPropScale(vals[vals.length-1]) + 3);
+  });
+
+  // Left Y axis labels (index)
+  ctx.fillStyle = '#5a6175';
+  ctx.font = '10px Georgia';
+  ctx.textAlign = 'right';
+  for (let i = 0; i <= 5; i++) {
+    const v = idxMin + ((idxMax - idxMin) / 5) * (5 - i);
+    ctx.fillText(v.toFixed(0), pad.left - 8, pad.top + (cH / 5) * i + 4);
+  }
+  ctx.save();
+  ctx.translate(12, pad.top + cH/2);
+  ctx.rotate(-Math.PI/2);
+  ctx.textAlign = 'center';
+  ctx.fillText('London Index (2006=100)', 0, 0);
+  ctx.restore();
+
+  // Right Y axis labels (GBP)
+  ctx.textAlign = 'left';
+  for (let i = 0; i <= 5; i++) {
+    const v = propMin + ((propMax - propMin) / 5) * (5 - i);
+    ctx.fillText('\u00a3' + f(v/1000) + 'k', W - pad.right + 4, pad.top + (cH / 5) * i + 4);
+  }
+
+  // Legend
+  const legend = el('chart-legend');
+  if (legend) {
+    legend.innerHTML = `
+      <div class="chart-legend-item"><div class="chart-legend-dot" style="background:rgba(216,221,232,0.3)"></div>London Index (2006=100)</div>
+      ${PROPS.map((p, i) => `<div class="chart-legend-item"><div class="chart-legend-dot" style="background:${PROP_COLORS[i]}"></div>${p.name}</div>`).join('')}
+    `;
+  }
+}
+
+// Bar chart — annual % change
+function drawBarChart() {
+  const canvas = el('bar-chart');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.parentElement.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = 280 * dpr;
+  canvas.style.width = rect.width + 'px';
+  canvas.style.height = '280px';
+  ctx.scale(dpr, dpr);
+  const W = rect.width, H = 280;
+  const pad = { top: 20, right: 20, bottom: 40, left: 50 };
+  const cW = W - pad.left - pad.right;
+  const cH = H - pad.top - pad.bottom;
+
+  ctx.fillStyle = '#181c26';
+  ctx.fillRect(0, 0, W, H);
+
+  const years = YEARS;
+  const vals = years.map(y => LONDON_PRICE_DATA[y].pct);
+  const maxV = Math.max(...vals.map(Math.abs)) * 1.15;
+
+  const barW = (cW / years.length) * 0.7;
+  const gap = (cW / years.length) * 0.3;
+  const zeroY = pad.top + cH * (maxV / (2 * maxV));
+
+  // Zero line
+  ctx.strokeStyle = '#5a6175';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(pad.left, zeroY); ctx.lineTo(W - pad.right, zeroY); ctx.stroke();
+
+  // Grid
+  ctx.strokeStyle = '#1a1e28';
+  ctx.lineWidth = 0.5;
+  [-15,-10,-5,5,10,15,20].forEach(v => {
+    if (Math.abs(v) > maxV) return;
+    const y = pad.top + cH * ((maxV - v) / (2 * maxV));
+    ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(W - pad.right, y); ctx.stroke();
+  });
+
+  // Y labels
+  ctx.fillStyle = '#5a6175';
+  ctx.font = '10px Georgia';
+  ctx.textAlign = 'right';
+  [-15,-10,-5,0,5,10,15,20].forEach(v => {
+    if (Math.abs(v) > maxV && v !== 0) return;
+    const y = pad.top + cH * ((maxV - v) / (2 * maxV));
+    ctx.fillText(v + '%', pad.left - 6, y + 3);
+  });
+
+  // Bars
+  years.forEach((yr, i) => {
+    const x = pad.left + (cW / years.length) * i + gap/2;
+    const v = vals[i];
+    const barH = Math.abs(v) / (2 * maxV) * cH;
+    const type = LONDON_PRICE_DATA[yr].type;
+
+    if (type === 'actual') ctx.fillStyle = v >= 0 ? '#4caf82' : '#e05c5c';
+    else if (type === 'forecast') ctx.fillStyle = v >= 0 ? 'rgba(201,168,76,0.8)' : 'rgba(224,92,92,0.6)';
+    else ctx.fillStyle = v >= 0 ? 'rgba(90,97,117,0.6)' : 'rgba(224,92,92,0.4)';
+
+    if (v >= 0) {
+      ctx.fillRect(x, zeroY - barH, barW, barH);
+    } else {
+      ctx.fillRect(x, zeroY, barW, barH);
+    }
+
+    // Year label
+    ctx.fillStyle = '#5a6175';
+    ctx.font = '9px Georgia';
+    ctx.textAlign = 'center';
+    if (yr % 2 === 1 || years.length < 25) {
+      ctx.fillText(yr.toString().slice(-2), x + barW/2, H - pad.bottom + 14);
+    }
+
+    // Value label on bar
+    ctx.fillStyle = '#d8dde8';
+    ctx.font = '8px Georgia';
+    if (v >= 0) {
+      ctx.fillText(v.toFixed(1), x + barW/2, zeroY - barH - 4);
+    } else {
+      ctx.fillText(v.toFixed(1), x + barW/2, zeroY + barH + 10);
+    }
+  });
+
+  // Legend labels at bottom
+  ctx.font = '10px Georgia';
+  ctx.textAlign = 'left';
+  const lx = pad.left;
+  ctx.fillStyle = '#4caf82'; ctx.fillRect(lx, H-12, 10, 8);
+  ctx.fillStyle = '#5a6175'; ctx.fillText('Actual', lx+14, H-5);
+  ctx.fillStyle = '#c9a84c'; ctx.fillRect(lx+60, H-12, 10, 8);
+  ctx.fillStyle = '#5a6175'; ctx.fillText('Savills Forecast', lx+74, H-5);
+  ctx.fillStyle = '#5a6175'; ctx.fillRect(lx+180, H-12, 10, 8);
+  ctx.fillStyle = '#5a6175'; ctx.fillText('Extrapolation', lx+194, H-5);
+}
+
+// =====================================================================
+// MARKET & TAX — Projection Table + Tax Cards
+// =====================================================================
+function buildProjectionTable() {
+  const projYears = [];
+  for (let y = 2026; y <= 2037; y++) projYears.push(y);
+
+  let h = `<thead><tr><th style="text-align:left">Year</th><th>London %</th><th>Type</th>`;
+  PROPS.forEach(p => h += `<th>${p.name}</th>`);
+  h += `</tr></thead><tbody>`;
+
+  const propVals = PROPS.map(p => [p.price]);
+
+  projYears.forEach((yr, yi) => {
+    const d = LONDON_PRICE_DATA[yr];
+    const rowClass = d.type === 'actual' ? 'proj-actual' : d.type === 'forecast' ? 'proj-forecast' : 'proj-extrap';
+    const pctClass = d.pct >= 0 ? 'pos' : 'neg';
+    const typeLabel = d.type === 'actual' ? 'Actual' : d.type === 'forecast' ? 'Savills' : 'Est.';
+
+    h += `<tr class="${rowClass}"><td>${yr}</td><td class="${pctClass}">${d.pct >= 0 ? '+' : ''}${d.pct.toFixed(1)}%</td><td style="font-size:10px;color:var(--muted)">${typeLabel}</td>`;
+
+    PROPS.forEach((p, pi) => {
+      if (yi === 0) {
+        propVals[pi] = [p.price];
+        h += `<td>\u00a3${f(p.price)}</td>`;
+      } else {
+        const prev = propVals[pi][yi - 1] || p.price;
+        const curr = prev * (1 + d.pct / 100);
+        propVals[pi].push(curr);
+        const change = curr - p.price;
+        const changePct = ((curr / p.price - 1) * 100).toFixed(1);
+        h += `<td>\u00a3${f(curr)}<br><span style="font-size:10px;color:${change >= 0 ? 'var(--green)' : 'var(--red)'}">${change >= 0 ? '+' : ''}\u00a3${f(change)} (${changePct}%)</span></td>`;
+      }
+    });
+    h += '</tr>';
+  });
+
+  h += '</tbody>';
+  el('proj-tbl').innerHTML = h;
+}
+
+function buildTaxCards() {
+  let html = '';
+  PROPS.forEach((p, i) => {
+    const r = computeBTL(p.price, p.dep, p.rate, p.term, p.rent, p.void_, p.agent, p.maint, p.ins, p.gr, p.sc, p.legal, p.survey, p.refurb, p.growth, p.hold, p.tax);
+    const nrs = p.price * 0.02;
+    const sdltBase = sdltUK(p.price);
+    const sdltTotal = sdlt(p.price);
+    const cgtOnGain = Math.max(0, r.capGain * 0.25);
+    const ated = getATEDBand(p.price);
+
+    html += `
+    <div class="tax-card" style="border-left: 3px solid ${PROP_COLORS[i]}">
+      <div class="tax-card-title">${p.badge === '\u2b50' ? '\u2b50 ' : p.badge+'. '}${p.name}</div>
+      <table>
+        <tr><td>Purchase Price</td><td>${gbp(p.price)}</td></tr>
+        <tr class="divider"><td colspan="2"></td></tr>
+        <tr><td>SDLT (5% surcharge base)</td><td>${gbp(sdltBase)}</td></tr>
+        <tr><td>NR Surcharge (2%)</td><td style="color:var(--red)">+${gbp(nrs)}</td></tr>
+        <tr class="bold"><td>Total SDLT</td><td>${gbp(sdltTotal)}</td></tr>
+        <tr class="divider"><td colspan="2"></td></tr>
+        <tr><td>Corp Tax Rate</td><td>25% flat (no marginal relief)</td></tr>
+        <tr><td>Annual CT Liability</td><td>${gbp(r.taxAmt)}</td></tr>
+        <tr><td>NRLS Withholding (20%)</td><td>${gbp(r.nrlsWithholding)}/yr</td></tr>
+        <tr><td>&nbsp;&nbsp;Offset against CT</td><td style="color:var(--green);font-size:11px">Yes — apply for NRL1</td></tr>
+        <tr class="divider"><td colspan="2"></td></tr>
+        <tr><td>ATED Band Charge</td><td>${ated > 0 ? gbp(ated)+'/yr' : 'N/A'}</td></tr>
+        <tr><td>&nbsp;&nbsp;Letting Relief</td><td style="color:var(--green);font-size:11px">${ated > 0 ? 'Full relief (commercial let)' : 'N/A'}</td></tr>
+        <tr class="divider"><td colspan="2"></td></tr>
+        <tr><td>Projected Capital Gain</td><td>${gbp(r.capGain)}</td></tr>
+        <tr><td>CT on Gain (25%)</td><td style="color:var(--red)">${gbp(cgtOnGain)}</td></tr>
+        <tr><td>Net Gain After Tax</td><td style="color:var(--green);font-weight:700">${gbp(r.capGain - cgtOnGain)}</td></tr>
+      </table>
+      <div class="tax-note">
+        UK-Canada DTA: UK tax credit available in Canada. Dividend extraction may attract UK WHT (5-15% treaty rate) + Canadian personal tax. File CGT return within 60 days of disposal.
+      </div>
+    </div>`;
+  });
+  el('tax-grid').innerHTML = html;
+}
+
+function buildHistoryTable() {
+  let h = `<thead><tr><th style="text-align:left">Year</th><th>Annual Change</th><th>Type</th><th>Index</th><th>Cumulative</th><th style="text-align:left">Notes</th></tr></thead><tbody>`;
+  const base = LONDON_INDEX[2007];
+  YEARS.forEach(yr => {
+    const d = LONDON_PRICE_DATA[yr];
+    const idx = LONDON_INDEX[yr];
+    const cum = ((idx / LONDON_INDEX[2006]) - 1) * 100;
+    const rowClass = d.type === 'actual' ? 'proj-actual' : d.type === 'forecast' ? 'proj-forecast' : 'proj-extrap';
+    const pctClass = d.pct >= 0 ? 'pos' : 'neg';
+    const typeLabel = d.type === 'actual' ? 'Actual (adj.)' : d.type === 'forecast' ? 'Forecast' : 'Extrapolation';
+    const note = d.note || '';
+    h += `<tr class="${rowClass}">
+      <td>${yr}</td>
+      <td class="${pctClass}">${d.pct >= 0 ? '+' : ''}${d.pct.toFixed(1)}%</td>
+      <td style="font-size:10px;color:var(--muted)">${typeLabel}</td>
+      <td>${idx.toFixed(1)}</td>
+      <td class="${cum >= 0 ? 'pos' : 'neg'}">${cum >= 0 ? '+' : ''}${cum.toFixed(1)}%</td>
+      <td style="text-align:left;font-size:10px;color:var(--muted);white-space:normal;max-width:400px">${note}</td>
+    </tr>`;
+  });
+  h += '</tbody>';
+  el('history-tbl').innerHTML = h;
+}
+
+// =====================================================================
+// EXPORT / SHARE
+// =====================================================================
+function exportModel() {
+  // Show all panels for printing
+  const hiddenEls = document.querySelectorAll('.hidden');
+  hiddenEls.forEach(e => e.dataset.wasHidden = 'true');
+
+  // Show all property panels
+  document.querySelectorAll('[id^="panel-p"]').forEach(e => e.style.display = 'block');
+  el('panel-compare').style.display = 'block';
+
+  // Brief delay then print
+  setTimeout(() => {
+    window.print();
+    // Restore hidden state after print dialog closes
+    setTimeout(() => {
+      hiddenEls.forEach(e => {
+        if (e.dataset.wasHidden) e.classList.add('hidden');
+        delete e.dataset.wasHidden;
+      });
+    }, 500);
+  }, 100);
+}
+
+// =====================================================================
+// INIT
+// =====================================================================
+document.addEventListener('DOMContentLoaded', () => {
+  // Inject property panels
+  el('prop-panels').innerHTML = PROPS.map(p => buildPropPanel(p)).join('');
+  // Build comparison table
+  el('compare-tbl').innerHTML = buildCompareTable();
+  // Calc all property panels
+  PROPS.forEach(p => calcProp(p.id));
+  // Init other tabs
+  calcRVB();
+  calcPrivLend();
+  calcPortfolio();
+  // Build Market & Tax content
+  buildProjectionTable();
+  buildTaxCards();
+  buildHistoryTable();
+});
+
+// Redraw charts on window resize
+window.addEventListener('resize', () => {
+  if (!el('tab-mkt').classList.contains('hidden')) {
+    drawPriceChart();
+    drawBarChart();
+  }
+});
+</script>
+</body>
+</html>
