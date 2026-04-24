@@ -228,9 +228,14 @@ td:last-child { text-align: right; }
   <button class="tab" onclick="switchTab('crdirt',this)">Costa Rica Dirt</button>
 </div>
 
-<!-- BTL Property sub-nav -->
-<div id="btl-subnav" class="prop-nav">
+<!-- BTL sub-nav: portfolio views + individual properties -->
+<div id="btl-subnav" class="prop-nav" style="align-items:center;">
+  <!-- Portfolio-wide views -->
   <button class="pnav active" onclick="showProp('compare',this)">Compare All</button>
+  <button class="pnav" onclick="showProp('mkt',this)">Market &amp; Tax</button>
+  <!-- Visual divider between portfolio views and individual properties -->
+  <span style="display:inline-block;width:1px;height:20px;background:var(--border);margin:0 4px;"></span>
+  <!-- Individual property views -->
   <button class="pnav" onclick="showProp('p1',this)">Argyle Rd, W13</button>
   <button class="pnav" onclick="showProp('p2',this)">Woodhill, SE18</button>
   <button class="pnav" onclick="showProp('p3',this)">Cumberland Rd, Reading</button>
@@ -241,7 +246,6 @@ td:last-child { text-align: right; }
   <button class="pnav" onclick="showProp('p8',this)">Woodseer St, E1</button>
   <button class="pnav" onclick="showProp('p9',this)">Lea Bridge Rd, E10</button>
   <button class="pnav" onclick="showProp('p10',this)">Newburgh Rd, W3</button>
-  <button class="pnav" onclick="showProp('mkt',this)" style="border-color:var(--accent-dim);">Market &amp; Tax</button>
 </div>
 
 <div class="content">
