@@ -7,10 +7,31 @@
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 :root {
+  /* Dark mode (default) */
   --bg: #0d0f14; --surface: #13161d; --card: #181c26;
   --border: #252a38; --accent: #c9a84c; --accent-dim: #9c7c30;
   --green: #4caf82; --red: #e05c5c; --muted: #5a6175;
   --text: #d8dde8; --text-dim: #8c94a8;
+  --accent-soft: rgba(201,168,76,0.05);
+  --hover-bg: var(--card);
+  color-scheme: dark;
+}
+:root[data-theme="light"] {
+  /* Light mode — editorial / off-white / walnut accent */
+  --bg: #f7f4ec;        /* warm off-white page */
+  --surface: #ffffff;   /* header/tabs surface */
+  --card: #fbf8f0;      /* panels and metric cards */
+  --border: #dcd4bf;    /* subtle warm border */
+  --accent: #8a6d1e;    /* darker gold for contrast on light */
+  --accent-dim: #a88934;
+  --green: #2f7a4a;     /* deeper greens & reds for readability */
+  --red: #b63434;
+  --muted: #7a7567;
+  --text: #1d1a14;      /* near-black ink */
+  --text-dim: #4a4636;
+  --accent-soft: rgba(138,109,30,0.08);
+  --hover-bg: #f1ecdc;
+  color-scheme: light;
 }
 body { background: var(--bg); color: var(--text); font-family: Georgia, 'Times New Roman', serif; min-height: 100vh; }
 input[type=number], input[type=text] {
@@ -34,7 +55,7 @@ input:focus { outline: 1px solid var(--accent); }
 .prop-nav { display: flex; flex-wrap: wrap; gap: 8px; padding: 14px 32px; background: var(--surface); border-bottom: 1px solid var(--border); }
 .pnav { background: var(--card); border: 1px solid var(--border); border-radius: 20px; color: var(--muted); padding: 7px 16px; cursor: pointer; font-size: 12px; font-family: inherit; letter-spacing: .04em; transition: all .15s; white-space: nowrap; }
 .pnav:hover { border-color: var(--accent-dim); color: var(--text-dim); }
-.pnav.active { background: var(--accent); border-color: var(--accent); color: #0d0f14; font-weight: 700; }
+.pnav.active { background: var(--accent); border-color: var(--accent); color: var(--bg); font-weight: 700; }
 
 /* Layout */
 .content { padding: 24px 32px; }
@@ -95,7 +116,7 @@ td:last-child { text-align: right; }
 .compare-tbl th:first-child { text-align: left; }
 .compare-tbl td { padding: 11px 12px; font-size: 13px; color: var(--text-dim); border-bottom: 1px solid var(--border); text-align: right; white-space: nowrap; vertical-align: top; }
 .compare-tbl td:first-child { text-align: left; font-size: 13px; color: var(--text); }
-.compare-tbl tr.ref-row td { background: rgba(201,168,76,0.05); }
+.compare-tbl tr.ref-row td { background: var(--accent-soft); }
 .compare-tbl tr:hover td { background: var(--card); }
 .c-best { color: var(--green) !important; font-weight: 700; }
 .c-worst { color: var(--red) !important; }
@@ -144,7 +165,7 @@ td:last-child { text-align: right; }
 .neg { color: var(--red) !important; }
 .toggle-row { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
 .toggle-btn { background: var(--card); border: 1px solid var(--border); border-radius: 4px; color: var(--muted); padding: 6px 14px; cursor: pointer; font-size: 11px; font-family: inherit; transition: all .15s; }
-.toggle-btn.on { background: var(--accent); border-color: var(--accent); color: #0d0f14; font-weight: 700; }
+.toggle-btn.on { background: var(--accent); border-color: var(--accent); color: var(--bg); font-weight: 700; }
 
 /* Footer */
 .footer { padding: 12px 32px; border-top: 1px solid var(--border); font-size: 11px; color: var(--muted); margin-top: 40px; line-height: 1.8; }
@@ -160,7 +181,7 @@ td:last-child { text-align: right; }
   .content, #tab-lend > div { padding: 16px 20px; }
   .tab, .pnav { display: none; }
   .hidden { display: block !important; }
-  #tab-btl, #tab-mkt, #tab-rvb, #tab-lend { display: block !important; }
+  #tab-btl, #panel-mkt, #tab-rvb, #tab-lend { display: block !important; }
   #lend-bridge, #lend-btlmtg, #lend-lcompare, #lend-lnotes { display: block !important; }
   .panel { grid-template-columns: 1fr 1fr; }
   .inputs { page-break-inside: avoid; }
@@ -192,18 +213,19 @@ td:last-child { text-align: right; }
     <div>Structure: Limited Company (SPV)</div>
     <div>Market: Greater London · Elizabeth Line Corridor</div>
     <div>Buyer: Canadian Non-Resident</div>
-    <div style="margin-top:8px;">
-      <button onclick="exportModel()" style="background:var(--accent);color:#0d0f14;border:none;border-radius:4px;padding:6px 14px;font-size:11px;font-family:inherit;cursor:pointer;font-weight:700;letter-spacing:.04em;">Export / Print</button>
+    <div style="margin-top:8px;display:flex;gap:8px;justify-content:flex-end;">
+      <button id="theme-toggle" onclick="toggleTheme()" style="background:transparent;color:var(--accent);border:1px solid var(--accent-dim);border-radius:4px;padding:6px 12px;font-size:11px;font-family:inherit;cursor:pointer;letter-spacing:.04em;" title="Switch theme">Light mode</button>
+      <button onclick="exportModel()" style="background:var(--accent);color:var(--bg);border:none;border-radius:4px;padding:6px 14px;font-size:11px;font-family:inherit;cursor:pointer;font-weight:700;letter-spacing:.04em;">Export / Print</button>
     </div>
   </div>
 </div>
 
 <div class="tabs">
-  <button class="tab active" onclick="switchTab('btl',this)">Buy to Let</button>
-  <button class="tab" onclick="switchTab('mkt',this)">Market & Tax</button>
-  <button class="tab" onclick="switchTab('rvb',this)">Rent vs Buy</button>
-  <button class="tab" onclick="switchTab('lend',this)">Property Lending</button>
-  <button class="tab" onclick="switchTab('dirt',this)">The Dirt</button>
+  <button class="tab active" onclick="switchTab('btl',this)">London Property Buy to Let</button>
+  <button class="tab" onclick="switchTab('rvb',this)">London Rent vs Buy Analysis</button>
+  <button class="tab" onclick="switchTab('lend',this)">Private Lending London</button>
+  <button class="tab" onclick="switchTab('cadirt',this)">Canada Dirt</button>
+  <button class="tab" onclick="switchTab('crdirt',this)">Costa Rica Dirt</button>
 </div>
 
 <!-- BTL Property sub-nav -->
@@ -219,6 +241,7 @@ td:last-child { text-align: right; }
   <button class="pnav" onclick="showProp('p8',this)">Woodseer St, E1</button>
   <button class="pnav" onclick="showProp('p9',this)">Lea Bridge Rd, E10</button>
   <button class="pnav" onclick="showProp('p10',this)">Newburgh Rd, W3</button>
+  <button class="pnav" onclick="showProp('mkt',this)" style="border-color:var(--accent-dim);">Market &amp; Tax</button>
 </div>
 
 <div class="content">
@@ -245,10 +268,8 @@ td:last-child { text-align: right; }
     <!-- Individual property panels — injected by JS -->
     <div id="prop-panels"></div>
 
-  </div><!-- /tab-btl -->
-
-  <!-- MARKET & TAX -->
-  <div id="tab-mkt" class="hidden">
+    <!-- MARKET & TAX panel (nested inside BTL as a sub-view) -->
+    <div id="panel-mkt" class="hidden">
     <div class="mkt-layout">
 
       <!-- Price History Chart -->
@@ -315,7 +336,9 @@ td:last-child { text-align: right; }
       </div>
 
     </div>
-  </div><!-- /tab-mkt -->
+    </div><!-- /panel-mkt -->
+
+  </div><!-- /tab-btl -->
 
   <!-- RENT VS BUY -->
   <div id="tab-rvb" class="panel hidden">
@@ -602,16 +625,16 @@ td:last-child { text-align: right; }
     </div><!-- /padding wrapper -->
   </div><!-- /tab-lend -->
 
-  <!-- THE DIRT — Homesteading Research -->
-  <div id="tab-dirt" class="hidden" style="padding:0;">
+  <!-- CANADA DIRT — Homesteading Research -->
+  <div id="tab-cadirt" class="hidden" style="padding:0;">
 
-    <!-- Dirt sub-nav -->
-    <div class="prop-nav" id="dirt-subnav">
-      <button class="pnav active" onclick="showDirt('overview',this)">Regional Ranking</button>
-      <button class="pnav" onclick="showDirt('okanagan',this)">Okanagan / Sicamous</button>
-      <button class="pnav" onclick="showDirt('voices',this)">Community Voices</button>
-      <button class="pnav" onclick="showDirt('risks',this)">Risks & Regulation</button>
-      <button class="pnav" onclick="showDirt('sources',this)">Sources</button>
+    <!-- Canada Dirt sub-nav -->
+    <div class="prop-nav" id="cadirt-subnav">
+      <button class="pnav active" onclick="showCaDirt('overview',this)">Regional Ranking</button>
+      <button class="pnav" onclick="showCaDirt('okanagan',this)">Okanagan / Sicamous</button>
+      <button class="pnav" onclick="showCaDirt('voices',this)">Community Voices</button>
+      <button class="pnav" onclick="showCaDirt('risks',this)">Risks & Regulation</button>
+      <button class="pnav" onclick="showCaDirt('sources',this)">Sources</button>
     </div>
 
     <div style="padding:24px 32px;">
@@ -619,7 +642,7 @@ td:last-child { text-align: right; }
       <!-- Framing banner -->
       <div class="prop-banner">
         <div class="prop-banner-left">
-          <div class="prop-banner-name">The Dirt — Canadian Homesteading Research</div>
+          <div class="prop-banner-name">Canada Dirt — Canadian Homesteading Research</div>
           <div class="prop-banner-sub">Parallel thesis to the London BTL portfolio &middot; land, climate, water, regulation</div>
           <div class="prop-banner-note">Working brief: where in Canada does a homestead actually pencil out for us? Balancing climate stability, water, soil fertility, growing season, land affordability, and regulatory friction. This tab consolidates agent, blog, and community research — it is NOT financial modelling.</div>
         </div>
@@ -629,7 +652,7 @@ td:last-child { text-align: right; }
       </div>
 
       <!-- ================= OVERVIEW ================= -->
-      <div id="dirt-overview">
+      <div id="cadirt-overview">
         <div class="section-title" style="margin-top:0">Regional Ranking — Top Canadian Homestead Regions</div>
         <div class="compare-wrap">
           <table class="compare-tbl">
@@ -758,7 +781,7 @@ td:last-child { text-align: right; }
       </div>
 
       <!-- ================= OKANAGAN / SICAMOUS ================= -->
-      <div id="dirt-okanagan" class="hidden">
+      <div id="cadirt-okanagan" class="hidden">
         <div class="section-title" style="margin-top:0">Okanagan Valley &amp; Sicamous Deep Dive</div>
 
         <div class="panel" style="grid-template-columns:1fr 1fr;">
@@ -817,7 +840,7 @@ td:last-child { text-align: right; }
       </div>
 
       <!-- ================= COMMUNITY VOICES ================= -->
-      <div id="dirt-voices" class="hidden">
+      <div id="cadirt-voices" class="hidden">
         <div class="section-title" style="margin-top:0">Community Voices &mdash; Region-by-Region</div>
         <div style="color:var(--muted);font-size:12px;margin-bottom:16px;font-style:italic;">Curated quotes from r/homestead, r/Homesteading, r/britishcolumbia. Treated as lived-experience signal, not authoritative.</div>
 
@@ -881,7 +904,7 @@ td:last-child { text-align: right; }
       </div>
 
       <!-- ================= RISKS & REGULATION ================= -->
-      <div id="dirt-risks" class="hidden">
+      <div id="cadirt-risks" class="hidden">
         <div class="section-title" style="margin-top:0">Climate &amp; Geophysical Risks</div>
         <table>
           <tr class="bold"><td>Risk</td><td>Where it hits</td></tr>
@@ -919,7 +942,7 @@ td:last-child { text-align: right; }
       </div>
 
       <!-- ================= SOURCES ================= -->
-      <div id="dirt-sources" class="hidden">
+      <div id="cadirt-sources" class="hidden">
         <div class="section-title" style="margin-top:0">Sources &amp; Further Reading</div>
 
         <div class="section-title">Agent / Blog</div>
@@ -962,7 +985,353 @@ td:last-child { text-align: right; }
       </div>
 
     </div><!-- /padding wrapper -->
-  </div><!-- /tab-dirt -->
+  </div><!-- /tab-cadirt -->
+
+  <!-- COSTA RICA DIRT — Homesteading Research -->
+  <div id="tab-crdirt" class="hidden" style="padding:0;">
+
+    <!-- Costa Rica Dirt sub-nav -->
+    <div class="prop-nav" id="crdirt-subnav">
+      <button class="pnav active" onclick="showCrDirt('overview',this)">Regional Ranking</button>
+      <button class="pnav" onclick="showCrDirt('centralvalley',this)">Central Valley Deep Dive</button>
+      <button class="pnav" onclick="showCrDirt('voices',this)">Community Voices</button>
+      <button class="pnav" onclick="showCrDirt('risks',this)">Risks & Regulation</button>
+      <button class="pnav" onclick="showCrDirt('sources',this)">Sources</button>
+    </div>
+
+    <div style="padding:24px 32px;">
+
+      <!-- Framing banner -->
+      <div class="prop-banner">
+        <div class="prop-banner-left">
+          <div class="prop-banner-name">Costa Rica Dirt — Pura Vida Homesteading Research</div>
+          <div class="prop-banner-sub">Parallel thesis to Canada &middot; tropical climate, cheap land, strong foreign ownership rights</div>
+          <div class="prop-banner-note">Working brief: how Costa Rica compares to Canada for a homestead &mdash; climate, land law, residency, cost of living. Starter context populated from widely-known facts; expand with Reddit / expat blog / agent dumps the same way we built Canada Dirt.</div>
+        </div>
+        <div class="prop-banner-chips">
+          <span class="chip">Thesis: lower cost, year-round growing, equal ownership rights for foreigners</span>
+        </div>
+      </div>
+
+      <!-- ================= OVERVIEW ================= -->
+      <div id="crdirt-overview">
+        <div class="section-title" style="margin-top:0">Regional Ranking — Costa Rica Homestead Regions</div>
+        <div class="compare-wrap">
+          <table class="compare-tbl">
+            <thead>
+              <tr>
+                <th style="text-align:left;">Region</th>
+                <th style="text-align:left;">Climate / Elevation</th>
+                <th style="text-align:left;">Water</th>
+                <th style="text-align:left;">Soil / Growing</th>
+                <th style="text-align:left;">Land Price</th>
+                <th style="text-align:left;">Tier</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="ref-row">
+                <td>Central Valley / Highlands<br><span style="color:var(--muted);font-size:11px;">Atenas, Grecia, San Ramón, Naranjo</span></td>
+                <td style="text-align:left;">Spring-like year-round; ~800–1400m; no AC needed</td>
+                <td style="text-align:left;"><span class="c-best">Plentiful</span>; rivers, springs, mature ASADA water systems</td>
+                <td style="text-align:left;">Volcanic, very fertile; coffee country</td>
+                <td style="text-align:left;">Moderate; infra premium</td>
+                <td style="text-align:left;"><span class="c-best">S &mdash; best climate &amp; infra</span></td>
+              </tr>
+              <tr>
+                <td>Southern Zone<br><span style="color:var(--muted);font-size:11px;">Pérez Zeledón, Uvita, Dominical, Ojochal</span></td>
+                <td style="text-align:left;">Tropical; hills cooler; coastal hot &amp; humid</td>
+                <td style="text-align:left;">Abundant rain; rivers; some dry-season scarcity near coast</td>
+                <td style="text-align:left;">Fertile, jungle-regrowth soils</td>
+                <td style="text-align:left;">Moderate; rising fast</td>
+                <td style="text-align:left;"><span class="c-best">S &mdash; jungle + ocean combo</span></td>
+              </tr>
+              <tr>
+                <td>Nicoya Peninsula (inland hills)<br><span style="color:var(--muted);font-size:11px;">Hojancha, Nandayure, inland from Nosara</span></td>
+                <td style="text-align:left;">Dry tropical; 5-month dry season; <span class="c-best">Blue Zone longevity pocket</span></td>
+                <td style="text-align:left;">Dry-season water risk; wells + rain capture essential</td>
+                <td style="text-align:left;">Decent; cattle country historically</td>
+                <td style="text-align:left;">Moderate inland; expensive near coast</td>
+                <td style="text-align:left;">A &mdash; lifestyle + health</td>
+              </tr>
+              <tr>
+                <td>Osa Peninsula / Golfo Dulce</td>
+                <td style="text-align:left;">Tropical rainforest; extremely wet; hot</td>
+                <td style="text-align:left;">Abundant (too much)</td>
+                <td style="text-align:left;">Biodiverse; heavy regulation on clearing</td>
+                <td style="text-align:left;">Cheap but remote</td>
+                <td style="text-align:left;">B &mdash; off-grid purist only</td>
+              </tr>
+              <tr>
+                <td>Caribbean Coast<br><span style="color:var(--muted);font-size:11px;">Limón, Puerto Viejo, Cahuita</span></td>
+                <td style="text-align:left;">Very rainy; no dry season; Afro-Caribbean culture</td>
+                <td style="text-align:left;">Plentiful (excessive)</td>
+                <td style="text-align:left;">Rich; cacao, banana, plantain</td>
+                <td style="text-align:left;"><span class="c-best">Cheapest mainstream region</span></td>
+                <td style="text-align:left;">B &mdash; value + culture</td>
+              </tr>
+              <tr>
+                <td>Northern Plains<br><span style="color:var(--muted);font-size:11px;">San Carlos, La Fortuna, Bijagua</span></td>
+                <td style="text-align:left;">Hot, humid lowlands; Arenal views</td>
+                <td style="text-align:left;">Abundant rivers &amp; springs</td>
+                <td style="text-align:left;">Agricultural belt (pineapple, dairy)</td>
+                <td style="text-align:left;">Low-moderate</td>
+                <td style="text-align:left;">B &mdash; agri scale-up play</td>
+              </tr>
+              <tr>
+                <td>Guanacaste Coast<br><span style="color:var(--muted);font-size:11px;">Tamarindo, Sámara, Nosara</span></td>
+                <td style="text-align:left;">Hottest; long dry season; resort zone</td>
+                <td style="text-align:left;"><span class="c-worst">Water stress</span>; wells under pressure</td>
+                <td style="text-align:left;">Dry; limited without irrigation</td>
+                <td style="text-align:left;"><span class="c-worst">Priced like Florida</span></td>
+                <td style="text-align:left;">C &mdash; surf/tourism not homestead</td>
+              </tr>
+              <tr>
+                <td>Talamanca Highlands<br><span style="color:var(--muted);font-size:11px;">San Gerardo de Dota, Copey</span></td>
+                <td style="text-align:left;">Cool mountain; 2000–3000m; trout &amp; apples</td>
+                <td style="text-align:left;">Excellent; cloud-forest springs</td>
+                <td style="text-align:left;">Cooler crops possible (apple, stone fruit)</td>
+                <td style="text-align:left;">Moderate; limited inventory</td>
+                <td style="text-align:left;">A &mdash; niche alpine pick</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="compare-legend" style="margin-top:14px;">
+          <strong style="color:var(--accent);">Starter short list:</strong>
+          Central Valley (S) &middot; Southern Zone / Uvita–Dominical hills (S) &middot; Nicoya inland / Blue Zone (A) &middot; Talamanca highlands (A &mdash; cool climate)
+        </div>
+
+        <div class="section-title">Criteria Snapshot</div>
+        <div class="metrics" style="grid-template-columns:repeat(4,1fr);">
+          <div class="metric-card highlight"><div class="metric-label">Best Climate</div><div class="metric-value" style="font-size:16px;">Central Valley</div><div class="metric-sub">"Eternal spring" 18&ndash;26&deg;C</div></div>
+          <div class="metric-card highlight"><div class="metric-label">Best Water</div><div class="metric-value" style="font-size:16px;">Central Valley / South</div><div class="metric-sub">Volcanic aquifers &amp; ASADAs</div></div>
+          <div class="metric-card highlight"><div class="metric-label">Best Soil</div><div class="metric-value" style="font-size:16px;">Volcanic Central</div><div class="metric-sub">Coffee-country fertile loam</div></div>
+          <div class="metric-card highlight"><div class="metric-label">Best Affordability</div><div class="metric-value" style="font-size:16px;">Caribbean / North</div><div class="metric-sub">5&ndash;20&times; cheaper than Canada</div></div>
+        </div>
+
+        <div class="section-title">Why Costa Rica vs Canada</div>
+        <table>
+          <tr class="bold"><td>Factor</td><td>Costa Rica advantage</td></tr>
+          <tr><td style="color:var(--text);">Climate</td><td>Year-round growing. No winter. No snow load. No polar vortex.</td></tr>
+          <tr><td style="color:var(--text);">Land ownership</td><td>Foreigners have <span class="c-best">identical fee-simple rights</span> to citizens (except 200m Maritime Zone).</td></tr>
+          <tr><td style="color:var(--text);">Residency</td><td>Multiple paths: <em>rentista</em> ($2,500/mo proof), <em>pensionado</em> ($1,000/mo pension), <em>inversionista</em> ($150k&ndash;$200k investment).</td></tr>
+          <tr><td style="color:var(--text);">Property tax</td><td>0.25% of declared value &mdash; trivial vs UK council tax or CA property tax.</td></tr>
+          <tr><td style="color:var(--text);">Cost of living</td><td>Lower than Canada &amp; UK outside expat zones; groceries &amp; labour notably cheap.</td></tr>
+          <tr><td style="color:var(--text);">Stability</td><td>No army (abolished 1948); stable democracy; no civil conflict in living memory.</td></tr>
+          <tr><td style="color:var(--text);">Biodiversity</td><td>~5% of world's species on 0.03% of land area &mdash; forage, pollinators, soil biology.</td></tr>
+          <tr><td style="color:var(--text);">Healthcare</td><td>Universal Caja system + strong private; Costa Rica consistently ranks top-3 in Latin America.</td></tr>
+        </table>
+      </div>
+
+      <!-- ================= CENTRAL VALLEY DEEP DIVE ================= -->
+      <div id="crdirt-centralvalley" class="hidden">
+        <div class="section-title" style="margin-top:0">Central Valley Deep Dive &mdash; Atenas / Grecia / San Ramón</div>
+        <div class="panel" style="grid-template-columns:1fr 1fr;">
+          <div>
+            <div class="section-title" style="margin-top:0">Why the Central Valley is the consensus pick</div>
+            <table>
+              <tr><td style="color:var(--text);">Climate</td><td>~800&ndash;1400m elevation; 18&ndash;26&deg;C year-round; "best climate in the world" (National Geographic, widely cited)</td></tr>
+              <tr><td style="color:var(--text);">Growing season</td><td>365 days; coffee, citrus, banana, avocado, leafy greens, herbs perpetually</td></tr>
+              <tr><td style="color:var(--text);">Water</td><td>Volcanic aquifers; mature ASADA community-water systems; rivers everywhere</td></tr>
+              <tr><td style="color:var(--text);">Soil</td><td>Volcanic loam; the reason Costa Rican coffee commands premium</td></tr>
+              <tr><td style="color:var(--text);">Infrastructure</td><td>30&ndash;90 min from SJO international airport; fibre; hospitals (CIMA, Clínica Bíblica)</td></tr>
+              <tr><td style="color:var(--text);">Community</td><td>Large established expat base in Atenas / Grecia / San Ramón / Escazú</td></tr>
+              <tr><td style="color:var(--text);">Commerce</td><td>Farmers' markets weekly (feria) in every town; farm-gate direct sales normal</td></tr>
+            </table>
+
+            <div class="section-title">Red Flags</div>
+            <table>
+              <tr><td style="color:var(--red);">Earthquakes</td><td>Active volcanic zone (Poás, Irazú, Turrialba); building codes matter</td></tr>
+              <tr><td style="color:var(--red);">Landslides</td><td>Rainy-season risk on slopes &gt;30%; regulation restricts building on steep land</td></tr>
+              <tr><td style="color:var(--red);">Squatter rights</td><td>Absentee owners can lose land to occupants after 10 years &mdash; security &amp; caretaker presence matter</td></tr>
+              <tr><td style="color:var(--red);">Bureaucracy</td><td>"Tico time" &mdash; lawyer &amp; notary steps slow; escrow + title check essential</td></tr>
+              <tr><td style="color:var(--red);">Water rights</td><td>ASADA connections can be capped &mdash; verify water availability BEFORE buying</td></tr>
+              <tr><td style="color:var(--red);">Price inflation</td><td>Expat demand has pushed prices up 10&ndash;20%/yr in hot zones 2020&ndash;2025</td></tr>
+            </table>
+          </div>
+
+          <div>
+            <div class="section-title" style="margin-top:0">Practical Start-Small Playbook</div>
+            <table>
+              <tr><td style="color:var(--text);">Rent first (3&ndash;6 mo)</td><td>Test the microclimate &mdash; valleys vary 5&deg;C within 10km</td></tr>
+              <tr><td style="color:var(--text);">Parcel pre-checks</td><td>Water letter (<em>carta de agua</em>), road access (public not servidumbre), zoning, <em>plano catastrado</em> matching registry</td></tr>
+              <tr><td style="color:var(--text);">Use a tico-experienced lawyer</td><td>Not a realtor's lawyer &mdash; independent. Title insurance via Stewart Title CR.</td></tr>
+              <tr><td style="color:var(--text);">Residency path</td><td>Inversionista ($150k property after 2024 reform) covers it if land is in your name</td></tr>
+              <tr><td style="color:var(--text);">Banking</td><td>BAC San José / BCR accept residents; cash purchase via escrow (Stewart, Secure Title) common</td></tr>
+              <tr><td style="color:var(--text);">SUGEF registration</td><td>Required for wire transfers &gt;$10k &mdash; file early</td></tr>
+            </table>
+
+            <div class="section-title">Starter Crop Priorities (tropical)</div>
+            <table>
+              <tr><td style="color:var(--text);">Banana / plantain</td><td>Year 1 yield; propagates forever; feed for pigs/chickens</td></tr>
+              <tr><td style="color:var(--text);">Cassava (yuca) &amp; sweet potato</td><td>Staple calories; low input; store in ground</td></tr>
+              <tr><td style="color:var(--text);">Tomatoes, peppers, lettuce, cucumber</td><td>Continuous succession at Central Valley elevation</td></tr>
+              <tr><td style="color:var(--text);">Herbs (cilantro, oregano, basil)</td><td>Perpetual; feria markup strong</td></tr>
+              <tr><td style="color:var(--text);">Perennials</td><td>Avocado, citrus (orange, lime, mandarin), mango, papaya, starfruit, coffee, cacao &mdash; 3&ndash;5 yr to yield</td></tr>
+              <tr><td style="color:var(--text);">Leucaena / Moringa</td><td>Fast-growing nitrogen fixer + livestock feed + human use</td></tr>
+            </table>
+
+            <div class="section-title">Livestock Starter</div>
+            <table>
+              <tr><td style="color:var(--text);">Chickens</td><td>Criollo breed; year-round free-range; no winter housing needed</td></tr>
+              <tr><td style="color:var(--text);">Pigs</td><td>Feed on banana, yuca, food scraps; fast turnaround</td></tr>
+              <tr><td style="color:var(--text);">Goats / hair sheep</td><td>Hair sheep (Katahdin, Pelibuey) thrive in tropics &mdash; no shearing</td></tr>
+              <tr><td style="color:var(--text);">Bees</td><td>Native <em>Apis</em> + <em>mariola</em> (stingless) &mdash; honey + pollination</td></tr>
+              <tr><td style="color:var(--text);">Tilapia</td><td>Pond aquaculture common; ready CR hatcheries</td></tr>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ================= COMMUNITY VOICES ================= -->
+      <div id="crdirt-voices" class="hidden">
+        <div class="section-title" style="margin-top:0">Community Voices &mdash; Costa Rica</div>
+        <div style="color:var(--muted);font-size:12px;margin-bottom:16px;font-style:italic;">Placeholder &mdash; awaiting research dumps from Reddit (r/costa_rica, r/expats), Facebook expat groups, Ticotimes, We Love Costa Rica forum. Seeded with widely-echoed expat themes so the structure is ready to expand.</div>
+
+        <div class="section-title">Central Valley</div>
+        <div style="background:var(--card);border-left:3px solid var(--accent);padding:12px 16px;margin-bottom:10px;border-radius:4px;">
+          <div style="color:var(--text);">Widely echoed theme: Atenas / Grecia / San Ramón are the "retire &amp; homestead" sweet spot &mdash; close enough to SJO for international flights &amp; hospitals, far enough for land &amp; quiet. Climate consistently cited as the single best reason.</div>
+          <div style="color:var(--muted);font-size:11px;margin-top:6px;">&mdash; Placeholder &middot; replace with sourced quotes</div>
+        </div>
+
+        <div class="section-title">Southern Zone (Uvita / Dominical / Ojochal)</div>
+        <div style="background:var(--card);border-left:3px solid var(--green);padding:12px 16px;margin-bottom:10px;border-radius:4px;">
+          <div style="color:var(--text);">Common sentiment: the "new Central Valley" &mdash; hills behind the coast give elevation+breeze without giving up ocean access. Prices up sharply 2020&ndash;2025 but still below Nicoya coast. Community of homesteading expats meaningful.</div>
+          <div style="color:var(--muted);font-size:11px;margin-top:6px;">&mdash; Placeholder &middot; replace with sourced quotes</div>
+        </div>
+
+        <div class="section-title">Nicoya Blue Zone</div>
+        <div style="background:var(--card);border-left:3px solid var(--accent);padding:12px 16px;margin-bottom:10px;border-radius:4px;">
+          <div style="color:var(--text);">Widely cited longevity hotspot (Dan Buettner, <em>Blue Zones</em>). Traditional diet of beans, corn, squash, tropical fruit. Dry-season water management the perennial practical concern.</div>
+          <div style="color:var(--muted);font-size:11px;margin-top:6px;">&mdash; Placeholder &middot; replace with sourced quotes</div>
+        </div>
+
+        <div class="section-title">Caribbean Coast</div>
+        <div style="background:var(--card);border-left:3px solid var(--accent);padding:12px 16px;margin-bottom:10px;border-radius:4px;">
+          <div style="color:var(--text);">Cheapest mainstream region. Rain is the thing &mdash; no dry-season break. Afro-Caribbean + Bribri indigenous culture distinctive. Historically underdeveloped but road upgrades changing that.</div>
+          <div style="color:var(--muted);font-size:11px;margin-top:6px;">&mdash; Placeholder &middot; replace with sourced quotes</div>
+        </div>
+      </div>
+
+      <!-- ================= RISKS & REGULATION ================= -->
+      <div id="crdirt-risks" class="hidden">
+        <div class="section-title" style="margin-top:0">Climate &amp; Geophysical Risks</div>
+        <table>
+          <tr class="bold"><td>Risk</td><td>Where it hits</td></tr>
+          <tr><td style="color:var(--text);">Earthquakes</td><td>Whole country &mdash; Pacific Ring of Fire. 5+ magnitude events every few years. Codes strict; follow them.</td></tr>
+          <tr><td style="color:var(--text);">Volcanic activity</td><td>Poás, Turrialba, Arenal, Rincón de la Vieja. Ashfall rare; lava flows confined to parks.</td></tr>
+          <tr><td style="color:var(--text);">Landslides</td><td>Rainy season (May&ndash;Nov) on slopes &gt;30%. Check soils, drainage, retaining walls.</td></tr>
+          <tr><td style="color:var(--text);">Flooding</td><td>Caribbean + Southern Pacific; rivers swell fast. Avoid floodplains even in dry season.</td></tr>
+          <tr><td style="color:var(--text);">Hurricanes</td><td>Rare direct strikes but fringes hit (Otto 2016, Nate 2017). Caribbean coast more exposed.</td></tr>
+          <tr><td style="color:var(--text);">Dry-season water</td><td>Nicoya / Guanacaste &mdash; wells drying up. ASADA rationing real in drought years.</td></tr>
+          <tr><td style="color:var(--text);">Heat / humidity</td><td>Lowlands oppressive Mar&ndash;May pre-rains. Highlands spared.</td></tr>
+        </table>
+
+        <div class="section-title">Legal &amp; Ownership Risks</div>
+        <table>
+          <tr class="bold"><td>Issue</td><td>What to know</td></tr>
+          <tr><td style="color:var(--green);">Foreign ownership</td><td>Foreigners have same fee-simple rights as citizens. Titled land (<em>propiedad titulada</em>) is the gold standard.</td></tr>
+          <tr><td style="color:var(--accent);">Maritime Zone (ZMT)</td><td>First 50m of beach: public, cannot own. Next 150m: concession (leasehold) from municipality, foreign ownership capped at 49% unless CR resident 5+ years. <strong>Avoid ZMT for homesteading.</strong></td></tr>
+          <tr><td style="color:var(--red);">Squatter rights</td><td>Occupancy 10 years can lead to title transfer. <strong>Never leave land unoccupied.</strong> Hire caretaker; fence &amp; sign it.</td></tr>
+          <tr><td style="color:var(--red);">Derecho vs Título</td><td><em>Derechos</em> (rights) land is NOT titled &mdash; avoid. Only buy <em>propiedad titulada</em> registered at Registro Nacional.</td></tr>
+          <tr><td style="color:var(--accent);">Water letter</td><td>"Carta de agua" from local ASADA required to confirm water supply. No letter = no home build permit.</td></tr>
+          <tr><td style="color:var(--accent);">Setbacks &amp; environmental</td><td>Rivers: 15m setback rural / 10m urban. Slopes &gt;30%: build restrictions. Protected zones: clearance prohibited.</td></tr>
+          <tr><td style="color:var(--accent);">Rental law</td><td>Heavily tenant-favouring &mdash; if you rent out a casita, eviction hard. Use short-term/tourist rental structure not long lease.</td></tr>
+          <tr><td style="color:var(--accent);">Luxury tax</td><td>Homes with value &gt; ~$235k (indexed) pay 0.25&ndash;0.55% p.a. &mdash; modest but plan for it.</td></tr>
+        </table>
+
+        <div class="section-title">Residency Paths (2026)</div>
+        <table>
+          <tr><td style="color:var(--text);">Pensionado</td><td>$1,000/mo lifetime pension income &mdash; retiree path</td></tr>
+          <tr><td style="color:var(--text);">Rentista</td><td>$2,500/mo demonstrated income for 2 years OR $60k bank deposit</td></tr>
+          <tr><td style="color:var(--text);">Inversionista</td><td>$150k invested in real estate, business, or registered assets (reduced from $200k in 2022 law)</td></tr>
+          <tr><td style="color:var(--text);">Familiar</td><td>Parent/spouse/child of Costa Rican citizen</td></tr>
+          <tr><td style="color:var(--text);">Permanent residency</td><td>After 3 years on temporary &mdash; unlocks work rights</td></tr>
+          <tr><td style="color:var(--text);">Citizenship</td><td>After 7 years permanent residency (5 for Ibero-American/Spanish)</td></tr>
+        </table>
+
+        <div class="section-title">Hidden Costs Checklist</div>
+        <table>
+          <tr><td style="color:var(--text);">Lawyer + notary</td><td>1&ndash;2% of price for closing; non-negotiable</td></tr>
+          <tr><td style="color:var(--text);">Transfer tax + stamps</td><td>~3.6% of declared value at closing</td></tr>
+          <tr><td style="color:var(--text);">Title insurance</td><td>~0.5&ndash;1% via Stewart Title CR &mdash; worth it</td></tr>
+          <tr><td style="color:var(--text);">Well + septic</td><td>$8k&ndash;$20k where ASADA unavailable</td></tr>
+          <tr><td style="color:var(--text);">Road access upgrades</td><td>Gravel grading $500&ndash;$2k; asphalt unlikely on rural parcels</td></tr>
+          <tr><td style="color:var(--text);">Import of possessions</td><td>Heavy duties on cars &amp; electronics; budget local purchase</td></tr>
+          <tr><td style="color:var(--text);">Caja health contribution</td><td>~7&ndash;11% of declared income once resident &mdash; gives universal healthcare</td></tr>
+          <tr><td style="color:var(--text);">SUGEF / AML filings</td><td>Any wire &gt;$10k requires source-of-funds documentation</td></tr>
+        </table>
+      </div>
+
+      <!-- ================= SOURCES ================= -->
+      <div id="crdirt-sources" class="hidden">
+        <div class="section-title" style="margin-top:0">Sources &amp; Further Reading</div>
+
+        <div class="section-title">Agent / Legal / Official</div>
+        <table>
+          <tr>
+            <td style="color:var(--text);">Registro Nacional &mdash; Costa Rica land registry (check <em>plano catastrado</em> before purchase)</td>
+            <td><a class="tbl-link" href="https://www.rnpdigital.com/" target="_blank" rel="noopener">rnpdigital.com &rarr;</a></td>
+          </tr>
+          <tr>
+            <td style="color:var(--text);">Stewart Title Costa Rica &mdash; escrow &amp; title insurance</td>
+            <td><a class="tbl-link" href="https://www.stewart.com/" target="_blank" rel="noopener">stewart.com &rarr;</a></td>
+          </tr>
+          <tr>
+            <td style="color:var(--text);">Costa Rica Residency Experts / outliers.cr</td>
+            <td><a class="tbl-link" href="https://www.outliers.cr/" target="_blank" rel="noopener">outliers.cr &rarr;</a></td>
+          </tr>
+          <tr>
+            <td style="color:var(--text);">Tico Times &mdash; English-language news, real estate coverage</td>
+            <td><a class="tbl-link" href="https://ticotimes.net/" target="_blank" rel="noopener">ticotimes.net &rarr;</a></td>
+          </tr>
+        </table>
+
+        <div class="section-title">Community Threads &amp; Forums</div>
+        <table>
+          <tr>
+            <td style="color:var(--text);">r/costa_rica &mdash; general expat/resident discussions</td>
+            <td><a class="tbl-link" href="https://www.reddit.com/r/costa_rica/" target="_blank" rel="noopener">reddit.com/r/costa_rica &rarr;</a></td>
+          </tr>
+          <tr>
+            <td style="color:var(--text);">r/expats &mdash; cross-country residency comparisons</td>
+            <td><a class="tbl-link" href="https://www.reddit.com/r/expats/" target="_blank" rel="noopener">reddit.com/r/expats &rarr;</a></td>
+          </tr>
+          <tr>
+            <td style="color:var(--text);">We Love Costa Rica &mdash; expat Q&amp;A archive</td>
+            <td><a class="tbl-link" href="https://www.welovecostarica.com/" target="_blank" rel="noopener">welovecostarica.com &rarr;</a></td>
+          </tr>
+          <tr>
+            <td style="color:var(--text);">Facebook: "Expats in Costa Rica", "Homesteading in Costa Rica"</td>
+            <td><span style="color:var(--muted);font-size:11px;">search groups on fb</span></td>
+          </tr>
+        </table>
+
+        <div class="section-title">Reading / Reference</div>
+        <table>
+          <tr>
+            <td style="color:var(--text);">Dan Buettner &mdash; <em>The Blue Zones</em> (Nicoya chapter)</td>
+            <td><span style="color:var(--muted);font-size:11px;">book</span></td>
+          </tr>
+          <tr>
+            <td style="color:var(--text);">Christopher Howard &mdash; <em>Living &amp; Investing in the New Costa Rica</em></td>
+            <td><span style="color:var(--muted);font-size:11px;">book</span></td>
+          </tr>
+        </table>
+
+        <div class="section-title">Next Research Steps</div>
+        <table>
+          <tr><td style="color:var(--text);">1. Drop research dumps</td><td>Same workflow as Canada &mdash; paste Reddit threads / agent blogs and they'll be folded in</td></tr>
+          <tr><td style="color:var(--text);">2. Shortlist 2 regions</td><td>Central Valley + Southern Zone probable &mdash; get comparables</td></tr>
+          <tr><td style="color:var(--text);">3. Visit scouting</td><td>2&ndash;3 week rent-before-buy stays in each shortlist</td></tr>
+          <tr><td style="color:var(--text);">4. Bilingual lawyer + escrow</td><td>Vet before any offer &mdash; referrals via outliers.cr or expat networks</td></tr>
+          <tr><td style="color:var(--text);">5. Water letter + title check</td><td>Absolute prerequisites on any specific parcel</td></tr>
+          <tr><td style="color:var(--text);">6. Cross-compare to Canada Dirt</td><td>Side-by-side P&amp;L tab once both shortlists firm</td></tr>
+        </table>
+      </div>
+
+    </div><!-- /padding wrapper -->
+  </div><!-- /tab-crdirt -->
 
 </div><!-- /content -->
 
@@ -1589,18 +1958,25 @@ function showProp(pid, btn) {
     const panel = el('panel-'+p.id);
     if (panel) panel.classList.toggle('hidden', p.id !== pid);
   });
-  document.querySelectorAll('.pnav').forEach(b => b.classList.remove('active'));
+  const mkt = el('panel-mkt');
+  if (mkt) mkt.classList.toggle('hidden', pid !== 'mkt');
+  // BTL sub-nav only — don't clobber active states on other tabs' sub-navs
+  const subnav = el('btl-subnav');
+  if (subnav) subnav.querySelectorAll('.pnav').forEach(b => b.classList.remove('active'));
   if (btn) btn.classList.add('active');
+  // Redraw charts when entering Market & Tax sub-view
+  if (pid === 'mkt') { try { drawPriceChart(); drawBarChart(); } catch(e){} }
 }
 
 function switchTab(id, btn) {
-  ['btl','mkt','rvb','lend','dirt'].forEach(t => el('tab-'+t).classList.toggle('hidden', t !== id));
-  document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
+  ['btl','rvb','lend','cadirt','crdirt'].forEach(t => {
+    const node = el('tab-'+t);
+    if (node) node.classList.toggle('hidden', t !== id);
+  });
+  document.querySelectorAll('.tabs > .tab').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
   const sn = el('btl-subnav');
   if (sn) sn.classList.toggle('hidden', id !== 'btl');
-  // Redraw charts when switching to market tab
-  if (id === 'mkt') { drawPriceChart(); drawBarChart(); }
   // Trigger lending calc when switching to lending tab
   if (id === 'lend') { calcPrivLend(); }
 }
@@ -1849,6 +2225,22 @@ function calcPortfolio() {
 // =====================================================================
 // CHARTS — Canvas-based (no external dependencies)
 // =====================================================================
+function tvar(name) {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+function chartPalette() {
+  return {
+    bg:     tvar('--card')    || '#181c26',
+    surface:tvar('--surface') || '#13161d',
+    border: tvar('--border')  || '#252a38',
+    muted:  tvar('--muted')   || '#5a6175',
+    text:   tvar('--text')    || '#d8dde8',
+    accent: tvar('--accent')  || '#c9a84c',
+    green:  tvar('--green')   || '#4caf82',
+    red:    tvar('--red')     || '#e05c5c'
+  };
+}
+
 function drawPriceChart() {
   const canvas = el('price-chart');
   if (!canvas) return;
@@ -1868,7 +2260,8 @@ function drawPriceChart() {
   const cH = H - pad.top - pad.bottom;
 
   // Clear
-  ctx.fillStyle = '#181c26';
+  const pal = chartPalette();
+  ctx.fillStyle = pal.bg;
   ctx.fillRect(0, 0, W, H);
 
   // Build property projection lines (purchase 2026, project forward)
@@ -1911,7 +2304,7 @@ function drawPriceChart() {
   const yPropScale = (v) => pad.top + cH - ((v - propMin) / (propMax - propMin)) * cH;
 
   // Grid lines
-  ctx.strokeStyle = '#252a38';
+  ctx.strokeStyle = pal.border;
   ctx.lineWidth = 0.5;
   for (let i = 0; i <= 5; i++) {
     const y = pad.top + (cH / 5) * i;
@@ -1919,12 +2312,12 @@ function drawPriceChart() {
   }
 
   // Vertical year lines
-  ctx.fillStyle = '#5a6175';
+  ctx.fillStyle = pal.muted;
   ctx.font = '10px Georgia';
   ctx.textAlign = 'center';
   for (let yr = 2008; yr <= 2036; yr += 2) {
     const x = xScale(yr);
-    ctx.strokeStyle = '#1a1e28';
+    ctx.strokeStyle = pal.border;
     ctx.beginPath(); ctx.moveTo(x, pad.top); ctx.lineTo(x, pad.top + cH); ctx.stroke();
     ctx.fillText(yr, x, H - pad.bottom + 16);
   }
@@ -1932,18 +2325,18 @@ function drawPriceChart() {
   ctx.fillText('2037', xScale(2037), H - pad.bottom + 16);
 
   // Divider line at 2026 (forecast boundary)
-  ctx.strokeStyle = '#5a6175';
+  ctx.strokeStyle = pal.muted;
   ctx.setLineDash([4, 4]);
   ctx.lineWidth = 1;
   const x2026 = xScale(2026);
   ctx.beginPath(); ctx.moveTo(x2026, pad.top); ctx.lineTo(x2026, pad.top + cH); ctx.stroke();
   ctx.setLineDash([]);
-  ctx.fillStyle = '#5a6175';
+  ctx.fillStyle = pal.muted;
   ctx.font = '10px Georgia';
   ctx.fillText('Purchase', x2026, pad.top - 6);
 
   // Draw London index line (grey, thicker)
-  ctx.strokeStyle = 'rgba(216,221,232,0.3)';
+  ctx.strokeStyle = pal.muted;
   ctx.lineWidth = 2.5;
   ctx.beginPath();
   allYears.forEach((yr, i) => {
@@ -1973,7 +2366,7 @@ function drawPriceChart() {
   });
 
   // Left Y axis labels (index)
-  ctx.fillStyle = '#5a6175';
+  ctx.fillStyle = pal.muted;
   ctx.font = '10px Georgia';
   ctx.textAlign = 'right';
   for (let i = 0; i <= 5; i++) {
@@ -2021,7 +2414,8 @@ function drawBarChart() {
   const cW = W - pad.left - pad.right;
   const cH = H - pad.top - pad.bottom;
 
-  ctx.fillStyle = '#181c26';
+  const pal = chartPalette();
+  ctx.fillStyle = pal.bg;
   ctx.fillRect(0, 0, W, H);
 
   const years = YEARS;
@@ -2033,12 +2427,12 @@ function drawBarChart() {
   const zeroY = pad.top + cH * (maxV / (2 * maxV));
 
   // Zero line
-  ctx.strokeStyle = '#5a6175';
+  ctx.strokeStyle = pal.muted;
   ctx.lineWidth = 1;
   ctx.beginPath(); ctx.moveTo(pad.left, zeroY); ctx.lineTo(W - pad.right, zeroY); ctx.stroke();
 
   // Grid
-  ctx.strokeStyle = '#1a1e28';
+  ctx.strokeStyle = pal.border;
   ctx.lineWidth = 0.5;
   [-15,-10,-5,5,10,15,20].forEach(v => {
     if (Math.abs(v) > maxV) return;
@@ -2047,7 +2441,7 @@ function drawBarChart() {
   });
 
   // Y labels
-  ctx.fillStyle = '#5a6175';
+  ctx.fillStyle = pal.muted;
   ctx.font = '10px Georgia';
   ctx.textAlign = 'right';
   [-15,-10,-5,0,5,10,15,20].forEach(v => {
@@ -2063,9 +2457,9 @@ function drawBarChart() {
     const barH = Math.abs(v) / (2 * maxV) * cH;
     const type = LONDON_PRICE_DATA[yr].type;
 
-    if (type === 'actual') ctx.fillStyle = v >= 0 ? '#4caf82' : '#e05c5c';
-    else if (type === 'forecast') ctx.fillStyle = v >= 0 ? 'rgba(201,168,76,0.8)' : 'rgba(224,92,92,0.6)';
-    else ctx.fillStyle = v >= 0 ? 'rgba(90,97,117,0.6)' : 'rgba(224,92,92,0.4)';
+    if (type === 'actual') ctx.fillStyle = v >= 0 ? pal.green : pal.red;
+    else if (type === 'forecast') ctx.fillStyle = v >= 0 ? pal.accent : pal.red;
+    else ctx.fillStyle = v >= 0 ? pal.muted : pal.red;
 
     if (v >= 0) {
       ctx.fillRect(x, zeroY - barH, barW, barH);
@@ -2074,7 +2468,7 @@ function drawBarChart() {
     }
 
     // Year label
-    ctx.fillStyle = '#5a6175';
+    ctx.fillStyle = pal.muted;
     ctx.font = '9px Georgia';
     ctx.textAlign = 'center';
     if (yr % 2 === 1 || years.length < 25) {
@@ -2082,7 +2476,7 @@ function drawBarChart() {
     }
 
     // Value label on bar
-    ctx.fillStyle = '#d8dde8';
+    ctx.fillStyle = pal.text;
     ctx.font = '8px Georgia';
     if (v >= 0) {
       ctx.fillText(v.toFixed(1), x + barW/2, zeroY - barH - 4);
@@ -2095,12 +2489,12 @@ function drawBarChart() {
   ctx.font = '10px Georgia';
   ctx.textAlign = 'left';
   const lx = pad.left;
-  ctx.fillStyle = '#4caf82'; ctx.fillRect(lx, H-12, 10, 8);
-  ctx.fillStyle = '#5a6175'; ctx.fillText('Actual', lx+14, H-5);
-  ctx.fillStyle = '#c9a84c'; ctx.fillRect(lx+60, H-12, 10, 8);
-  ctx.fillStyle = '#5a6175'; ctx.fillText('Savills Forecast', lx+74, H-5);
-  ctx.fillStyle = '#5a6175'; ctx.fillRect(lx+180, H-12, 10, 8);
-  ctx.fillStyle = '#5a6175'; ctx.fillText('Extrapolation', lx+194, H-5);
+  ctx.fillStyle = pal.green;  ctx.fillRect(lx, H-12, 10, 8);
+  ctx.fillStyle = pal.muted;  ctx.fillText('Actual', lx+14, H-5);
+  ctx.fillStyle = pal.accent; ctx.fillRect(lx+60, H-12, 10, 8);
+  ctx.fillStyle = pal.muted;  ctx.fillText('Savills Forecast', lx+74, H-5);
+  ctx.fillStyle = pal.muted;  ctx.fillRect(lx+180, H-12, 10, 8);
+  ctx.fillStyle = pal.muted;  ctx.fillText('Extrapolation', lx+194, H-5);
 }
 
 // =====================================================================
@@ -2251,11 +2645,41 @@ document.addEventListener('DOMContentLoaded', () => {
   buildProjectionTable();
   buildTaxCards();
   buildHistoryTable();
+  // Apply persisted theme
+  initTheme();
 });
+
+// =====================================================================
+// THEME — Light / Dark toggle
+// =====================================================================
+function applyTheme(mode) {
+  const root = document.documentElement;
+  if (mode === 'light') root.setAttribute('data-theme', 'light');
+  else root.removeAttribute('data-theme');
+  const btn = el('theme-toggle');
+  if (btn) btn.textContent = (mode === 'light') ? 'Dark mode' : 'Light mode';
+  // Redraw charts with new palette if Market & Tax is currently visible
+  const mkt = el('panel-mkt');
+  if (mkt && !mkt.classList.contains('hidden')) {
+    try { drawPriceChart(); drawBarChart(); } catch(e){}
+  }
+}
+function toggleTheme() {
+  const current = document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+  const next = current === 'light' ? 'dark' : 'light';
+  try { localStorage.setItem('lpfm-theme', next); } catch(e){}
+  applyTheme(next);
+}
+function initTheme() {
+  let saved = 'dark';
+  try { saved = localStorage.getItem('lpfm-theme') || 'dark'; } catch(e){}
+  applyTheme(saved);
+}
 
 // Redraw charts on window resize
 window.addEventListener('resize', () => {
-  if (!el('tab-mkt').classList.contains('hidden')) {
+  const mkt = el('panel-mkt');
+  if (mkt && !mkt.classList.contains('hidden')) {
     drawPriceChart();
     drawBarChart();
   }
