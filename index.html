@@ -253,6 +253,8 @@ td:last-child { text-align: right; }
   <button class="tab" onclick="switchTab('cadirt',this)">Canada Dirt</button>
   <button class="tab" onclick="switchTab('crdirt',this)">Costa Rica Dirt</button>
   <button class="tab" onclick="switchTab('amdirt',this)">American Dirt</button>
+  <button class="tab" onclick="switchTab('eudirt',this)">Euro Dirt</button>
+  <button class="tab" onclick="switchTab('guide',this)" style="margin-left:auto;color:var(--text-dim);">Guide</button>
 </div>
 
 <!-- BTL second-level subtabs: Real Estate vs Market Projections & Tax -->
@@ -264,7 +266,6 @@ td:last-child { text-align: right; }
 <!-- Property selector — only visible when "Real Estate" subtab is active -->
 <div id="btl-subnav" class="prop-nav">
   <button class="pnav active" onclick="showProp('compare',this)">Compare All</button>
-  <button class="pnav" onclick="showProp('p1',this)">Argyle Rd, W13</button>
   <button class="pnav" onclick="showProp('p2',this)">Woodhill, SE18</button>
   <button class="pnav" onclick="showProp('p3',this)">Cumberland Rd, Reading</button>
   <button class="pnav" onclick="showProp('p4',this)">Goodmayes Ln, IG3</button>
@@ -1786,6 +1787,596 @@ td:last-child { text-align: right; }
     </div><!-- /padding wrapper -->
   </div><!-- /tab-amdirt -->
 
+  <!-- EURO DIRT — European Homesteading Research (Swiss-anchored) -->
+  <div id="tab-eudirt" class="hidden" style="padding:0;">
+
+    <!-- Euro Dirt sub-nav -->
+    <div class="prop-nav" id="eudirt-subnav">
+      <button class="pnav active" onclick="showEuDirt('overview',this)">Regional Ranking</button>
+      <button class="pnav" onclick="showEuDirt('portugal',this)">Portugal Centro Deep Dive</button>
+      <button class="pnav" onclick="showEuDirt('voices',this)">Community Voices</button>
+      <button class="pnav" onclick="showEuDirt('risks',this)">Risks &amp; Regulation</button>
+      <button class="pnav" onclick="showEuDirt('sources',this)">Sources</button>
+    </div>
+
+    <div style="padding:24px 32px;">
+
+      <!-- Framing banner -->
+      <div class="prop-banner">
+        <div class="prop-banner-left">
+          <div class="prop-banner-name">Euro Dirt &mdash; European Homesteading Research</div>
+          <div class="prop-banner-sub">Swiss-anchored thesis &middot; FOMP entry to EU/EEA &middot; family base &amp; cross-border lifestyle</div>
+          <div class="prop-banner-note">Strategic angle: Allegra is a Swiss citizen, which under the EU&ndash;CH Agreement on Free Movement of Persons (FOMP, in force since 2002) gives her the right to live, work, and own property anywhere in the EU/EEA. James qualifies for residency as a family member of an EU-rights-bearing citizen (Directive 2004/38/EC). This unlocks a fundamentally different homesteading strategy than CA / CR / US: <strong>Switzerland as legal/family base, EU country as actual homestead</strong>. No visa cliff, multi-decade flexibility, easier family visits.</div>
+        </div>
+        <div class="prop-banner-chips">
+          <span class="chip">Thesis: Swiss base + cheap EU homestead = best lifestyle &times; access combo on the menu</span>
+        </div>
+      </div>
+
+      <!-- ================= OVERVIEW ================= -->
+      <div id="eudirt-overview">
+        <div class="section-title" style="margin-top:0">Regional Ranking &mdash; European Homestead Regions</div>
+        <div class="compare-wrap">
+          <table class="compare-tbl">
+            <thead>
+              <tr>
+                <th style="text-align:left;">Country / Region</th>
+                <th style="text-align:left;">Climate</th>
+                <th style="text-align:left;">Water / Soil</th>
+                <th style="text-align:left;">Land &euro;/acre</th>
+                <th style="text-align:left;">EU / Schengen</th>
+                <th style="text-align:left;">Tier</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="ref-row">
+                <td><strong>Portugal &mdash; Centro / Beiras</strong><br><span style="color:var(--muted);font-size:11px;">Coimbra, Viseu, Castelo Branco, Guarda</span></td>
+                <td style="text-align:left;">Atlantic mild + Mediterranean influence; hot dry summers</td>
+                <td style="text-align:left;">Adequate; <span class="c-worst">drought intensifying</span>; volcanic + alluvial soils</td>
+                <td style="text-align:left;"><span class="c-best">&euro;5,000&ndash;15,000</span></td>
+                <td style="text-align:left;">EU + Schengen</td>
+                <td style="text-align:left;"><span class="c-best">S &mdash; best EU value</span></td>
+              </tr>
+              <tr>
+                <td>Italy &mdash; Abruzzo / Puglia / Basilicata<br><span style="color:var(--muted);font-size:11px;">"Inner south", inland from coasts</span></td>
+                <td style="text-align:left;">Mediterranean; Apennines cooler interior</td>
+                <td style="text-align:left;">Variable; ancient ag tradition; <span class="c-worst">drought + fire</span></td>
+                <td style="text-align:left;">&euro;4,000&ndash;20,000; <span class="c-best">&euro;1 home programs</span> in some villages</td>
+                <td style="text-align:left;">EU + Schengen</td>
+                <td style="text-align:left;"><span class="c-best">S &mdash; heritage + price</span></td>
+              </tr>
+              <tr>
+                <td>Spain &mdash; Galicia / Asturias<br><span style="color:var(--muted);font-size:11px;">"Green Spain"</span></td>
+                <td style="text-align:left;">Atlantic, very wet, mild; Cantabrian rain</td>
+                <td style="text-align:left;"><span class="c-best">Abundant water</span>; verdant; granite soils</td>
+                <td style="text-align:left;">&euro;5,000&ndash;15,000</td>
+                <td style="text-align:left;">EU + Schengen</td>
+                <td style="text-align:left;"><span class="c-best">S &mdash; water security</span></td>
+              </tr>
+              <tr>
+                <td>France &mdash; Limousin / Creuse / Lot<br><span style="color:var(--muted);font-size:11px;">Massif Central periphery</span></td>
+                <td style="text-align:left;">Continental temperate; mild winters S, cooler N</td>
+                <td style="text-align:left;">Plentiful; productive; long ag tradition</td>
+                <td style="text-align:left;">&euro;4,000&ndash;10,000</td>
+                <td style="text-align:left;">EU + Schengen</td>
+                <td style="text-align:left;">A &mdash; bureaucracy heavy</td>
+              </tr>
+              <tr>
+                <td>Romania &mdash; Transylvania / Maramureș<br><span style="color:var(--muted);font-size:11px;">Carpathian valleys</span></td>
+                <td style="text-align:left;">Continental, cold winters; alpine in mountains</td>
+                <td style="text-align:left;">Plentiful; rich Carpathian valleys; Saxon heritage</td>
+                <td style="text-align:left;"><span class="c-best">&euro;1,000&ndash;5,000</span> &mdash; cheapest serious option</td>
+                <td style="text-align:left;">EU; Schengen <span class="c-best">full Mar 2024</span></td>
+                <td style="text-align:left;">A &mdash; value, language</td>
+              </tr>
+              <tr>
+                <td>Slovenia<br><span style="color:var(--muted);font-size:11px;">Štajerska, Dolenjska</span></td>
+                <td style="text-align:left;">Sub-alpine + sub-Mediterranean blend</td>
+                <td style="text-align:left;">Plentiful; excellent karst soils; mild</td>
+                <td style="text-align:left;">&euro;8,000&ndash;20,000</td>
+                <td style="text-align:left;">EU + Schengen + Eurozone</td>
+                <td style="text-align:left;">A &mdash; small + charming</td>
+              </tr>
+              <tr>
+                <td>Bulgaria<br><span style="color:var(--muted);font-size:11px;">Veliko Tarnovo, Plovdiv hinterland</span></td>
+                <td style="text-align:left;">Continental, mild Black Sea coast</td>
+                <td style="text-align:left;">Adequate; fertile but variable</td>
+                <td style="text-align:left;"><span class="c-best">&euro;1,500&ndash;5,000</span></td>
+                <td style="text-align:left;">EU; Schengen <span class="c-best">full Mar 2024</span></td>
+                <td style="text-align:left;">A &mdash; cheap; learning curve</td>
+              </tr>
+              <tr>
+                <td>Greece &mdash; Peloponnese, Crete</td>
+                <td style="text-align:left;">Mediterranean; <span class="c-worst">hot dry summers</span></td>
+                <td style="text-align:left;">Drought-prone; olive country; rocky</td>
+                <td style="text-align:left;">&euro;3,000&ndash;10,000</td>
+                <td style="text-align:left;">EU + Schengen + Eurozone</td>
+                <td style="text-align:left;">B &mdash; water + bureaucracy</td>
+              </tr>
+              <tr>
+                <td>Hungary &mdash; Pannonian Plain<br><span style="color:var(--muted);font-size:11px;">South of Lake Balaton</span></td>
+                <td style="text-align:left;">Continental, hot summers, cold winters</td>
+                <td style="text-align:left;"><span class="c-best">Excellent &mdash; Europe's breadbasket</span></td>
+                <td style="text-align:left;">&euro;3,000&ndash;8,000</td>
+                <td style="text-align:left;">EU + Schengen</td>
+                <td style="text-align:left;">B &mdash; language barrier high</td>
+              </tr>
+              <tr>
+                <td>Croatia &mdash; Istria / Slavonia<br><span style="color:var(--muted);font-size:11px;">Inland; coast pricier</span></td>
+                <td style="text-align:left;">Mediterranean coast / continental inland</td>
+                <td style="text-align:left;">Variable; productive in valleys</td>
+                <td style="text-align:left;">&euro;5,000&ndash;20,000 (coast much more)</td>
+                <td style="text-align:left;">EU since 2013 + Schengen 2023</td>
+                <td style="text-align:left;">B &mdash; coast pricey</td>
+              </tr>
+              <tr>
+                <td>Ireland &mdash; West Coast<br><span style="color:var(--muted);font-size:11px;">Mayo, Kerry, Clare</span></td>
+                <td style="text-align:left;">Atlantic, very wet, mild winters</td>
+                <td style="text-align:left;">Abundant; productive grassland; rocky in places</td>
+                <td style="text-align:left;"><span class="c-worst">&euro;15,000+</span></td>
+                <td style="text-align:left;">EU only (no Schengen)</td>
+                <td style="text-align:left;">B &mdash; pricey but English</td>
+              </tr>
+              <tr>
+                <td>Sweden &mdash; Sk&aring;ne / Sm&aring;land<br><span style="color:var(--muted);font-size:11px;">Southern half</span></td>
+                <td style="text-align:left;">North-continental, snowy winters, mild summers</td>
+                <td style="text-align:left;">Plentiful lakes; <span class="c-best">allemansr&auml;tten</span> right to roam</td>
+                <td style="text-align:left;">&euro;4,000&ndash;10,000 forested; ag higher</td>
+                <td style="text-align:left;">EU + Schengen</td>
+                <td style="text-align:left;">B &mdash; cold, premium infra</td>
+              </tr>
+              <tr>
+                <td><strong>Switzerland &mdash; alpine valleys</strong><br><span style="color:var(--muted);font-size:11px;">Allegra's home country</span></td>
+                <td style="text-align:left;">Alpine continental; long winters; valley microclimates</td>
+                <td style="text-align:left;"><span class="c-best">Pristine water</span>; limited arable; protected ag landscape</td>
+                <td style="text-align:left;"><span class="c-worst">&euro;80,000&ndash;150,000+</span> for productive</td>
+                <td style="text-align:left;">Not EU; Schengen since 2008; FOMP with EU</td>
+                <td style="text-align:left;">C &mdash; family base, not homestead</td>
+              </tr>
+              <tr>
+                <td>Germany &mdash; Bavaria / east</td>
+                <td style="text-align:left;">Continental, snowy winters</td>
+                <td style="text-align:left;">Plentiful; fertile; heavy regulation</td>
+                <td style="text-align:left;"><span class="c-worst">&euro;15,000&ndash;40,000</span></td>
+                <td style="text-align:left;">EU + Schengen + Eurozone</td>
+                <td style="text-align:left;">C &mdash; over-regulated for HS</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="compare-legend" style="margin-top:14px;">
+          <strong style="color:var(--accent);">Working short list:</strong>
+          Portugal Centro (S &mdash; value + climate) &middot; Italy Abruzzo (S &mdash; heritage) &middot; Spain Galicia (S &mdash; water) &middot; Slovenia (A &mdash; cultural fit, alpine charm, near CH) &middot; Switzerland (legal/family base, NOT homestead site)
+        </div>
+
+        <div class="section-title">Criteria Snapshot</div>
+        <div class="metrics" style="grid-template-columns:repeat(4,1fr);">
+          <div class="metric-card highlight"><div class="metric-label">Best Climate Combo</div><div class="metric-value" style="font-size:16px;">Portugal Centro</div><div class="metric-sub">Atlantic mild + Med. warmth</div></div>
+          <div class="metric-card highlight"><div class="metric-label">Best Water</div><div class="metric-value" style="font-size:16px;">Galicia / Slovenia</div><div class="metric-sub">No drought worry; abundant rain</div></div>
+          <div class="metric-card highlight"><div class="metric-label">Cheapest Land</div><div class="metric-value" style="font-size:16px;">Romania / Bulgaria</div><div class="metric-sub">&euro;1k&ndash;5k/acre rural</div></div>
+          <div class="metric-card highlight"><div class="metric-label">Strategic Fit</div><div class="metric-value" style="font-size:16px;">CH base + EU farm</div><div class="metric-sub">via FOMP, not single-country bet</div></div>
+        </div>
+
+        <div class="section-title">Why Europe vs CA / CR / USA</div>
+        <table>
+          <tr class="bold"><td>Factor</td><td>Europe edge</td></tr>
+          <tr><td style="color:var(--text);">Residency</td><td><span class="c-best">Allegra's Swiss FOMP &mdash; ANY EU/EEA country open</span> with 3-month notice. James qualifies as her family member under Directive 2004/38/EC. No EB-5 ($800k US), no inversionista ($150k CR), no investor visa needed.</td></tr>
+          <tr><td style="color:var(--text);">Compactness</td><td>Half-day drive from anywhere to a major airport. Switzerland to Lisbon: 3hr flight, &euro;100. Compared to Sicamous-to-anywhere or Atenas-to-anywhere: order of magnitude easier family visits.</td></tr>
+          <tr><td style="color:var(--text);">Cultural depth</td><td>Centuries of small-scale ag tradition still living. Slow-food networks, regional cooperatives, agritourism rules friendly to homesteaders. Italy's "agriturismo" framework was literally designed for this.</td></tr>
+          <tr><td style="color:var(--text);">Healthcare</td><td>Universal in every EU member state. Quality often higher than US private. Switzerland's mandatory insurance (KVG) high cost (CHF 400&ndash;700/mo) but world-class. EHIC-equivalent for short-stay coverage.</td></tr>
+          <tr><td style="color:var(--text);">Climate variance</td><td>Atlantic vs Mediterranean vs continental vs alpine, all within a country or two. Portugal's Atlantic mildness, Italy's Mediterranean warmth, Slovenia's sub-alpine, all on the table.</td></tr>
+          <tr><td style="color:var(--text);">Land cost spread</td><td>&euro;1,000/acre rural Romania vs &euro;150,000/acre Swiss productive. Within-bloc spread over 100&times; &mdash; matches the US spread.</td></tr>
+          <tr><td style="color:var(--text);">Cottage food / direct sale</td><td>Most EU countries have "auto-consumption" or "non-professional" exemptions making small-scale direct-sale legal without industrial-grade certifications. Italy's "vendita diretta" framework, Portugal's "produtor pequeno" status.</td></tr>
+          <tr><td style="color:var(--text);">Multi-base lifestyle</td><td>Once Allegra establishes residence in any EU country, multi-base living becomes easy: Swiss base + Italian summer + Portuguese winter, all on one passport. Effectively unattainable from CA / CR / USA.</td></tr>
+        </table>
+
+        <div class="section-title" style="color:var(--red);">The Switzerland Paradox</div>
+        <div style="background:var(--card);border-left:3px solid var(--red);padding:16px 20px;border-radius:4px;font-size:13px;color:var(--text);line-height:1.7;">
+          <p style="margin:0 0 10px;">Allegra's citizenship is the entire strategic moat &mdash; but Switzerland itself is <strong>not</strong> the homestead. Three legal regimes make it nearly impossible:</p>
+          <ul style="margin:0 0 10px 20px;color:var(--text-dim);">
+            <li><strong style="color:var(--text);">Lex Koller</strong> (Bundesgesetz &uuml;ber den Erwerb von Grundst&uuml;cken durch Personen im Ausland) &mdash; restricts non-resident foreigners from buying residential property. Not a problem for Allegra (Swiss); James gets access via family reunification once they reside in CH.</li>
+            <li><strong style="color:var(--text);">BGBB</strong> (Bundesgesetz &uuml;ber das b&auml;uerliche Bodenrecht / Loi sur le droit foncier rural) &mdash; agricultural land can only be purchased by a "self-managing farmer" (<em>Selbstbewirtschafter</em>) with cantonal approval. Anti-speculation pricing. Designed precisely to prevent the kind of homesteading purchase James and Allegra would make.</li>
+            <li><strong style="color:var(--text);">RPG</strong> (Raumplanungsgesetz / Loi sur l'am&eacute;nagement du territoire) &mdash; building outside the agricultural zone (<em>Landwirtschaftszone</em>) is sharply restricted. Conversion of agricultural buildings to residential extremely controlled.</li>
+          </ul>
+          <p style="margin:0;"><strong style="color:var(--accent);">The play:</strong> maintain Switzerland as legal residence + family base + healthcare home + strategic asset (Swiss bank account, pension, professional connections). Physically homestead in a cheaper, less-regulated EU country. Use FOMP to live there indefinitely. Visit Switzerland regularly. This is a fundamentally different optimization than the single-country bets in the other Dirt tabs.</p>
+        </div>
+      </div>
+
+      <!-- ================= PORTUGAL CENTRO DEEP DIVE ================= -->
+      <div id="eudirt-portugal" class="hidden">
+        <div class="section-title" style="margin-top:0">Portugal Centro Deep Dive &mdash; Beira Alta &amp; Beira Baixa</div>
+        <div class="panel" style="grid-template-columns:1fr 1fr;">
+          <div>
+            <div class="section-title" style="margin-top:0">Why Portugal Centro is the consensus EU pick</div>
+            <table>
+              <tr><td style="color:var(--text);">Cost</td><td>Cheapest serious "Western EU" homesteading. Centro/Beiras &euro;5k&ndash;15k/acre. Coastal Atlantic 3&times; that. Inland Beira Baixa cheapest (Idanha-a-Nova area).</td></tr>
+              <tr><td style="color:var(--text);">Climate</td><td>Hardiness zones 8b&ndash;9b. 700&ndash;1500mm annual rainfall (varies E&ndash;W). Hot dry summers, mild rainy winters. Less harsh than Mediterranean Spain, warmer than UK.</td></tr>
+              <tr><td style="color:var(--text);">Growing</td><td>Year-round (with irrigation). Olive (Galega, Cobran&ccedil;osa, Cordovil), grapevines, cork oak, citrus in lower elevations, vegetables continuously. Fig, almond, chestnut native abundance.</td></tr>
+              <tr><td style="color:var(--text);">Water</td><td>Variable. Coastal/north Centro plenty. Beira Baixa drier. Borehole (<em>furo</em>) common; verify yields. Public water (<em>SMAS</em>) reliable in towns.</td></tr>
+              <tr><td style="color:var(--text);">Community</td><td>Strong + growing homesteading expat scene. Slow Food chapters. Permaculture courses (Pun&shy;ique, Quinta do Vale, Tamera). Portuguese welcoming; rural depopulation means locals mostly thrilled new people arrive.</td></tr>
+              <tr><td style="color:var(--text);">Bureaucracy / property tax</td><td>IMI annual property tax 0.3&ndash;0.45% of fiscal value &mdash; among lowest in EU. IMT transfer tax progressive 1&ndash;8%, capped at 6.5% on most rural. Plus 0.8% stamp duty.</td></tr>
+              <tr><td style="color:var(--text);">Residency</td><td>For Allegra: nothing required &mdash; FOMP gives instant access. For James: family member residence card (<em>cart&atilde;o de resid&ecirc;ncia</em>), 5-yr renewable, leads to PR. SEF/AIMA office handles registration.</td></tr>
+            </table>
+
+            <div class="section-title">Red Flags</div>
+            <table>
+              <tr><td style="color:var(--red);">Wildfires</td><td>2017 Pedr&oacute;g&atilde;o Grande disaster (60+ dead) was the wakeup call. Centro is fire-prone. <strong>Eucalyptus monocultures + drought = serious risk.</strong> Defensible space mandatory now (50m clearance around dwellings, regulated since 2018).</td></tr>
+              <tr><td style="color:var(--red);">Drought intensifying</td><td>2022&ndash;2023 worst drought on record. Reservoirs &lt;30% capacity at peak. Aquifer depletion in Beira Baixa. Water rights paperwork on any borehole/spring is now critical due diligence.</td></tr>
+              <tr><td style="color:var(--red);">Bureaucracy slow</td><td>"Pacie&ncirc;ncia" the watchword. C&acirc;mara Municipal permits for build/renovation can take 6&ndash;18 months. Old-property-renovation often easier than new-build (existing footprint preserved).</td></tr>
+              <tr><td style="color:var(--red);">Renovation cost surprise</td><td>Old stone houses look idyllic; budget &euro;800&ndash;1500/m&sup2; for proper renovation incl. structural, plumbing, electrical. Frequently exceeds the property purchase price.</td></tr>
+              <tr><td style="color:var(--red);">Coastal price surge</td><td>Lisbon-Porto corridor and Algarve massively gentrified 2018&ndash;2024. Stay inland. Centro interior still affordable; that won't last forever.</td></tr>
+              <tr><td style="color:var(--red);">NHR ended 2024</td><td>The Non-Habitual Resident tax regime that drew expats was wound down end-2024. Replaced by IFICI (more restrictive, narrow tech/research focus). Doesn't matter much for a homestead earner; matters if you have remote-work or pension income.</td></tr>
+            </table>
+          </div>
+
+          <div>
+            <div class="section-title" style="margin-top:0">Sub-region picks (within Centro)</div>
+            <table>
+              <tr><td style="color:var(--text);">Beira Alta &mdash; <em>Guarda</em></td><td>Highest elevation, Serra da Estrela mountain country. Cooler summers, snowy winters. Fewer fires. Land cheaper than Litoral. Granite + slate construction.</td></tr>
+              <tr><td style="color:var(--text);">Beira Litoral &mdash; <em>Coimbra, Viseu</em></td><td>Wetter, milder; closer to coast and infrastructure. Higher land prices but easier daily life. University town energy in Coimbra.</td></tr>
+              <tr><td style="color:var(--text);">Beira Baixa &mdash; <em>Idanha-a-Nova, Castelo Branco</em></td><td>Driest, hottest, cheapest. Olive + livestock country. Rural depopulation extreme &mdash; many almost-abandoned villages. Idanha-a-Nova famous for its <em>aldeias hist&oacute;ricas</em> (heritage village) program.</td></tr>
+              <tr><td style="color:var(--text);">Alentejo Norte &mdash; <em>Portalegre, S&atilde;o Mamede</em></td><td>Officially southern but blends with Beira Baixa. S&atilde;o Mamede natural park. Cork oak + black pig (<em>porco preto</em>) heartland. Some of the best soils in PT.</td></tr>
+            </table>
+
+            <div class="section-title">Practical Buyer Playbook</div>
+            <table>
+              <tr><td style="color:var(--text);">1. Get a NIF</td><td>Tax number &mdash; required for any transaction. Apply via Finan&ccedil;as office or fiscal representative; takes 1&ndash;2 days.</td></tr>
+              <tr><td style="color:var(--text);">2. Hire a PT lawyer</td><td>Independent, not the seller's. ~&euro;800&ndash;2000 typical fee. Run title search at Conservat&oacute;ria do Registo Predial.</td></tr>
+              <tr><td style="color:var(--text);">3. Verify three documents</td><td>Caderneta Predial (tax record), Certid&atilde;o Permanente (live registry), Licen&ccedil;a de Habita&ccedil;&atilde;o (occupancy certificate). Older properties may lack the third &mdash; deal-breakable.</td></tr>
+              <tr><td style="color:var(--text);">4. Water rights</td><td>If borehole: licen&ccedil;a de capta&ccedil;&atilde;o de &aacute;guas. If spring: customary rights documented in old deeds. If municipal: capacity check. <strong>Walk away from properties without verified water.</strong></td></tr>
+              <tr><td style="color:var(--text);">5. Fire-defensible status</td><td>Verify the 50m clearance zone is achievable / has been maintained. Major liability and insurance issue.</td></tr>
+              <tr><td style="color:var(--text);">6. C&acirc;mara pre-approval</td><td>If you intend new construction or major works, talk to the C&acirc;mara before purchase. PDM (Plano Director Municipal) zoning rules vary widely.</td></tr>
+              <tr><td style="color:var(--text);">7. Closing</td><td>Promessa de Compra e Venda (10% down, locks deal). Final escritura at notary 30&ndash;90 days later. Bring NIF, ID, proof of funds.</td></tr>
+              <tr><td style="color:var(--text);">8. Annual</td><td>IMI in May; if rural &lt;&euro;125k fiscal value, often exempt. Income from sales potentially within "produtor primário" simplified scheme.</td></tr>
+            </table>
+
+            <div class="section-title">Starter Crops &amp; Livestock</div>
+            <table>
+              <tr><td style="color:var(--text);">Olive trees</td><td>The default. Galega Vulgar most planted, Cobran&ccedil;osa for oil quality. 5&ndash;7yr to first serious harvest; centenarians produce indefinitely.</td></tr>
+              <tr><td style="color:var(--text);">Vines</td><td>Region-specific castas. Touriga Nacional (D&atilde;o), Encruzado (white). Home wine production legal up to ~1000L/yr non-commercial.</td></tr>
+              <tr><td style="color:var(--text);">Cork oak (sobreiro)</td><td>Protected species &mdash; cannot cut without permit. Stripped every 9 yrs after age 25. Long horizon but generational asset.</td></tr>
+              <tr><td style="color:var(--text);">Veg + perennials</td><td>Tomato, pepper, courgette, melon (summer); brassicas, fava, peas (winter). Citrus in coastal/lowland; figs, almonds, chestnuts up high.</td></tr>
+              <tr><td style="color:var(--text);">Goats / sheep</td><td>Saloia (multipurpose), Merino (wool/meat). Cheese-making auto-consumption legal; commercial requires queijaria approval.</td></tr>
+              <tr><td style="color:var(--text);">Iberian pig (porco preto)</td><td>Forages on acorn (montado / dehesa system). Premium meat. Need legal-frame sty + slaughter at certified facility for sale.</td></tr>
+              <tr><td style="color:var(--text);">Bees</td><td>Strong tradition. Urze, multifloral, eucalyptus honeys all premium. Apicultor registration required (free).</td></tr>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ================= COMMUNITY VOICES ================= -->
+      <div id="eudirt-voices" class="hidden">
+        <div class="section-title" style="margin-top:0">Community Voices &mdash; widely-echoed expat themes</div>
+        <div style="color:var(--muted);font-size:12px;margin-bottom:16px;font-style:italic;">Placeholder &mdash; awaiting research dumps from r/homestead, r/PortugalExpats, r/expats, Italian/Spanish/French homestead Facebook groups, "Spain in English" threads. Seeded with widely-echoed themes.</div>
+
+        <div class="section-title">Portugal &mdash; Centro / Beiras</div>
+        <div style="background:var(--card);border-left:3px solid var(--green);padding:12px 16px;margin-bottom:10px;border-radius:4px;">
+          <div style="color:var(--text);">Recurring sentiment: Beira Baixa interior remains the cheapest "real EU" homesteading option, but the renovation-cost gap is the killer. Old stone houses at &euro;30k often need &euro;100k+ to be properly liveable. The math gets brutal once you've been through it once. Repeat advice: buy a smaller, sounder property than a "bargain" ruin.</div>
+          <div style="color:var(--muted);font-size:11px;margin-top:6px;">&mdash; Placeholder &middot; replace with sourced quotes</div>
+        </div>
+        <div style="background:var(--card);border-left:3px solid var(--accent);padding:12px 16px;margin-bottom:10px;border-radius:4px;">
+          <div style="color:var(--text);">Wildfire trauma post-Pedr&oacute;g&atilde;o Grande (2017) reshaped buyer behaviour. People now ask about defensible space before they ask about views. Local councils much stricter on the 50m clearance requirement.</div>
+          <div style="color:var(--muted);font-size:11px;margin-top:6px;">&mdash; Placeholder &middot; replace with sourced quotes</div>
+        </div>
+
+        <div class="section-title">Italy &mdash; the &euro;1 home programs</div>
+        <div style="background:var(--card);border-left:3px solid var(--accent);padding:12px 16px;margin-bottom:10px;border-radius:4px;">
+          <div style="color:var(--text);">Real but with conditions. Sambuca di Sicilia, Mussomeli, Sant'Antioco run schemes. Catch: 3-year renovation deadline, ~&euro;5k deposit, often need to use local builders, properties in serious disrepair. For a real homestead it's usually better to spend &euro;30k&ndash;50k on a sound farmhouse than &euro;1 + &euro;100k renovation.</div>
+          <div style="color:var(--muted);font-size:11px;margin-top:6px;">&mdash; Placeholder &middot; replace with sourced quotes</div>
+        </div>
+
+        <div class="section-title">Spain &mdash; "Espa&ntilde;a vaciada"</div>
+        <div style="background:var(--card);border-left:3px solid var(--green);padding:12px 16px;margin-bottom:10px;border-radius:4px;">
+          <div style="color:var(--text);">"Empty Spain" interior depopulation has government attention &mdash; tax breaks, repopulation grants in some autonomous communities (Castilla y Le&oacute;n, Aragon, Galicia). Worth checking ayuda incentives at the autonomous community level before settling on a region.</div>
+          <div style="color:var(--muted);font-size:11px;margin-top:6px;">&mdash; Placeholder &middot; replace with sourced quotes</div>
+        </div>
+
+        <div class="section-title">Romania &mdash; the new frontier</div>
+        <div style="background:var(--card);border-left:3px solid var(--accent);padding:12px 16px;margin-bottom:10px;border-radius:4px;">
+          <div style="color:var(--text);">Carpathian Saxon villages (Saseni heritage in Transylvania) attracting a growing wave of Western European homesteaders. Land 3&ndash;5&times; cheaper than equivalent Mediterranean. Trade-off: long winters (-15 to -20&deg;C), Romanian language hard, infrastructure variable. Schengen full membership March 2024 removed border friction.</div>
+          <div style="color:var(--muted);font-size:11px;margin-top:6px;">&mdash; Placeholder &middot; replace with sourced quotes</div>
+        </div>
+
+        <div class="section-title">Switzerland &mdash; the hard reality</div>
+        <div style="background:var(--card);border-left:3px solid var(--red);padding:12px 16px;margin-bottom:10px;border-radius:4px;">
+          <div style="color:var(--text);">"You can't homestead in Switzerland the way Anglo-Americans imagine homesteading." BGBB is iron-clad. Even Swiss citizens hit the self-managing-farmer wall. The realistic Swiss play is: inherit a farm, marry into a farm, become a registered Landwirt through formal training, OR maintain Swiss residence and farm elsewhere in EU. Most Swiss-rooted homesteaders interviewed take option 4.</div>
+          <div style="color:var(--muted);font-size:11px;margin-top:6px;">&mdash; Placeholder &middot; replace with sourced quotes</div>
+        </div>
+
+        <div class="section-title">FOMP &amp; family reunification &mdash; the invisible advantage</div>
+        <div style="background:var(--card);border-left:3px solid var(--green);padding:12px 16px;margin-bottom:10px;border-radius:4px;">
+          <div style="color:var(--text);">Repeat insight from Swiss-Anglo couples already homesteading in EU: the Swiss/EU FOMP + family-reunification combo is the single most underrated lifestyle moat available. Removes the visa cliff that defines US/CR/etc. options. "We didn't realise how much mental space the visa anxiety took up until we didn't have it anymore" is the recurring theme.</div>
+          <div style="color:var(--muted);font-size:11px;margin-top:6px;">&mdash; Placeholder &middot; replace with sourced quotes</div>
+        </div>
+      </div>
+
+      <!-- ================= RISKS & REGULATION ================= -->
+      <div id="eudirt-risks" class="hidden">
+        <div class="section-title" style="margin-top:0">Climate &amp; Geophysical Risks</div>
+        <table>
+          <tr class="bold"><td>Risk</td><td>Where it hits</td></tr>
+          <tr><td style="color:var(--text);">Mediterranean drought</td><td>Spain, Portugal, Italy, Greece, southern France &mdash; intensifying. Aquifer depletion + reservoir stress. Water-rights due diligence is the #1 buyer task.</td></tr>
+          <tr><td style="color:var(--text);">Wildfires</td><td>Same Mediterranean band. Portugal 2017 reset attitudes. Greece 2018, 2023 catastrophic seasons. Defensible space, fire-resistant species (no eucalyptus), insurance riders.</td></tr>
+          <tr><td style="color:var(--text);">Flooding</td><td>Northern + central Europe. Germany 2021 (Ahrtal), Italy Emilia-Romagna 2023, central Europe Sept 2024. Avoid floodplains; flood insurance often expensive or excluded.</td></tr>
+          <tr><td style="color:var(--text);">Cold snaps / polar vortex spillover</td><td>Eastern Europe (Romania, Bulgaria, Hungary, Poland). Less variable than continental N America but still real. Wood heat infrastructure + insulation matter.</td></tr>
+          <tr><td style="color:var(--text);">Earthquakes</td><td>Italy (Apennine spine), Greece, Turkey. Not impossible elsewhere (Spain 2011 Lorca) but lower frequency.</td></tr>
+          <tr><td style="color:var(--text);">Volcanic / coastal hazards</td><td>Italy (Etna, Vesuvius zones); Greek islands. Largely avoidable by region choice.</td></tr>
+        </table>
+
+        <div class="section-title">Swiss Citizenship &mdash; what it unlocks</div>
+        <table>
+          <tr class="bold"><td>Right</td><td>What it means for Allegra (and James as family)</td></tr>
+          <tr><td style="color:var(--green);">EU/EEA Free Movement</td><td>Under the EU&ndash;CH FOMP Agreement (in force June 2002), Allegra can take residence in any EU/EEA state without visa, work permit, or asset minimum. Right is permanent (not subject to EU directive sunset).</td></tr>
+          <tr><td style="color:var(--green);">Property purchase EU-wide</td><td>EU/EEA citizens enjoy national-treatment for property purchase in nearly all EU countries (transitional ag-land restrictions in Hungary/Romania/Bulgaria/Slovakia ended ~2014; Croatia 2020). Allegra has same rights as a national of the destination country.</td></tr>
+          <tr><td style="color:var(--green);">Family reunification (James)</td><td>Directive 2004/38/EC: "family member of a Union citizen exercising treaty rights" gets automatic residence card, valid 5 years, renewable; permanent residence after 5 yrs; eligible for citizenship per local rules. <strong>Spouse, registered partner, or unmarried partner in durable relationship</strong> all qualify (durable-partner clause varies by country implementation).</td></tr>
+          <tr><td style="color:var(--green);">Healthcare</td><td>Swiss-EU bilateral agreements include coordination of social security (Reg. 883/2004 + extension to CH). S1 form for cross-border coverage; EHIC-equivalent ("CFA" in CH terms) for traveller coverage.</td></tr>
+          <tr><td style="color:var(--green);">Pension portability</td><td>AHV/AVS portable; can be drawn while resident in EU. Swiss 2nd pillar (BVG/LPP) lump-sum withdrawal often possible on permanent EU emigration (but EU cantons have residual taxes on lump sum).</td></tr>
+          <tr><td style="color:var(--accent);">Limits</td><td>FOMP doesn't auto-extend to non-EU dependents in third countries. Schengen 90/180 rule applies for short stays (no issue if resident). Swiss citizens lose CH-only social benefits if they de-register from CH for too long.</td></tr>
+        </table>
+
+        <div class="section-title">Switzerland &mdash; Internal Property &amp; Ag-Land Regimes</div>
+        <table>
+          <tr class="bold"><td>Regime</td><td>What it does</td></tr>
+          <tr><td style="color:var(--text);">Lex Koller</td><td>Restricts non-resident foreigners from acquiring residential property. Doesn't apply to Swiss citizens (Allegra) or settled foreigners (C permit). James gets access via family reunification once they reside in CH.</td></tr>
+          <tr><td style="color:var(--text);">BGBB / LDFR</td><td>Federal Act on Rural Land Law: agricultural land can only be acquired by a "self-managing farmer" (Selbstbewirtschafter / exploitant agricole). Cantonal authority must approve every sale of ag land. Sets max-price ceilings (anti-speculation). Inheritance + intra-family transfer have separate rules. <strong>This blocks "I'll buy a Swiss farm and homestead" for non-farmers.</strong></td></tr>
+          <tr><td style="color:var(--text);">RPG / LAT</td><td>Federal Spatial Planning Act: building outside the agricultural zone (Landwirtschaftszone / zone agricole) requires special exception (Art. 24). Conversion of farm buildings to non-farm residential extremely controlled. New construction in Bauzone only.</td></tr>
+          <tr><td style="color:var(--text);">Cantonal layer</td><td>Canton Vaud, Bern, Graub&uuml;nden have additional rules. Some cantons stricter (e.g., Ticino on second-home limits per Lex Weber, 2014).</td></tr>
+        </table>
+
+        <div class="section-title">EU Country-by-Country &mdash; foreign-ownership posture (2026)</div>
+        <table>
+          <tr class="bold"><td>Country</td><td>For EU citizens (Allegra)</td><td>For Allegra+James as family</td></tr>
+          <tr><td style="color:var(--green);">Portugal</td><td>Open; no restrictions</td><td>Easy; <em>cart&atilde;o de resid&ecirc;ncia</em> for James via Allegra's FOMP</td></tr>
+          <tr><td style="color:var(--green);">Spain</td><td>Open; <em>NIE</em> required for any transaction</td><td>Easy; tarjeta de residencia for James as family member</td></tr>
+          <tr><td style="color:var(--green);">Italy</td><td>Open; <em>codice fiscale</em> for any transaction</td><td>Easy; permesso di soggiorno for James</td></tr>
+          <tr><td style="color:var(--green);">France</td><td>Open</td><td>Easy; titre de s&eacute;jour for James</td></tr>
+          <tr><td style="color:var(--green);">Slovenia</td><td>Open</td><td>Easy</td></tr>
+          <tr><td style="color:var(--accent);">Romania</td><td>Open since 2014; ag-land transitional ended</td><td>Easy; family-member card. Ownership may need PFA / SRL structure for working farm.</td></tr>
+          <tr><td style="color:var(--accent);">Bulgaria</td><td>Open since 2014</td><td>Easy; agricultural land technically still requires Bulgarian residency for direct ownership &mdash; workaround: Bulgarian SRL (EOOD).</td></tr>
+          <tr><td style="color:var(--accent);">Hungary</td><td>Open for residential. <strong>Ag land restricted</strong>: must be active farmer with 3+ years training/practice OR resident 3+ years.</td><td>Workaround: hold via Hungarian Kft (LLC) or commit to active-farmer status.</td></tr>
+          <tr><td style="color:var(--green);">Croatia</td><td>Open since 2020 (transitional ended)</td><td>Easy</td></tr>
+          <tr><td style="color:var(--green);">Greece</td><td>Open</td><td>Easy; AFM (tax number) required</td></tr>
+        </table>
+
+        <div class="section-title">Tax Highlights</div>
+        <table>
+          <tr><td style="color:var(--text);">Property transfer tax</td><td>Switzerland: cantonal, 1&ndash;3.3%. Portugal: IMT 1&ndash;6.5%. Spain: ITP 6&ndash;10%. Italy: 9% (registered) or 2% (primary residence). France: ~5.8%. Romania/Bulgaria/Hungary: 1&ndash;4%.</td></tr>
+          <tr><td style="color:var(--text);">Annual property tax</td><td>Most EU countries 0.3&ndash;1% (Portugal IMI, Spain IBI, Italy IMU, France TF). Swiss cantonal &mdash; varies. Generally lower than UK council tax + vastly lower than US.</td></tr>
+          <tr><td style="color:var(--text);">Wealth tax</td><td>Spain (regional, varies); France IFI on real estate &gt;&euro;1.3M; Switzerland cantonal (modest); Italy/Portugal/etc. none.</td></tr>
+          <tr><td style="color:var(--text);">Income tax</td><td>Major variation. Portugal flat-ish post-NHR. Italy "regime impatriati" tax breaks if relocating. Switzerland cantonal &mdash; Zug/Schwyz/Nidwalden very low.</td></tr>
+          <tr><td style="color:var(--text);">Inheritance / gift</td><td>EU very heterogeneous. Switzerland cantonal &mdash; Schwyz / Zug very favourable for family. Italy generous spouse/child allowance. France harsher.</td></tr>
+        </table>
+
+        <div class="section-title">Hidden Costs Checklist</div>
+        <table>
+          <tr><td style="color:var(--text);">Notary + lawyer fees</td><td>1&ndash;2.5% of price across EU. Notary mandatory for property transfer in most countries.</td></tr>
+          <tr><td style="color:var(--text);">Renovation</td><td>Old EU stone houses: budget &euro;800&ndash;1500/m&sup2; for proper structural + utilities work. Frequently 2&ndash;3&times; the purchase price.</td></tr>
+          <tr><td style="color:var(--text);">Energy retrofit</td><td>Old houses fail modern thermal codes; insulation + heating upgrade often mandatory before sale or required for rental. EU "renovation wave" funding sometimes available.</td></tr>
+          <tr><td style="color:var(--text);">Septic / well</td><td>If not on mains: &euro;5k&ndash;15k for septic; &euro;3k&ndash;10k for borehole + permit.</td></tr>
+          <tr><td style="color:var(--text);">Insurance</td><td>Mediterranean fire belt: rising premiums or exclusions. Floodplain coverage often refused. Swiss insurance world-class but costly (~CHF 1500&ndash;3500/yr building).</td></tr>
+          <tr><td style="color:var(--text);">Translation + admin</td><td>Even if you speak the language, certified translations of CH docs into local language (apostille + sworn translator) for marriage cert, birth cert, residence registration: &euro;500&ndash;2000.</td></tr>
+          <tr><td style="color:var(--text);">Healthcare double-coverage</td><td>If maintaining Swiss residence + EU residence, may need both Swiss KVG (mandatory) and EU local cover during transition. Plan deregistration carefully.</td></tr>
+          <tr><td style="color:var(--text);">Swiss tax exit</td><td>Permanent emigration triggers cantonal exit tax considerations on 2nd-pillar (BVG) lump sum. Plan with Swiss fiduciary before departure.</td></tr>
+        </table>
+      </div>
+
+      <!-- ================= SOURCES ================= -->
+      <div id="eudirt-sources" class="hidden">
+        <div class="section-title" style="margin-top:0">Sources &amp; Further Reading</div>
+
+        <div class="section-title">Property Listings</div>
+        <table>
+          <tr><td style="color:var(--text);">Idealista &mdash; Portugal &amp; Spain (largest combined listings)</td><td><a class="tbl-link" href="https://www.idealista.pt/" target="_blank" rel="noopener">idealista.pt &rarr;</a> &middot; <a class="tbl-link" href="https://www.idealista.com/" target="_blank" rel="noopener">idealista.com &rarr;</a></td></tr>
+          <tr><td style="color:var(--text);">Imovirtual &mdash; Portugal alternative</td><td><a class="tbl-link" href="https://www.imovirtual.com/" target="_blank" rel="noopener">imovirtual.com &rarr;</a></td></tr>
+          <tr><td style="color:var(--text);">Immobiliare.it &mdash; Italy</td><td><a class="tbl-link" href="https://www.immobiliare.it/" target="_blank" rel="noopener">immobiliare.it &rarr;</a></td></tr>
+          <tr><td style="color:var(--text);">SeLoger &amp; LeBonCoin &mdash; France</td><td><a class="tbl-link" href="https://www.seloger.com/" target="_blank" rel="noopener">seloger.com &rarr;</a> &middot; <a class="tbl-link" href="https://www.leboncoin.fr/" target="_blank" rel="noopener">leboncoin.fr &rarr;</a></td></tr>
+          <tr><td style="color:var(--text);">Imot.bg &mdash; Bulgaria</td><td><a class="tbl-link" href="https://www.imot.bg/" target="_blank" rel="noopener">imot.bg &rarr;</a></td></tr>
+          <tr><td style="color:var(--text);">Homegate &amp; ImmoScout24 &mdash; Switzerland</td><td><a class="tbl-link" href="https://www.homegate.ch/" target="_blank" rel="noopener">homegate.ch &rarr;</a> &middot; <a class="tbl-link" href="https://www.immoscout24.ch/" target="_blank" rel="noopener">immoscout24.ch &rarr;</a></td></tr>
+        </table>
+
+        <div class="section-title">Legal &amp; Regulatory References</div>
+        <table>
+          <tr><td style="color:var(--text);">EU&ndash;Switzerland Free Movement of Persons (FOMP) &mdash; full text + guidance</td><td><a class="tbl-link" href="https://www.eda.admin.ch/missions/mission-eu-brussels/en/home/key-issues/free-movement-of-persons.html" target="_blank" rel="noopener">eda.admin.ch &rarr;</a></td></tr>
+          <tr><td style="color:var(--text);">Directive 2004/38/EC &mdash; EU citizens' &amp; family members' free movement rights</td><td><a class="tbl-link" href="https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:32004L0038" target="_blank" rel="noopener">eur-lex.europa.eu &rarr;</a></td></tr>
+          <tr><td style="color:var(--text);">Lex Koller (foreigners' acquisition of Swiss property)</td><td><a class="tbl-link" href="https://www.bj.admin.ch/bj/en/home/wirtschaft/grundstueckerwerb.html" target="_blank" rel="noopener">bj.admin.ch &rarr;</a></td></tr>
+          <tr><td style="color:var(--text);">BGBB (Swiss rural land law) &mdash; FedLex</td><td><a class="tbl-link" href="https://www.fedlex.admin.ch/eli/cc/1993/1410_1410_1410/en" target="_blank" rel="noopener">fedlex.admin.ch &rarr;</a></td></tr>
+          <tr><td style="color:var(--text);">Idanha-a-Nova historic-villages programme (PT)</td><td><a class="tbl-link" href="https://www.aldeiashistoricasdeportugal.com/" target="_blank" rel="noopener">aldeiashistoricasdeportugal.com &rarr;</a></td></tr>
+        </table>
+
+        <div class="section-title">Community Threads &amp; Forums</div>
+        <table>
+          <tr><td style="color:var(--text);">r/homestead &mdash; ongoing EU homestead discussions</td><td><a class="tbl-link" href="https://www.reddit.com/r/homestead/" target="_blank" rel="noopener">reddit.com/r/homestead &rarr;</a></td></tr>
+          <tr><td style="color:var(--text);">r/PortugalExpats</td><td><a class="tbl-link" href="https://www.reddit.com/r/PortugalExpats/" target="_blank" rel="noopener">reddit.com/r/PortugalExpats &rarr;</a></td></tr>
+          <tr><td style="color:var(--text);">r/SpainExpats / r/Spain &mdash; "Espa&ntilde;a vaciada" repopulation programmes</td><td><a class="tbl-link" href="https://www.reddit.com/r/SpainExpats/" target="_blank" rel="noopener">reddit.com/r/SpainExpats &rarr;</a></td></tr>
+          <tr><td style="color:var(--text);">r/expats &mdash; Swiss-EU relocation threads</td><td><a class="tbl-link" href="https://www.reddit.com/r/expats/" target="_blank" rel="noopener">reddit.com/r/expats &rarr;</a></td></tr>
+          <tr><td style="color:var(--text);">r/Switzerland &mdash; departure / FOMP threads</td><td><a class="tbl-link" href="https://www.reddit.com/r/Switzerland/" target="_blank" rel="noopener">reddit.com/r/Switzerland &rarr;</a></td></tr>
+          <tr><td style="color:var(--text);">Permaculture / agroforestry networks &mdash; Tamera (PT), Ecovillage Findhorn (UK), Velida (CR)</td><td><a class="tbl-link" href="https://www.tamera.org/" target="_blank" rel="noopener">tamera.org &rarr;</a></td></tr>
+        </table>
+
+        <div class="section-title">Reading / Reference</div>
+        <table>
+          <tr><td style="color:var(--text);">Sepp Holzer &mdash; <em>Permaculture: A Practical Guide for Farmers, Smallholders &amp; Gardeners</em></td><td><span style="color:var(--muted);font-size:11px;">Austrian alpine permaculture pioneer</span></td></tr>
+          <tr><td style="color:var(--text);">Geoff Lawton &mdash; permaculture training (incl. Mediterranean / Iberian projects)</td><td><span style="color:var(--muted);font-size:11px;">video courses</span></td></tr>
+          <tr><td style="color:var(--text);">"How to Buy Property in Portugal" &mdash; Portuguese Bar Association guides (in PT &amp; EN)</td><td><span style="color:var(--muted);font-size:11px;">official OA guidance</span></td></tr>
+        </table>
+
+        <div class="section-title">Next Research Steps</div>
+        <table>
+          <tr><td style="color:var(--text);">1. Drop research dumps</td><td>Same workflow as the other Dirt tabs &mdash; paste Reddit threads / agent blogs / expat forum posts and they get folded in</td></tr>
+          <tr><td style="color:var(--text);">2. Family reunification path mapping</td><td>If unmarried: check the destination country's "durable partner" clause &mdash; some interpret D2004/38 strictly (marriage only), others liberal. PT, ES, IT generous; FR, CH historically stricter.</td></tr>
+          <tr><td style="color:var(--text);">3. Swiss tax-exit strategy</td><td>Talk to a Swiss fiduciary BEFORE the move. 2nd-pillar treatment, cantonal exit tax, AHV continuation, double-tax treaty interaction with chosen EU country.</td></tr>
+          <tr><td style="color:var(--text);">4. Shortlist 2 EU countries</td><td>Portugal Centro + Italy Abruzzo natural pair (Atlantic + Mediterranean, both cheap). Or Slovenia + Italy if proximity to CH matters more than land cost.</td></tr>
+          <tr><td style="color:var(--text);">5. Visit-test 2 weeks each</td><td>Rent a place. Talk to local C&acirc;mara / Comune. See properties. Get a feel for community fit before buying.</td></tr>
+          <tr><td style="color:var(--text);">6. Cross-compare with other Dirts</td><td>Once shortlist firms: side-by-side P&amp;L vs Canada Dirt &amp; Costa Rica Dirt &amp; American Dirt. Same &euro;X capital deployed, four lifestyles compared.</td></tr>
+        </table>
+      </div>
+
+    </div><!-- /padding wrapper -->
+  </div><!-- /tab-eudirt -->
+
+  <!-- ============================================================== -->
+  <!-- GUIDE — embedded user manual                                    -->
+  <!-- ============================================================== -->
+  <div id="tab-guide" class="hidden" style="padding:32px 40px; max-width:980px; margin:0 auto;">
+
+    <div style="margin-bottom:32px;">
+      <div class="header-sub" style="font-size:11px;">User Guide</div>
+      <div style="font-size:26px;font-weight:700;letter-spacing:-.02em;color:var(--text);margin-top:4px;">How to use this model</div>
+      <div style="font-size:13px;color:var(--muted);margin-top:8px;line-height:1.6;">A short reference for everything in this financial model &mdash; what each tab does, what each metric means, and how to edit inputs without losing your work.</div>
+    </div>
+
+    <!-- Table of contents -->
+    <div style="background:var(--card);border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:6px;padding:18px 22px;margin-bottom:32px;">
+      <div style="font-size:11px;color:var(--accent);letter-spacing:.12em;text-transform:uppercase;margin-bottom:10px;">Contents</div>
+      <ol style="list-style:none;padding:0;margin:0;font-size:13px;line-height:1.9;">
+        <li>1. <a href="#g-quickstart" style="color:var(--text);text-decoration:none;border-bottom:1px dotted var(--accent-dim);">30-second quick start</a></li>
+        <li>2. <a href="#g-tabs" style="color:var(--text);text-decoration:none;border-bottom:1px dotted var(--accent-dim);">The seven tabs</a></li>
+        <li>3. <a href="#g-property" style="color:var(--text);text-decoration:none;border-bottom:1px dotted var(--accent-dim);">Inside London Property Buy to Let</a></li>
+        <li>4. <a href="#g-metrics" style="color:var(--text);text-decoration:none;border-bottom:1px dotted var(--accent-dim);">Metric glossary</a></li>
+        <li>5. <a href="#g-inputs" style="color:var(--text);text-decoration:none;border-bottom:1px dotted var(--accent-dim);">Editing inputs (auto-save, reset)</a></li>
+        <li>6. <a href="#g-display" style="color:var(--text);text-decoration:none;border-bottom:1px dotted var(--accent-dim);">Light/Dark mode + Export/Print</a></li>
+        <li>7. <a href="#g-dirt" style="color:var(--text);text-decoration:none;border-bottom:1px dotted var(--accent-dim);">The "Dirt" research tabs</a></li>
+        <li>8. <a href="#g-caveats" style="color:var(--text);text-decoration:none;border-bottom:1px dotted var(--accent-dim);">Caveats &amp; disclaimers</a></li>
+      </ol>
+    </div>
+
+    <!-- 1. QUICK START -->
+    <h2 id="g-quickstart" style="font-size:18px;color:var(--accent);margin:0 0 14px;letter-spacing:-.01em;">1. 30-second quick start</h2>
+    <div style="font-size:13px;color:var(--text-dim);line-height:1.7;margin-bottom:14px;">
+      Click <strong style="color:var(--text);">London Property Buy to Let</strong> at the top &rarr; click any property in the selector strip (e.g. <strong style="color:var(--text);">Woodhill, SE18</strong>) &rarr; you're looking at the headline metrics for that property. Click <strong style="color:var(--text);">Year-by-Year</strong>, <strong style="color:var(--text);">Sensitivity</strong>, or <strong style="color:var(--text);">Stress &amp; Risk</strong> in the small tab strip above the metrics to drill into deeper analysis.
+    </div>
+    <div style="font-size:13px;color:var(--text-dim);line-height:1.7;margin-bottom:32px;">
+      Edit any number on the left (price, rent, mortgage rate, etc.) &mdash; everything recalculates instantly and your edits auto-save to your browser. Refresh the page and your edits are still there.
+    </div>
+
+    <!-- 2. THE SEVEN TABS -->
+    <h2 id="g-tabs" style="font-size:18px;color:var(--accent);margin:0 0 14px;letter-spacing:-.01em;">2. The seven top-level tabs</h2>
+    <table style="width:100%;border-collapse:collapse;margin-bottom:32px;">
+      <tr><td style="padding:10px 0;border-bottom:1px solid var(--border);width:230px;color:var(--text);font-weight:700;font-size:13px;vertical-align:top;">London Property Buy to Let</td>
+          <td style="padding:10px 0 10px 18px;border-bottom:1px solid var(--border);font-size:13px;color:var(--text-dim);line-height:1.6;">Your main UK BTL portfolio &mdash; 11 properties, full P&amp;L per property plus an aggregated comparison table. Two sub-tabs: <em>Real Estate</em> (the properties) and <em>Market Projections &amp; Tax</em> (London HPI history + Savills forecast + tax narrative).</td></tr>
+      <tr><td style="padding:10px 0;border-bottom:1px solid var(--border);color:var(--text);font-weight:700;font-size:13px;vertical-align:top;">London Rent vs Buy Analysis</td>
+          <td style="padding:10px 0 10px 18px;border-bottom:1px solid var(--border);font-size:13px;color:var(--text-dim);line-height:1.6;">Should you buy or rent your own residence in London? Inputs your salary, target property, hold period &mdash; outputs total cost of buying vs renting net of investment alternatives.</td></tr>
+      <tr><td style="padding:10px 0;border-bottom:1px solid var(--border);color:var(--text);font-weight:700;font-size:13px;vertical-align:top;">Private Lending London</td>
+          <td style="padding:10px 0 10px 18px;border-bottom:1px solid var(--border);font-size:13px;color:var(--text-dim);line-height:1.6;">Could you instead deploy capital as a private lender against UK property? Three views: <em>Single Loan</em> (one bridging loan P&amp;L), <em>Portfolio</em> (deploy &pound;X across many loans), <em>Market Rate Guide</em> (reference rates &amp; structures).</td></tr>
+      <tr><td style="padding:10px 0;border-bottom:1px solid var(--border);color:var(--text);font-weight:700;font-size:13px;vertical-align:top;">Canada Dirt</td>
+          <td style="padding:10px 0 10px 18px;border-bottom:1px solid var(--border);font-size:13px;color:var(--text-dim);line-height:1.6;">Homestead research &mdash; Canada. Regional ranking, Okanagan/Sicamous deep dive, community voices, risks &amp; regulation, sources.</td></tr>
+      <tr><td style="padding:10px 0;border-bottom:1px solid var(--border);color:var(--text);font-weight:700;font-size:13px;vertical-align:top;">Costa Rica Dirt</td>
+          <td style="padding:10px 0 10px 18px;border-bottom:1px solid var(--border);font-size:13px;color:var(--text-dim);line-height:1.6;">Homestead research &mdash; Costa Rica. Regional ranking, Central Valley deep dive, voices, risks &amp; regulation including Maritime Zone &amp; squatter rights, sources.</td></tr>
+      <tr><td style="padding:10px 0;border-bottom:1px solid var(--border);color:var(--text);font-weight:700;font-size:13px;vertical-align:top;">American Dirt</td>
+          <td style="padding:10px 0 10px 18px;border-bottom:1px solid var(--border);font-size:13px;color:var(--text-dim);line-height:1.6;">Homestead research &mdash; USA. 14-state ranking, Tennessee deep dive, voices by region, climate &amp; regulatory risks (tornadoes/hurricanes/wildfires/visa paths), sources.</td></tr>
+      <tr><td style="padding:10px 0;color:var(--text);font-weight:700;font-size:13px;vertical-align:top;">Guide</td>
+          <td style="padding:10px 0 10px 18px;font-size:13px;color:var(--text-dim);line-height:1.6;">This page.</td></tr>
+    </table>
+
+    <!-- 3. INSIDE BTL -->
+    <h2 id="g-property" style="font-size:18px;color:var(--accent);margin:0 0 14px;letter-spacing:-.01em;">3. Inside London Property Buy to Let</h2>
+
+    <div style="font-size:13px;color:var(--text-dim);line-height:1.7;margin-bottom:14px;">
+      Two sub-tabs at the top of the BTL section:
+    </div>
+    <ul style="font-size:13px;color:var(--text-dim);line-height:1.7;margin:0 0 18px 20px;">
+      <li><strong style="color:var(--text);">Real Estate</strong> &mdash; the property selector strip + 11 individual property panels + Compare All comparison table</li>
+      <li><strong style="color:var(--text);">Market Projections &amp; Tax</strong> &mdash; London freehold flat-block price history (2007&ndash;2025 actual), Savills 2026&ndash;2030 forecast, extrapolation to 2037, year-by-year projection table per property, plus narrative on SDLT/Corp Tax/NRLS/ATED for non-resident SPV buyers</li>
+    </ul>
+
+    <div style="font-size:13px;color:var(--text-dim);line-height:1.7;margin-bottom:14px;">
+      <strong style="color:var(--text);">Inside any property panel</strong>, the right side has a sub-tab strip with four progressive-disclosure views:
+    </div>
+    <table style="width:100%;border-collapse:collapse;margin-bottom:32px;">
+      <tr><td style="padding:10px 0;border-bottom:1px solid var(--border);width:160px;color:var(--accent);font-weight:700;font-size:12px;letter-spacing:.07em;text-transform:uppercase;vertical-align:top;">Snapshot</td>
+          <td style="padding:10px 0 10px 18px;border-bottom:1px solid var(--border);font-size:13px;color:var(--text-dim);line-height:1.6;">Default view. Headline metric cards (yields, CoC, Total Return, Equity Multiple, IRR), full year-1 P&amp;L, acquisition cost stack, exit projection (asset side + loan side + total return breakdown), non-resident tax summary.</td></tr>
+      <tr><td style="padding:10px 0;border-bottom:1px solid var(--border);color:var(--accent);font-weight:700;font-size:12px;letter-spacing:.07em;text-transform:uppercase;vertical-align:top;">Year-by-Year</td>
+          <td style="padding:10px 0 10px 18px;border-bottom:1px solid var(--border);font-size:13px;color:var(--text-dim);line-height:1.6;">Full schedule across the hold period. Rent escalates each year (3% default &mdash; editable). Mortgage interest declines as the loan amortises. LTV trajectory year-by-year. Optional <strong>refinance year</strong> highlights the row where you refi to release equity.</td></tr>
+      <tr><td style="padding:10px 0;border-bottom:1px solid var(--border);color:var(--accent);font-weight:700;font-size:12px;letter-spacing:.07em;text-transform:uppercase;vertical-align:top;">Sensitivity</td>
+          <td style="padding:10px 0 10px 18px;border-bottom:1px solid var(--border);font-size:13px;color:var(--text-dim);line-height:1.6;">Bear / Base / Bull side-by-side. <em>Bear:</em> rate +2%, growth &minus;1.5%, void +2 mo, rent &minus;10%. <em>Bull:</em> rate &minus;0.5%, growth +1%, void &minus;0.5 mo, rent +5%. Plus a Ltd Co vs Personal Name (40% MTR) tax structure comparison &mdash; shows why higher-rate UK earners hold via Ltd Co.</td></tr>
+      <tr><td style="padding:10px 0;color:var(--accent);font-weight:700;font-size:12px;letter-spacing:.07em;text-transform:uppercase;vertical-align:top;">Stress &amp; Risk</td>
+          <td style="padding:10px 0 10px 18px;font-size:13px;color:var(--text-dim);line-height:1.6;">Three big metric cards: break-even rate (rate at which year-1 cashflow = 0), max void months tolerable, rate headroom. DSCR table at current rate / +2% / +4% with lender-threshold verdict. Payment shock table showing year-1 cashflow change across &minus;1% to +4% rate moves.</td></tr>
+    </table>
+
+    <!-- 4. METRIC GLOSSARY -->
+    <h2 id="g-metrics" style="font-size:18px;color:var(--accent);margin:0 0 14px;letter-spacing:-.01em;">4. Metric glossary</h2>
+    <table style="width:100%;border-collapse:collapse;margin-bottom:32px;">
+      <tr><td style="padding:10px 0;border-bottom:1px solid var(--border);width:200px;color:var(--text);font-weight:700;font-size:13px;vertical-align:top;">Gross Yield</td>
+          <td style="padding:10px 0 10px 18px;border-bottom:1px solid var(--border);font-size:13px;color:var(--text-dim);line-height:1.6;">Annual rent &divide; purchase price. <strong style="color:var(--accent-dim);">Unlevered.</strong> Tells you about the asset, not your investment. Same property, different mortgage = same Gross Yield.</td></tr>
+      <tr><td style="padding:10px 0;border-bottom:1px solid var(--border);color:var(--text);font-weight:700;font-size:13px;vertical-align:top;">Net Yield</td>
+          <td style="padding:10px 0 10px 18px;border-bottom:1px solid var(--border);font-size:13px;color:var(--text-dim);line-height:1.6;">NOI (rent minus opex) &divide; purchase price. <strong style="color:var(--accent-dim);">Unlevered.</strong> Same as Gross Yield but after running costs.</td></tr>
+      <tr><td style="padding:10px 0;border-bottom:1px solid var(--border);color:var(--text);font-weight:700;font-size:13px;vertical-align:top;">Cash-on-Cash</td>
+          <td style="padding:10px 0 10px 18px;border-bottom:1px solid var(--border);font-size:13px;color:var(--text-dim);line-height:1.6;">Year-1 cashflow &divide; total cash you put in. <strong style="color:var(--accent);">Levered.</strong> "How much yield does my actual money earn in year 1?" Doesn't include capital gain or paydown.</td></tr>
+      <tr><td style="padding:10px 0;border-bottom:1px solid var(--border);color:var(--text);font-weight:700;font-size:13px;vertical-align:top;">Total Return</td>
+          <td style="padding:10px 0 10px 18px;border-bottom:1px solid var(--border);font-size:13px;color:var(--text-dim);line-height:1.6;">Cumulative cashflow + capital gain + principal paydown, all post-tax, over the full hold period. The "what did I actually make" number. Usually 4&ndash;6&times; the year-1 cashflow on a leveraged 10-year hold.</td></tr>
+      <tr><td style="padding:10px 0;border-bottom:1px solid var(--border);color:var(--text);font-weight:700;font-size:13px;vertical-align:top;">Equity Multiple</td>
+          <td style="padding:10px 0 10px 18px;border-bottom:1px solid var(--border);font-size:13px;color:var(--text-dim);line-height:1.6;">(Cash-in + total return) &divide; cash-in. 2.0&times; means you doubled your money. 3.5&times; means you 3.5x'd it. Time-blind &mdash; doesn't tell you how long it took.</td></tr>
+      <tr><td style="padding:10px 0;border-bottom:1px solid var(--border);color:var(--text);font-weight:700;font-size:13px;vertical-align:top;">IRR</td>
+          <td style="padding:10px 0 10px 18px;border-bottom:1px solid var(--border);font-size:13px;color:var(--text-dim);line-height:1.6;">Internal Rate of Return. Time-weighted annualised return on the cash you put in. Comparable to a bond yield or stock CAGR. 12% IRR over 10 years roughly equals a 3.1&times; equity multiple.</td></tr>
+      <tr><td style="padding:10px 0;border-bottom:1px solid var(--border);color:var(--text);font-weight:700;font-size:13px;vertical-align:top;">Capital Gain</td>
+          <td style="padding:10px 0 10px 18px;border-bottom:1px solid var(--border);font-size:13px;color:var(--text-dim);line-height:1.6;">Exit value minus purchase price. Pre-tax &mdash; the model applies Corp Tax (25%) on this when computing post-tax Total Return. Driven by the London HPI forecast.</td></tr>
+      <tr><td style="padding:10px 0;border-bottom:1px solid var(--border);color:var(--text);font-weight:700;font-size:13px;vertical-align:top;">Principal Paydown</td>
+          <td style="padding:10px 0 10px 18px;border-bottom:1px solid var(--border);font-size:13px;color:var(--text-dim);line-height:1.6;">Reduction in mortgage balance over the hold period. Effectively rent paying down your loan &mdash; equity transferred from the bank to you, paid by your tenant. On a 25-year C&amp;I over 10 years, this can be 25&ndash;30% of original loan.</td></tr>
+      <tr><td style="padding:10px 0;border-bottom:1px solid var(--border);color:var(--text);font-weight:700;font-size:13px;vertical-align:top;">DSCR / ICR</td>
+          <td style="padding:10px 0 10px 18px;border-bottom:1px solid var(--border);font-size:13px;color:var(--text-dim);line-height:1.6;">Debt Service Coverage Ratio. NOI &divide; annual debt service, expressed as a percentage. UK BTL lenders typically require <span style="color:var(--green);">&ge;145%</span> for higher-rate / Ltd Co, <span style="color:var(--accent);">125&ndash;145%</span> for basic-rate. Below 125% &mdash; lender unlikely to finance at requested LTV.</td></tr>
+      <tr><td style="padding:10px 0;color:var(--text);font-weight:700;font-size:13px;vertical-align:top;">Break-Even Rate</td>
+          <td style="padding:10px 0 10px 18px;font-size:13px;color:var(--text-dim);line-height:1.6;">Mortgage rate at which year-1 cashflow = 0. The gap between this and your current rate is your <em>rate headroom</em> &mdash; how much rates can rise before the property goes cashflow-negative.</td></tr>
+    </table>
+
+    <!-- 5. INPUTS -->
+    <h2 id="g-inputs" style="font-size:18px;color:var(--accent);margin:0 0 14px;letter-spacing:-.01em;">5. Editing inputs (auto-save, reset)</h2>
+    <div style="font-size:13px;color:var(--text-dim);line-height:1.7;margin-bottom:14px;">
+      Click any input field on the left side of any panel and type a new value. Everything recalculates instantly &mdash; metric cards, tables, comparison columns, the year-by-year schedule, sensitivity scenarios, stress tests, all of it.
+    </div>
+    <div style="font-size:13px;color:var(--text-dim);line-height:1.7;margin-bottom:14px;">
+      <strong style="color:var(--text);">Auto-save.</strong> Every edit is saved to your browser's localStorage. Refresh the page, close the tab, come back tomorrow &mdash; your edits are preserved.
+    </div>
+    <div style="font-size:13px;color:var(--text-dim);line-height:1.7;margin-bottom:32px;">
+      <strong style="color:var(--text);">Reset button</strong> (top-right of the header). Wipes all edits and reloads with the original property data. Useful when you've been experimenting and want a clean slate.
+    </div>
+
+    <!-- 6. DISPLAY -->
+    <h2 id="g-display" style="font-size:18px;color:var(--accent);margin:0 0 14px;letter-spacing:-.01em;">6. Light/Dark mode + Export/Print</h2>
+    <div style="font-size:13px;color:var(--text-dim);line-height:1.7;margin-bottom:14px;">
+      <strong style="color:var(--text);">Theme toggle</strong> (top-right). Dark mode is default; Light mode is editorial off-white with walnut accent. Choice persists via localStorage. Charts redraw with the new palette.
+    </div>
+    <div style="font-size:13px;color:var(--text-dim);line-height:1.7;margin-bottom:32px;">
+      <strong style="color:var(--text);">Export / Print</strong> (top-right, gold button). Opens a print dialog. The print stylesheet expands all collapsed panels and lays them out for paper. Use "Save as PDF" in the print dialog for a portable archive.
+    </div>
+
+    <!-- 7. DIRT TABS -->
+    <h2 id="g-dirt" style="font-size:18px;color:var(--accent);margin:0 0 14px;letter-spacing:-.01em;">7. The "Dirt" research tabs</h2>
+    <div style="font-size:13px;color:var(--text-dim);line-height:1.7;margin-bottom:14px;">
+      Three parallel research tabs &mdash; <strong style="color:var(--text);">Canada Dirt</strong>, <strong style="color:var(--text);">Costa Rica Dirt</strong>, <strong style="color:var(--text);">American Dirt</strong> &mdash; consolidating homesteading research as an alternative thesis to UK BTL. Each follows the same five-section structure:
+    </div>
+    <ul style="font-size:13px;color:var(--text-dim);line-height:1.7;margin:0 0 14px 20px;">
+      <li><strong style="color:var(--text);">Regional Ranking</strong> &mdash; comparison table of regions in that country (climate, water, soil, land price, regulatory tier)</li>
+      <li><strong style="color:var(--text);">Featured Region Deep Dive</strong> &mdash; the consensus pick with pros, red flags, start-small playbook, starter crops, livestock</li>
+      <li><strong style="color:var(--text);">Community Voices</strong> &mdash; curated quotes from Reddit, agent blogs, lived experience</li>
+      <li><strong style="color:var(--text);">Risks &amp; Regulation</strong> &mdash; climate hazards + legal/regulatory friction</li>
+      <li><strong style="color:var(--text);">Sources</strong> &mdash; links to agent blogs, community forums, reference data</li>
+    </ul>
+    <div style="font-size:13px;color:var(--text-dim);line-height:1.7;margin-bottom:32px;">
+      These are research scratchpads, not financial models. They consolidate your research dumps so you can compare countries side-by-side qualitatively before any of them gets a P&amp;L tab.
+    </div>
+
+    <!-- 8. CAVEATS -->
+    <h2 id="g-caveats" style="font-size:18px;color:var(--accent);margin:0 0 14px;letter-spacing:-.01em;">8. Caveats &amp; disclaimers</h2>
+    <div style="background:var(--card);border:1px solid var(--border);border-left:3px solid var(--red);border-radius:6px;padding:18px 22px;margin-bottom:32px;">
+      <ul style="font-size:13px;color:var(--text-dim);line-height:1.8;margin:0;padding-left:20px;">
+        <li>Indicative modelling only. <strong>Not financial advice.</strong> Consult a qualified accountant + solicitor before transacting.</li>
+        <li>SDLT rates reflect Autumn Budget 2024 (5% additional dwelling surcharge) + 2% non-resident surcharge; nil-rate band reverted to &pound;125k from April 2025.</li>
+        <li>ATED bands labelled 2025-26. They are uprated annually by CPI &mdash; verify current figures on gov.uk before relying on them.</li>
+        <li>Property listings (Rightmove, HomeMove, KFH) may be sold or withdrawn since added &mdash; check current status before acting.</li>
+        <li>Some prices and rents are marked <em>est.</em> and are estimates not confirmed by the listing agent.</li>
+        <li>The Costa Rica Dirt tab uses widely-known facts plus widely-echoed expat themes; specific quotes flagged as "Placeholder" need replacement with sourced material.</li>
+        <li>The US has no homesteader visa &mdash; land ownership confers no right to live there. Realistic residency paths are EB-5 ($800k+), E-2 (treaty trader), or family-based.</li>
+        <li>Mortgage interest in the model is treated as flat year-1 in the Snapshot view, but the Year-by-Year and Total Return calculations use a true amortizing schedule.</li>
+        <li>Source code and live deployment: <a class="tbl-link" href="https://github.com/jramsaymckit-del/jramsaymckit-del.github.io" target="_blank" rel="noopener">github.com/jramsaymckit-del &rarr;</a></li>
+      </ul>
+    </div>
+
+    <div style="font-size:11px;color:var(--muted);text-align:center;padding:16px 0;border-top:1px solid var(--border);">
+      Built for personal use &middot; Tab structure and metric definitions subject to change as the model evolves
+    </div>
+
+  </div><!-- /tab-guide -->
+
 </div><!-- /content -->
 
 <div class="footer">
@@ -1882,21 +2473,6 @@ function getATEDBand(value) {
 // PROPERTY DATA
 // =====================================================================
 const PROPS = [
-  {
-    id: 'p1', badge: '⭐', ref: true,
-    name: 'Argyle Road, West Ealing W13',
-    sub: '4 self-contained flats · West Ealing Elizabeth line · Zone 3',
-    agent_name: 'Savills, Ealing',
-    note: 'Price confirmed on Rightmove (Savills). 4-unit freehold block, walking distance West Ealing Elizabeth line station. Est. £1,500/flat/mo. Refurb allowance for cosmetic updates.',
-    url: 'https://www.rightmove.co.uk/properties/164903600',
-    url_label: 'Rightmove',
-    price: 1650000, dep: 25, rate: 5.5, term: 25,
-    rent: 6000, void_: 1,
-    agent: 10, maint: 1.5, ins: 2400, gr: 0, sc: 0,
-    legal: 3500, survey: 1200, refurb: 15000,
-    growth: 3.5, hold: 10, tax: 25,
-    price_est: false, rent_est: true, units: 4
-  },
   {
     id: 'p2', badge: '2', ref: false,
     name: 'Woodhill, Greenwich SE18',
@@ -2896,7 +3472,7 @@ function showBtlSection(section, btn) {
 }
 
 function switchTab(id, btn) {
-  ['btl','rvb','lend','cadirt','crdirt','amdirt'].forEach(t => {
+  ['btl','rvb','lend','cadirt','crdirt','amdirt','eudirt','guide'].forEach(t => {
     const node = el('tab-'+t);
     if (node) node.classList.toggle('hidden', t !== id);
   });
@@ -2932,6 +3508,14 @@ function showAmDirt(id, btn) {
     const n = el('amdirt-'+s); if (n) n.classList.toggle('hidden', s !== id);
   });
   const sub = el('amdirt-subnav');
+  if (sub) sub.querySelectorAll('.pnav').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+}
+function showEuDirt(id, btn) {
+  ['overview','portugal','voices','risks','sources'].forEach(s => {
+    const n = el('eudirt-'+s); if (n) n.classList.toggle('hidden', s !== id);
+  });
+  const sub = el('eudirt-subnav');
   if (sub) sub.querySelectorAll('.pnav').forEach(b => b.classList.remove('active'));
   if (btn) btn.classList.add('active');
 }
