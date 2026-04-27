@@ -1637,6 +1637,18 @@ function mortgage(loan, ratePct, termYrs) {
 // =====================================================================
 // COMPUTE BTL — with year-specific projected growth
 // =====================================================================
+// True mortgage amortization: outstanding balance after N months of scheduled payments.
+// Handles interest-only (termYears === 0 or very large) and C+I gracefully.
+function amortBalance(loan, annualRate, termYears, monthsElapsed) {
+  const r = (annualRate / 100) / 12;
+  const n = Math.max(1, termYears * 12);
+  const t = Math.min(monthsElapsed, n);
+  if (r === 0) return Math.max(0, loan - (loan / n) * t);
+  const monthlyPmt = loan * r * Math.pow(1 + r, n) / (Math.pow(1 + r, n) - 1);
+  const bal = loan * Math.pow(1 + r, t) - monthlyPmt * (Math.pow(1 + r, t) - 1) / r;
+  return Math.max(0, bal);
+}
+
 function computeBTL(price, dep, rate, term, rent, void_, agent, maint, ins, gr, sc, legal, survey, refurb, growth, hold, tax) {
   const deposit    = price * (dep / 100);
   const loan       = price - deposit;
@@ -1645,7 +1657,7 @@ function computeBTL(price, dep, rate, term, rent, void_, agent, maint, ins, gr, 
   const totalCashIn = deposit + acqCosts;
   const mtg        = mortgage(loan, rate, term);
   const annMtg     = mtg * 12;
-  const annInt     = loan * (rate / 100);
+  const annInt     = loan * (rate / 100);           // year-1 interest (headline cashflow)
   const grossRent  = rent * (12 - void_);
   const agentFee   = grossRent * (agent / 100);
   const maintCost  = price * (maint / 100);
@@ -1654,7 +1666,7 @@ function computeBTL(price, dep, rate, term, rent, void_, agent, maint, ins, gr, 
   const ebt        = ebitda - annInt;
   const taxAmt     = Math.max(0, ebt * (tax / 100));
   const netProfit  = ebt - taxAmt;
-  const cashflow   = netProfit - (annMtg - annInt);
+  const cashflow   = netProfit - (annMtg - annInt); // year-1 cashflow (post-principal-repayment)
   const grossYield = (grossRent / price) * 100;
   const netYield   = (ebitda / price) * 100;
   const coc        = (cashflow / totalCashIn) * 100;
@@ -1668,10 +1680,29 @@ function computeBTL(price, dep, rate, term, rent, void_, agent, maint, ins, gr, 
     exitVal *= (1 + g / 100);
   }
   const capGain    = exitVal - price;
-  const irr        = (Math.pow((totalCashIn + cashflow * hold + capGain) / totalCashIn, 1 / hold) - 1) * 100;
 
-  // Also calculate flat-growth exit for comparison
+  // Flat-growth comparison
   const exitValFlat = price * Math.pow(1 + growth / 100, hold);
+
+  // === PRINCIPAL PAYDOWN BY THE RENTER ===
+  // Over `hold` years the scheduled mortgage payments (which rent services) reduce the loan balance.
+  // That reduction is equity the investor owns at exit — it MUST be counted as return.
+  const outstandingAtExit   = amortBalance(loan, rate, term, hold * 12);
+  const principalPaidDown   = loan - outstandingAtExit;
+  const equityAtExit        = exitVal - outstandingAtExit;                 // investor's equity in the asset at exit
+  const cumCashflow         = cashflow * hold;                             // approx: year-1 cashflow × years
+  const cgtOnGainInternal   = Math.max(0, capGain * (tax / 100));          // tax on appreciation
+  const totalReturn         = cumCashflow + capGain + principalPaidDown - cgtOnGainInternal; // post-tax total return
+  const equityMultiple      = (totalCashIn > 0) ? (totalCashIn + totalReturn) / totalCashIn : 0;
+
+  // IRR (now includes principal paydown — was missing before)
+  const terminalValue = totalCashIn + totalReturn;
+  const irr           = (Math.pow(terminalValue / totalCashIn, 1 / hold) - 1) * 100;
+
+  // Decompose total return by source (for the breakdown display)
+  const returnFromCashflow = cumCashflow;
+  const returnFromGain     = capGain - cgtOnGainInternal;
+  const returnFromPaydown  = principalPaidDown;
 
   // NRLS (Non-Resident Landlord Scheme) — informational
   const nrlsWithholding = grossRent * 0.20;
@@ -1682,6 +1713,9 @@ function computeBTL(price, dep, rate, term, rent, void_, agent, maint, ins, gr, 
   return { deposit, loan, stax, acqCosts, totalCashIn, mtg, annMtg, annInt,
     grossRent, agentFee, maintCost, opex, ebitda, ebt, taxAmt, netProfit,
     cashflow, grossYield, netYield, coc, exitVal, exitValFlat, capGain, irr,
+    outstandingAtExit, principalPaidDown, equityAtExit,
+    cumCashflow, totalReturn, equityMultiple,
+    returnFromCashflow, returnFromGain, returnFromPaydown,
     nrlsWithholding, atedAnnual };
 }
 
@@ -1777,12 +1811,14 @@ function buildPropPanel(p) {
     <div class="results">
       <div class="section-title" style="margin-top:0">Key Metrics</div>
       <div class="metrics">
-        <div class="metric-card highlight"><div class="metric-label">Gross Yield</div><div class="metric-value" id="${pid}-m-gy">&mdash;</div></div>
-        <div class="metric-card highlight"><div class="metric-label">Net Yield</div><div class="metric-value" id="${pid}-m-ny">&mdash;</div></div>
-        <div class="metric-card highlight"><div class="metric-label">Cash-on-Cash</div><div class="metric-value" id="${pid}-m-coc">&mdash;</div></div>
+        <div class="metric-card"><div class="metric-label">Gross Yield</div><div class="metric-value" id="${pid}-m-gy">&mdash;</div><div class="metric-sub">rent &div; price &mdash; unlevered</div></div>
+        <div class="metric-card"><div class="metric-label">Net Yield</div><div class="metric-value" id="${pid}-m-ny">&mdash;</div><div class="metric-sub">NOI &div; price &mdash; unlevered</div></div>
+        <div class="metric-card highlight"><div class="metric-label">Cash-on-Cash</div><div class="metric-value" id="${pid}-m-coc">&mdash;</div><div class="metric-sub">cashflow &div; cash-in &mdash; levered</div></div>
         <div class="metric-card"><div class="metric-label">Annual Net Cashflow</div><div class="metric-value" id="${pid}-m-cf">&mdash;</div><div class="metric-sub" id="${pid}-m-cfmo">&mdash;</div></div>
         <div class="metric-card"><div class="metric-label">Total Cash Required</div><div class="metric-value" id="${pid}-m-cash">&mdash;</div><div class="metric-sub" id="${pid}-m-sdlt">&mdash;</div></div>
-        <div class="metric-card"><div class="metric-label">Approx. IRR</div><div class="metric-value" id="${pid}-m-irr">&mdash;</div><div class="metric-sub" id="${pid}-m-irryr">&mdash;</div></div>
+        <div class="metric-card highlight"><div class="metric-label">Total Return</div><div class="metric-value" id="${pid}-m-tr">&mdash;</div><div class="metric-sub" id="${pid}-m-trsub">cashflow + gain + paydown</div></div>
+        <div class="metric-card highlight"><div class="metric-label">Equity Multiple</div><div class="metric-value" id="${pid}-m-em">&mdash;</div><div class="metric-sub">value &div; cash-in at exit</div></div>
+        <div class="metric-card highlight"><div class="metric-label">IRR</div><div class="metric-value" id="${pid}-m-irr">&mdash;</div><div class="metric-sub" id="${pid}-m-irryr">&mdash;</div></div>
       </div>
       <div class="results-grid">
         <div>
@@ -1820,13 +1856,24 @@ function buildPropPanel(p) {
           </table>
           <div class="section-title">Exit Projection (London Forecast Rates)</div>
           <table>
+            <tr class="bold"><td colspan="2" style="color:var(--accent);font-size:11px;letter-spacing:.06em;text-transform:uppercase;">Asset side</td></tr>
             <tr><td>Exit Value (projected)</td><td id="${pid}-e-exit">&mdash;</td></tr>
             <tr><td>Exit Value (flat ${p.growth}% p.a.)</td><td id="${pid}-e-exitflat">&mdash;</td></tr>
             <tr><td>Capital Gain</td><td id="${pid}-e-cg">&mdash;</td></tr>
             <tr><td>Corp Tax on Gain (25%)</td><td id="${pid}-e-cgt">&mdash;</td></tr>
-            <tr><td>Cumulative Cashflow</td><td id="${pid}-e-cumcf">&mdash;</td></tr>
+            <tr class="divider"><td colspan="2"></td></tr>
+            <tr class="bold"><td colspan="2" style="color:var(--accent);font-size:11px;letter-spacing:.06em;text-transform:uppercase;">Loan side &mdash; principal paydown by renter</td></tr>
+            <tr><td>Outstanding Mortgage at Exit</td><td id="${pid}-e-outstanding">&mdash;</td></tr>
+            <tr><td>Principal Paid Down (by rent)</td><td id="${pid}-e-paydown">&mdash;</td></tr>
+            <tr class="bold"><td>Equity at Exit (value &minus; loan)</td><td id="${pid}-e-equityexit">&mdash;</td></tr>
+            <tr class="divider"><td colspan="2"></td></tr>
+            <tr class="bold"><td colspan="2" style="color:var(--accent);font-size:11px;letter-spacing:.06em;text-transform:uppercase;">Total Return breakdown</td></tr>
+            <tr><td>Cumulative Net Cashflow</td><td id="${pid}-e-cumcf">&mdash;</td></tr>
+            <tr><td>Capital Gain (post-tax)</td><td id="${pid}-e-rg">&mdash;</td></tr>
+            <tr><td>Principal Paydown</td><td id="${pid}-e-rp">&mdash;</td></tr>
             <tr class="divider"><td colspan="2"></td></tr>
             <tr class="bold"><td>Total Return (post-tax)</td><td id="${pid}-e-total">&mdash;</td></tr>
+            <tr class="bold"><td>Equity Multiple (value &div; cash-in)</td><td id="${pid}-e-em">&mdash;</td></tr>
           </table>
           <div class="section-title">Non-Resident Tax Summary</div>
           <table>
@@ -1873,6 +1920,9 @@ function calcProp(pid) {
   set(`${pid}-m-cfmo`,  '\u00a3'+f(r.cashflow/12,0)+'/mo');
   set(`${pid}-m-cash`,  gbp(r.totalCashIn));
   set(`${pid}-m-sdlt`,  'SDLT \u00a3'+f(r.stax)+' (incl. NR \u00a3'+f(nrSurcharge)+')');
+  set(`${pid}-m-tr`,    gbp(r.totalReturn));
+  set(`${pid}-m-trsub`, 'over '+hold+' yrs post-tax');
+  set(`${pid}-m-em`,    r.equityMultiple.toFixed(2)+'\u00d7');
   set(`${pid}-m-irr`,   pct(r.irr));
 
   set(`${pid}-t-rent`,   gbp(r.grossRent));
@@ -1896,12 +1946,18 @@ function calcProp(pid) {
   set(`${pid}-a-refurb`, gbp(refurb));
   set(`${pid}-a-total`,  gbp(r.totalCashIn));
 
-  set(`${pid}-e-exit`,     gbp(r.exitVal));
-  set(`${pid}-e-exitflat`, gbp(r.exitValFlat));
-  set(`${pid}-e-cg`,       gbp(r.capGain));
-  set(`${pid}-e-cgt`,      '('+gbp(cgtOnGain)+')');
-  set(`${pid}-e-cumcf`,    gbp(r.cashflow * hold));
-  set(`${pid}-e-total`,    gbp(r.capGain - cgtOnGain + r.cashflow * hold));
+  set(`${pid}-e-exit`,        gbp(r.exitVal));
+  set(`${pid}-e-exitflat`,    gbp(r.exitValFlat));
+  set(`${pid}-e-cg`,          gbp(r.capGain));
+  set(`${pid}-e-cgt`,         '('+gbp(cgtOnGain)+')');
+  set(`${pid}-e-outstanding`, gbp(r.outstandingAtExit));
+  set(`${pid}-e-paydown`,     gbp(r.principalPaidDown));
+  set(`${pid}-e-equityexit`,  gbp(r.equityAtExit));
+  set(`${pid}-e-cumcf`,       gbp(r.returnFromCashflow));
+  set(`${pid}-e-rg`,          gbp(r.returnFromGain));
+  set(`${pid}-e-rp`,          gbp(r.returnFromPaydown));
+  set(`${pid}-e-total`,       gbp(r.totalReturn));
+  set(`${pid}-e-em`,          r.equityMultiple.toFixed(2) + '\u00d7');
 
   set(`${pid}-x-nrls`,  gbp(r.nrlsWithholding) + '/yr');
   set(`${pid}-x-ated`,  r.atedAnnual > 0 ? gbp(r.atedAnnual) + '/yr' : 'N/A (< \u00a3500k)');
@@ -1921,10 +1977,15 @@ function buildCompareTable() {
 
   let h = `<thead><tr>
     <th style="text-align:left;min-width:170px">Property</th>
-    <th>Price</th><th>Units</th><th>Cash-In</th><th>SDLT (w/ NR)</th>
-    <th>Gross Rent p.a.</th><th>Net CF p.a.</th>
-    <th>Gross Yield</th><th>Net Yield</th>
-    <th>Cash-on-Cash</th><th>IRR</th><th>Exit Value</th>
+    <th>Price</th><th>Units</th><th>Cash-In</th>
+    <th title="Rent &div; price (unlevered)">Gross Yield</th>
+    <th title="Cashflow &div; cash-in (levered)">Cash-on-Cash</th>
+    <th title="Net cashflow in year 1">Net CF p.a.</th>
+    <th title="Property value growth over hold period">Capital Gain</th>
+    <th title="Principal paid down by renter over hold period">Paydown</th>
+    <th title="Cashflow + Gain + Paydown, post-tax">Total Return</th>
+    <th title="(cash-in + total return) &div; cash-in">Equity Mult.</th>
+    <th>IRR</th>
   </tr></thead><tbody>`;
 
   R.forEach(r => {
@@ -1938,14 +1999,14 @@ function buildCompareTable() {
       <td>${priceStr}</td>
       <td style="text-align:center">${r.units}</td>
       <td>${gbp(r.totalCashIn)}</td>
-      <td>${gbp(r.stax)}</td>
-      <td>${gbp(r.grossRent)}</td>
-      <td class="${cls(r.cashflow,'cashflow')}">${gbp(r.cashflow)}</td>
       <td class="${cls(r.grossYield,'grossYield')}">${pct(r.grossYield)}</td>
-      <td class="${cls(r.netYield,'netYield')}">${pct(r.netYield)}</td>
       <td class="${cls(r.coc,'coc')}">${pct(r.coc)}</td>
+      <td class="${cls(r.cashflow,'cashflow')}">${gbp(r.cashflow)}</td>
+      <td>${gbp(r.capGain)}</td>
+      <td>${gbp(r.principalPaidDown)}</td>
+      <td class="${cls(r.totalReturn,'totalReturn')}">${gbp(r.totalReturn)}</td>
+      <td class="${cls(r.equityMultiple,'equityMultiple')}">${r.equityMultiple.toFixed(2)}\u00d7</td>
       <td class="${cls(r.irr,'irr')}">${pct(r.irr)}</td>
-      <td>${gbp(r.exitVal)}</td>
     </tr>`;
   });
 
@@ -1985,11 +2046,19 @@ function switchTab(id, btn) {
   if (id === 'lend') { calcPrivLend(); }
 }
 
-function showDirt(id, btn) {
+function showCaDirt(id, btn) {
   ['overview','okanagan','voices','risks','sources'].forEach(s => {
-    const n = el('dirt-'+s); if (n) n.classList.toggle('hidden', s !== id);
+    const n = el('cadirt-'+s); if (n) n.classList.toggle('hidden', s !== id);
   });
-  const sub = el('dirt-subnav');
+  const sub = el('cadirt-subnav');
+  if (sub) sub.querySelectorAll('.pnav').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+}
+function showCrDirt(id, btn) {
+  ['overview','centralvalley','voices','risks','sources'].forEach(s => {
+    const n = el('crdirt-'+s); if (n) n.classList.toggle('hidden', s !== id);
+  });
+  const sub = el('crdirt-subnav');
   if (sub) sub.querySelectorAll('.pnav').forEach(b => b.classList.remove('active'));
   if (btn) btn.classList.add('active');
 }
