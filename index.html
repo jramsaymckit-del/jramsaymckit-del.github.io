@@ -149,27 +149,51 @@ td:last-child { text-align: right; }
 .compare-legend { font-size: 11px; color: var(--muted); margin-top: 10px; line-height: 1.8; }
 
 /* Verdict (RVB) */
-.verdict { border-radius: 8px; padding: 20px; margin-bottom: 20px; display: flex; align-items: center; gap: 20px; }
-.verdict.buy  { background: rgba(76,175,130,0.08); border: 1px solid var(--green); }
-.verdict.rent { background: rgba(224,92,92,0.08);  border: 1px solid var(--red); }
-.verdict.lend { background: var(--accent-soft);     border: 1px solid var(--accent); }
-.verdict-icon { font-size: 36px; }
-.verdict-title { font-size: 16px; font-weight: 700; }
+/* Verdict bar — editorial, no icons. Left accent stripe carries the verdict colour. */
+.verdict { border-radius: 6px; padding: 18px 22px 18px 24px; margin-bottom: 22px; border: 1px solid var(--border); border-left: 4px solid var(--muted); background: var(--card); }
+.verdict.buy  { border-left-color: var(--green);  background: rgba(76,175,130,0.04); }
+.verdict.rent { border-left-color: var(--red);    background: rgba(224,92,92,0.04); }
+.verdict.lend { border-left-color: var(--accent); background: var(--accent-soft); }
+.verdict-eyebrow { font-size: 10px; color: var(--muted); letter-spacing: .14em; text-transform: uppercase; margin-bottom: 6px; }
+.verdict-title { font-size: 18px; font-weight: 700; letter-spacing: -.01em; }
 .verdict.buy .verdict-title  { color: var(--green); }
 .verdict.rent .verdict-title { color: var(--red); }
 .verdict.lend .verdict-title { color: var(--accent); }
-.verdict-detail { font-size: 13px; color: var(--text-dim); margin-top: 4px; }
-.verdict-break { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.verdict-detail { font-size: 13px; color: var(--text-dim); margin-top: 6px; line-height: 1.55; }
+.verdict-break { font-size: 12px; color: var(--muted); margin-top: 4px; line-height: 1.5; }
 
-/* RVB scenario cards */
-.rvb-scenario { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 18px; transition: border-color .15s; }
-.rvb-scenario.win { border-color: var(--green); border-width: 2px; padding: 17px; }
-.rvb-scenario.lose { opacity: .85; }
-.rvb-scenario-label { font-size: 11px; color: var(--accent); letter-spacing: .12em; text-transform: uppercase; margin-bottom: 6px; }
-.rvb-scenario-title { font-size: 15px; font-weight: 700; color: var(--text); margin-bottom: 10px; }
-.rvb-scenario-wealth { font-size: 22px; font-weight: 700; color: var(--text); }
-.rvb-scenario-sub { font-size: 11px; color: var(--muted); margin-top: 4px; }
-.rvb-win-badge { display: inline-block; background: var(--green); color: var(--bg); font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 10px; letter-spacing: .08em; text-transform: uppercase; margin-left: 6px; vertical-align: middle; }
+/* RVB scenario cards — editorial; rank ribbon, no icons */
+.rvb-scenario {
+  background: var(--card); border: 1px solid var(--border); border-radius: 6px;
+  padding: 18px 20px; position: relative;
+  transition: border-color .15s, transform .15s;
+}
+.rvb-scenario.win  { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+.rvb-scenario.lose { }
+.rvb-scenario-rank { font-size: 9px; color: var(--muted); letter-spacing: .18em; text-transform: uppercase; font-weight: 700; }
+.rvb-scenario.win .rvb-scenario-rank { color: var(--accent); }
+.rvb-scenario-title {
+  font-size: 16px; font-weight: 700; color: var(--text); margin: 4px 0 14px;
+  letter-spacing: -.01em; display: flex; justify-content: space-between; align-items: baseline; gap: 8px;
+}
+.rvb-scenario-wealth { font-size: 24px; font-weight: 700; color: var(--text); letter-spacing: -.01em; }
+.rvb-scenario.win .rvb-scenario-wealth { color: var(--accent); }
+.rvb-scenario-sub { font-size: 11px; color: var(--muted); margin-top: 4px; line-height: 1.4; }
+.rvb-scenario-meta { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); font-size: 11px; color: var(--muted); line-height: 1.7; }
+.rvb-scenario-meta strong { color: var(--text-dim); font-weight: 700; }
+.rvb-win-badge {
+  font-size: 9px; color: var(--accent); letter-spacing: .14em; text-transform: uppercase; font-weight: 700;
+  padding: 2px 8px; border: 1px solid var(--accent); border-radius: 10px; white-space: nowrap;
+}
+
+/* Wealth trajectory table — slim, editorial */
+.traj-tbl { width: 100%; border-collapse: collapse; font-size: 12px; }
+.traj-tbl th { font-size: 10px; color: var(--accent); letter-spacing: .08em; text-transform: uppercase; text-align: right; padding: 8px 10px; border-bottom: 2px solid var(--border); }
+.traj-tbl th:first-child { text-align: left; }
+.traj-tbl td { padding: 6px 10px; font-size: 12px; color: var(--text-dim); border-bottom: 1px solid var(--border); text-align: right; }
+.traj-tbl td:first-child { text-align: left; color: var(--text); font-weight: 700; font-feature-settings: "tnum"; }
+.traj-tbl td.lead { color: var(--accent); font-weight: 700; }
+.traj-tbl tr.cross-row td { background: var(--accent-soft); color: var(--accent); font-style: italic; }
 
 /* Market & Tax tab */
 .mkt-layout { display: grid; grid-template-columns: 1fr; gap: 24px; }
@@ -275,19 +299,15 @@ td:last-child { text-align: right; }
   <button class="btl-subtab" onclick="showBtlSection('mkt',this)">Market Projections &amp; Tax</button>
 </div>
 
-<!-- Property selector — only visible when "Real Estate" subtab is active -->
-<div id="btl-subnav" class="prop-nav">
-  <button class="pnav active" onclick="showProp('compare',this)">Compare All</button>
-  <button class="pnav" onclick="showProp('p2',this)">Woodhill, SE18</button>
-  <button class="pnav" onclick="showProp('p3',this)">Cumberland Rd, Reading</button>
-  <button class="pnav" onclick="showProp('p4',this)">Goodmayes Ln, IG3</button>
-  <button class="pnav" onclick="showProp('p5',this)">Market St, Maidenhead</button>
-  <button class="pnav" onclick="showProp('p6',this)">Singapore Rd, W13</button>
-  <button class="pnav" onclick="showProp('p7',this)">Mattock Ln, W5</button>
-  <button class="pnav" onclick="showProp('p8',this)">Woodseer St, E1</button>
-  <button class="pnav" onclick="showProp('p9',this)">Lea Bridge Rd, E10</button>
-  <button class="pnav" onclick="showProp('p10',this)">Newburgh Rd, W3</button>
-  <button class="pnav" onclick="showProp('p11',this)">Cheshire St, E2</button>
+<!-- Real Estate research selector — only visible when "Real Estate" subtab is active -->
+<div id="btl-subnav" class="prop-nav" style="align-items:center;">
+  <button class="pnav active" onclick="showProp('boroughs',this)">Boroughs</button>
+  <button class="pnav" onclick="showProp('types',this)">Property Types</button>
+  <button class="pnav" onclick="showProp('strategies',this)">Strategies</button>
+  <button class="pnav" onclick="showProp('risks',this)">Risks &amp; Regulation</button>
+  <button class="pnav" onclick="showProp('sources',this)">Sources</button>
+  <span style="display:inline-block;width:1px;height:20px;background:var(--border);margin:0 4px;"></span>
+  <button class="pnav" onclick="showProp('p11',this)" style="border-color:var(--accent-dim);font-weight:700;">Cheshire St, E2 &mdash; Worked Example</button>
 </div>
 
 <div class="content">
@@ -295,20 +315,590 @@ td:last-child { text-align: right; }
   <!-- BUY TO LET -->
   <div id="tab-btl">
 
-    <!-- Compare All panel -->
-    <div id="panel-compare">
-      <div class="section-title" style="margin-top:0">Portfolio Comparison — All 10 Properties (Canadian Non-Resident via SPV)</div>
+    <!-- ============================================================== -->
+    <!-- RESEARCH PANELS — London BTL landlord research hub              -->
+    <!-- ============================================================== -->
+
+    <!-- Framing banner shared across research panels -->
+    <div id="panel-research-banner">
+      <div class="prop-banner">
+        <div class="prop-banner-left">
+          <div class="prop-banner-name">London BTL Research Hub</div>
+          <div class="prop-banner-sub">Where to buy &middot; What to buy &middot; How to profit &middot; What can break it</div>
+          <div class="prop-banner-note">Pre-acquisition research for a London BTL portfolio. Mirrors the Dirt tabs' structure but applied to London-specific borough dynamics, property type tradeoffs, rental strategies, and the regulatory landscape that makes UK BTL distinct from any other market in the world.</div>
+        </div>
+        <div class="prop-banner-chips">
+          <span class="chip">Thesis: dual-mode (LTR + STR) capable, central enough for STR demand, yield-supported by LTR floor</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============= BOROUGHS PANEL ============= -->
+    <div id="panel-boroughs">
+      <div class="section-title" style="margin-top:0">London Borough Ranking for Landlords (2026)</div>
       <div class="compare-wrap">
-        <table class="compare-tbl" id="compare-tbl">
-          <!-- populated by JS -->
+        <table class="compare-tbl">
+          <thead>
+            <tr>
+              <th style="text-align:left;">Borough / Area</th>
+              <th>Avg 1-bed &pound;</th>
+              <th>LTR &pound;/mo</th>
+              <th title="Annual rent &divide; price">Gross Yield</th>
+              <th>STR Fit</th>
+              <th>5-yr Capital Growth</th>
+              <th style="text-align:left;">Notes</th>
+              <th>Tier</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="ref-row">
+              <td><strong>Tower Hamlets &mdash; Bow / Bromley-by-Bow / Whitechapel</strong></td>
+              <td>&pound;420&ndash;500k</td>
+              <td>&pound;1,700&ndash;2,100</td>
+              <td>4.5&ndash;5.5%</td>
+              <td><span class="c-best">High</span> (some areas; tightened 2025)</td>
+              <td>+12&ndash;18%</td>
+              <td style="text-align:left;">Elizabeth line fully embedded; Brick Lane / Shoreditch fringe; STR planning friction varies block-to-block</td>
+              <td><span class="c-best">S &mdash; dual-mode</span></td>
+            </tr>
+            <tr>
+              <td><strong>Newham &mdash; Stratford / Maryland / Forest Gate</strong></td>
+              <td>&pound;350&ndash;450k</td>
+              <td>&pound;1,500&ndash;1,800</td>
+              <td><span class="c-best">5&ndash;6%</span></td>
+              <td>Med</td>
+              <td>+10&ndash;15% (Stratford regen continues)</td>
+              <td style="text-align:left;">Highest yields with Elizabeth line + Olympic legacy infra; selective licensing (extended 2024)</td>
+              <td><span class="c-best">S &mdash; yield + growth</span></td>
+            </tr>
+            <tr>
+              <td><strong>Greenwich &mdash; Woolwich / Maritime Greenwich</strong></td>
+              <td>&pound;375&ndash;475k</td>
+              <td>&pound;1,500&ndash;1,900</td>
+              <td>4.5&ndash;5.5%</td>
+              <td>Med-High (Maritime Greenwich tourist zone)</td>
+              <td>+8&ndash;14% (Woolwich Elizabeth line)</td>
+              <td style="text-align:left;">Maritime Greenwich UNESCO; Woolwich regen still maturing; STR friendly in tourist core</td>
+              <td><span class="c-best">S &mdash; balanced</span></td>
+            </tr>
+            <tr>
+              <td>Hackney &mdash; Shoreditch / De Beauvoir / Dalston</td>
+              <td>&pound;450&ndash;600k</td>
+              <td>&pound;1,700&ndash;2,200</td>
+              <td>4&ndash;5%</td>
+              <td><span class="c-best">High</span></td>
+              <td>+8&ndash;12%</td>
+              <td style="text-align:left;">Strongest STR demand outside zone 1; Article 4 HMO restrictions; tightening on STR enforcement</td>
+              <td>A &mdash; STR strong</td>
+            </tr>
+            <tr>
+              <td>Southwark &mdash; Bankside / Bermondsey / Borough</td>
+              <td>&pound;475&ndash;625k</td>
+              <td>&pound;1,850&ndash;2,400</td>
+              <td>4&ndash;5%</td>
+              <td><span class="c-best">High</span></td>
+              <td>+7&ndash;11%</td>
+              <td style="text-align:left;">Riverside premium; Borough Market + Tate tourist anchors; planning generally permissive</td>
+              <td>A &mdash; STR strong</td>
+            </tr>
+            <tr>
+              <td>Lambeth &mdash; Waterloo / Vauxhall / Brixton</td>
+              <td>&pound;425&ndash;575k</td>
+              <td>&pound;1,700&ndash;2,200</td>
+              <td>4&ndash;5%</td>
+              <td>High</td>
+              <td>+7&ndash;10%</td>
+              <td style="text-align:left;">Waterloo Eurostar legacy; Nine Elms regen; Brixton vibrant</td>
+              <td>A</td>
+            </tr>
+            <tr>
+              <td>Walthamstow / Leyton / Leytonstone (E17 / E10 / E11)</td>
+              <td>&pound;350&ndash;450k</td>
+              <td>&pound;1,450&ndash;1,800</td>
+              <td>4.5&ndash;5.5%</td>
+              <td>Low-Med</td>
+              <td>+10&ndash;14%</td>
+              <td style="text-align:left;">"Hipster surge" continues; Lea Valley access; mostly LTR demand, weak STR</td>
+              <td>A &mdash; LTR yield play</td>
+            </tr>
+            <tr>
+              <td>Lewisham &mdash; Lewisham / Catford / New Cross</td>
+              <td>&pound;325&ndash;425k</td>
+              <td>&pound;1,400&ndash;1,700</td>
+              <td>4.5&ndash;5.5%</td>
+              <td>Low</td>
+              <td>+8&ndash;12%</td>
+              <td style="text-align:left;">Goldsmiths spillover; DLR + Bakerloo extension chatter; LTR focus</td>
+              <td>B+ &mdash; value LTR</td>
+            </tr>
+            <tr>
+              <td>Brent &mdash; Wembley / Willesden / Kilburn</td>
+              <td>&pound;325&ndash;450k</td>
+              <td>&pound;1,400&ndash;1,700</td>
+              <td>4.5&ndash;5.5%</td>
+              <td>Med (event-driven Wembley)</td>
+              <td>+7&ndash;11%</td>
+              <td style="text-align:left;">Wembley Stadium STR seasonal; Met line + new Brent Cross Town</td>
+              <td>B</td>
+            </tr>
+            <tr>
+              <td>Camden &mdash; Camden Town / Holborn / Bloomsbury</td>
+              <td>&pound;550&ndash;750k</td>
+              <td>&pound;2,000&ndash;2,500</td>
+              <td>3.5&ndash;4.5%</td>
+              <td><span class="c-best">Very High</span></td>
+              <td>+5&ndash;9%</td>
+              <td style="text-align:left;">Tourist + business; tighter STR planning in residential zones; Camden Market premium</td>
+              <td>B &mdash; STR-only economics</td>
+            </tr>
+            <tr>
+              <td>Westminster &mdash; Marylebone / Pimlico / Bayswater</td>
+              <td>&pound;700k&ndash;1M+</td>
+              <td>&pound;2,400&ndash;3,500</td>
+              <td>3&ndash;4%</td>
+              <td><span class="c-best">Very High</span></td>
+              <td>+3&ndash;7%</td>
+              <td style="text-align:left;">Some commercial-class blocks STR-permitted year-round; high entry bar</td>
+              <td>B &mdash; STR-only economics</td>
+            </tr>
+            <tr>
+              <td>Croydon &mdash; central / South Norwood</td>
+              <td>&pound;275&ndash;375k</td>
+              <td>&pound;1,200&ndash;1,500</td>
+              <td><span class="c-best">5&ndash;6%</span></td>
+              <td>Low</td>
+              <td>0&ndash;5% (mixed regen progress)</td>
+              <td style="text-align:left;">Cheap entry; Westfield delays; long-horizon yield play</td>
+              <td>B &mdash; speculative</td>
+            </tr>
+            <tr>
+              <td>Barking &amp; Dagenham</td>
+              <td>&pound;225&ndash;325k</td>
+              <td>&pound;1,200&ndash;1,450</td>
+              <td><span class="c-best">5.5&ndash;6.5%</span> (highest)</td>
+              <td>Low</td>
+              <td>+5&ndash;9% (regen pipeline)</td>
+              <td style="text-align:left;">Highest yields in London; ferry &amp; Riverside development pipeline</td>
+              <td>B+ &mdash; pure yield</td>
+            </tr>
+            <tr>
+              <td>Bexley</td>
+              <td>&pound;225&ndash;300k</td>
+              <td>&pound;1,100&ndash;1,400</td>
+              <td>5&ndash;6%</td>
+              <td>Low</td>
+              <td>+3&ndash;7%</td>
+              <td style="text-align:left;">Suburban; Crossrail extension chatter; family LTR demand</td>
+              <td>B &mdash; suburban</td>
+            </tr>
+            <tr>
+              <td>Kensington &amp; Chelsea</td>
+              <td>&pound;900k+</td>
+              <td>&pound;3,000&ndash;4,500</td>
+              <td><span class="c-worst">2.5&ndash;3.5%</span></td>
+              <td>Very High (super-prime)</td>
+              <td>+2&ndash;5%</td>
+              <td style="text-align:left;">Capital preservation play; not a yield strategy</td>
+              <td>C (entry); A (super-prime STR)</td>
+            </tr>
+            <tr>
+              <td>Hammersmith &amp; Fulham</td>
+              <td>&pound;500&ndash;700k</td>
+              <td>&pound;1,800&ndash;2,400</td>
+              <td>3.5&ndash;4.5%</td>
+              <td>Med</td>
+              <td>+4&ndash;8%</td>
+              <td style="text-align:left;">Solid but unspectacular; family LTR focus; W12 White City regen anchor</td>
+              <td>B</td>
+            </tr>
+            <tr>
+              <td>Wandsworth &mdash; Battersea / Clapham</td>
+              <td>&pound;500&ndash;700k</td>
+              <td>&pound;1,800&ndash;2,400</td>
+              <td>3.5&ndash;4.5%</td>
+              <td>Med-High (Battersea Power Station)</td>
+              <td>+4&ndash;8%</td>
+              <td style="text-align:left;">Battersea Power Station premium; Northern line extension done; STR planning tightening</td>
+              <td>B</td>
+            </tr>
+          </tbody>
         </table>
       </div>
-      <div class="compare-legend">
-        <span style="color:var(--green);font-weight:700">Green</span> = best in class &nbsp;&middot;&nbsp;
-        <span style="color:var(--red)">Red</span> = weakest &nbsp;&middot;&nbsp;
-        <span style="color:var(--accent-dim)">est.</span> = price or rent not confirmed by agent &nbsp;&middot;&nbsp;
-        All figures assume Ltd Co SPV &middot; 25% deposit &middot; mortgage rate per property (adjustable) &middot; 25-yr term &middot; Corp Tax 25% (flat — no small profits relief for non-residents) &middot; SDLT includes 5% additional dwelling surcharge + 2% non-resident surcharge
+      <div class="compare-legend" style="margin-top:14px;">
+        <strong style="color:var(--accent);">Working short list (dual-mode + capital growth):</strong>
+        Tower Hamlets fringe (S) &middot; Newham/Stratford (S) &middot; Greenwich/Woolwich (S) &middot; Hackney (A) &middot; Southwark (A)
       </div>
+
+      <div class="section-title">Borough Selection Criteria Snapshot</div>
+      <div class="metrics" style="grid-template-columns:repeat(4,1fr);">
+        <div class="metric-card highlight"><div class="metric-label">Best Yield</div><div class="metric-value" style="font-size:16px;">B&amp;D / Newham</div><div class="metric-sub">5.5&ndash;6.5% gross</div></div>
+        <div class="metric-card highlight"><div class="metric-label">Best STR Fit</div><div class="metric-value" style="font-size:16px;">Westminster / Camden</div><div class="metric-sub">Tourist zones, planning permits</div></div>
+        <div class="metric-card highlight"><div class="metric-label">Best Capital Growth</div><div class="metric-value" style="font-size:16px;">Tower Hamlets / Newham</div><div class="metric-sub">Elizabeth line embedded</div></div>
+        <div class="metric-card highlight"><div class="metric-label">Best Dual-Mode</div><div class="metric-value" style="font-size:16px;">Tower Hamlets fringe</div><div class="metric-sub">Yield + STR + growth combo</div></div>
+      </div>
+    </div>
+
+    <!-- ============= PROPERTY TYPES PANEL ============= -->
+    <div id="panel-types" class="hidden">
+      <div class="section-title" style="margin-top:0">Property Type Ranking &mdash; for the London BTL landlord</div>
+      <div class="compare-wrap">
+        <table class="compare-tbl">
+          <thead>
+            <tr>
+              <th style="text-align:left;">Type</th>
+              <th>LTR Yield</th>
+              <th>STR Yield (effective)</th>
+              <th>Mgmt Effort</th>
+              <th>Entry &pound;</th>
+              <th style="text-align:left;">Notes</th>
+              <th>Tier</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="ref-row">
+              <td><strong>Period 1- or 2-bed conversion (zone 1&ndash;2)</strong></td>
+              <td>4&ndash;5%</td>
+              <td>9&ndash;13%</td>
+              <td>Low</td>
+              <td>Med-High</td>
+              <td style="text-align:left;">Best dual-mode pick. Character + STR demand + LTR floor. Cheshire fits this slot.</td>
+              <td><span class="c-best">S</span></td>
+            </tr>
+            <tr>
+              <td>New-build 1-bed (zone 1&ndash;2)</td>
+              <td>3&ndash;4%</td>
+              <td>8&ndash;12%</td>
+              <td>Low</td>
+              <td>High</td>
+              <td style="text-align:left;">Easy STR (modern, no surprises); tight LTR margins. Good if commercial-use planning class.</td>
+              <td>A</td>
+            </tr>
+            <tr>
+              <td>New-build 2-bed (zone 1)</td>
+              <td>3&ndash;4%</td>
+              <td><span class="c-best">10&ndash;14%</span></td>
+              <td>Low</td>
+              <td>Very High</td>
+              <td style="text-align:left;">Top STR earner per night; brutal entry £; SDLT bite. STR-led economics only.</td>
+              <td>A &mdash; STR-only</td>
+            </tr>
+            <tr>
+              <td>Mansion-block flat (period, zone 1&ndash;2)</td>
+              <td>3&ndash;4%</td>
+              <td>9&ndash;12%</td>
+              <td>Low</td>
+              <td>High</td>
+              <td style="text-align:left;">Premium STR location; high SC; check lease terms (some block STR via covenant)</td>
+              <td>A</td>
+            </tr>
+            <tr>
+              <td><strong>Freehold flat block (3&ndash;5 units)</strong></td>
+              <td><span class="c-best">5&ndash;7%</span></td>
+              <td>n/a (typically LTR-only at scale)</td>
+              <td>Med</td>
+              <td>High (&pound;700k+)</td>
+              <td style="text-align:left;">The classic SPV BTL. Best LTR yield. Multi-unit risk diversification. STR usually impractical for full block.</td>
+              <td>A &mdash; LTR-led</td>
+            </tr>
+            <tr>
+              <td><strong>HMO (5+ unrelated tenants)</strong></td>
+              <td><span class="c-best">8&ndash;12%</span></td>
+              <td>n/a</td>
+              <td><span class="c-worst">High</span></td>
+              <td>Med</td>
+              <td style="text-align:left;">Highest LTR yield. Mandatory licensing 5+, Article 4 restricts conversion in many boroughs. Heavy mgmt.</td>
+              <td>A &mdash; high-effort</td>
+            </tr>
+            <tr>
+              <td>Riverside / waterfront flat</td>
+              <td>3&ndash;4%</td>
+              <td><span class="c-best">10&ndash;15%</span></td>
+              <td>Low</td>
+              <td>Very High</td>
+              <td style="text-align:left;">STR premium; capital appreciation strong; ground rent / SC often high</td>
+              <td>A &mdash; STR-led</td>
+            </tr>
+            <tr>
+              <td>3+ bed terraced house</td>
+              <td>3&ndash;4%</td>
+              <td>10&ndash;15% (family STR premium)</td>
+              <td>Med</td>
+              <td>High</td>
+              <td style="text-align:left;">Family STR market underserved. Council tax band higher. Garden = STR premium.</td>
+              <td>B+</td>
+            </tr>
+            <tr>
+              <td>Studio (zone 1&ndash;2)</td>
+              <td>3&ndash;4%</td>
+              <td>7&ndash;10%</td>
+              <td>Low</td>
+              <td>Med</td>
+              <td style="text-align:left;">STR ceiling lower; LTR feasible. Lender-difficult sub-30m&sup2;.</td>
+              <td>B</td>
+            </tr>
+            <tr>
+              <td>Auction lot / refurb (BRRR)</td>
+              <td>varies</td>
+              <td>varies</td>
+              <td><span class="c-worst">High</span></td>
+              <td>Low (after refi)</td>
+              <td style="text-align:left;">Buy below market &rarr; refurb &rarr; refi &rarr; release capital. Highest IRR strategy if executed well; high execution risk.</td>
+              <td>A &mdash; expert play</td>
+            </tr>
+            <tr>
+              <td>Ex-local-authority flat</td>
+              <td>5&ndash;7%</td>
+              <td>varies (some lender-restricted)</td>
+              <td>Low</td>
+              <td>Low-Med</td>
+              <td style="text-align:left;">High yield, low entry; lender list narrower; share-of-freehold rare; insurance check (cladding, ACM)</td>
+              <td>B &mdash; tight financing</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="compare-legend" style="margin-top:14px;">
+        <strong style="color:var(--accent);">Type pick for dual-mode (LTR + STR):</strong>
+        Period 1- or 2-bed conversion in central/zone-1-or-2 borough. Character + tourist demand + LTR floor + manageable entry &pound;. Cheshire Street is exactly this slot.
+      </div>
+
+      <div class="section-title">Type vs Strategy Fit Matrix</div>
+      <table style="width:100%;border-collapse:collapse;">
+        <tr class="bold"><td>Type \ Strategy</td><td>LTR</td><td>STR</td><td>HMO</td><td>BRRR</td></tr>
+        <tr><td style="color:var(--text);">Period 1-2 bed conversion</td><td><span class="c-best">Ideal</span></td><td><span class="c-best">Ideal</span></td><td>&mdash;</td><td>Yes</td></tr>
+        <tr><td style="color:var(--text);">New-build 1-2 bed</td><td>Yes</td><td><span class="c-best">Ideal</span></td><td>&mdash;</td><td>&mdash;</td></tr>
+        <tr><td style="color:var(--text);">Freehold flat block</td><td><span class="c-best">Ideal</span></td><td>&mdash;</td><td>Yes</td><td>Yes</td></tr>
+        <tr><td style="color:var(--text);">HMO (period house)</td><td>&mdash;</td><td>&mdash;</td><td><span class="c-best">Ideal</span></td><td>Yes</td></tr>
+        <tr><td style="color:var(--text);">Auction refurb</td><td>Yes</td><td>Yes</td><td>Yes</td><td><span class="c-best">Ideal</span></td></tr>
+        <tr><td style="color:var(--text);">Ex-LA flat</td><td><span class="c-best">Ideal</span></td><td>Yes <span style="font-size:10px;color:var(--muted);">(lender-check)</span></td><td>&mdash;</td><td>&mdash;</td></tr>
+      </table>
+    </div>
+
+    <!-- ============= STRATEGIES PANEL ============= -->
+    <div id="panel-strategies" class="hidden">
+      <div class="section-title" style="margin-top:0">London Rental Strategies &mdash; ranked by net yield &amp; effort</div>
+      <div class="compare-wrap">
+        <table class="compare-tbl">
+          <thead>
+            <tr>
+              <th style="text-align:left;">Strategy</th>
+              <th>Gross Yield</th>
+              <th>Net Yield</th>
+              <th>Capital Need</th>
+              <th>Effort</th>
+              <th>Risk</th>
+              <th style="text-align:left;">UK Reg Burden</th>
+              <th>Tier</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="ref-row">
+              <td><strong>Long-term AST (12-mo+ tenancy)</strong></td>
+              <td>4&ndash;6%</td>
+              <td>2&ndash;4%</td>
+              <td>High</td>
+              <td>Low</td>
+              <td>Low</td>
+              <td style="text-align:left;">Tenant Fees Act; Renters' Rights Bill 2025 (S21 abolition); Selective Licensing in many boroughs</td>
+              <td>A &mdash; default</td>
+            </tr>
+            <tr>
+              <td><strong>HMO (5+ tenants, room rents)</strong></td>
+              <td><span class="c-best">8&ndash;12%</span></td>
+              <td>5&ndash;8%</td>
+              <td>Med</td>
+              <td><span class="c-worst">High</span></td>
+              <td>Med</td>
+              <td style="text-align:left;">Mandatory licensing (5+); Additional licensing in many boroughs; Article 4 restricts conversion; HHSRS standards</td>
+              <td>A &mdash; high yield</td>
+            </tr>
+            <tr>
+              <td><strong>Short-term rental (Airbnb / Booking.com)</strong></td>
+              <td><span class="c-best">10&ndash;18% effective</span></td>
+              <td>6&ndash;10%</td>
+              <td>Med</td>
+              <td><span class="c-worst">Very High</span></td>
+              <td>High</td>
+              <td style="text-align:left;"><span class="c-worst">90-night rule</span> (Greater London) unless C1/sui-generis planning; Tower Hamlets 2025 tightening; Westminster permissive in commercial blocks</td>
+              <td>A &mdash; conditional on planning</td>
+            </tr>
+            <tr>
+              <td>Serviced accommodation (purpose-built)</td>
+              <td>10&ndash;15%</td>
+              <td>6&ndash;9%</td>
+              <td>High</td>
+              <td>High</td>
+              <td>Med</td>
+              <td style="text-align:left;">C1 planning use; commercial mortgages required; VAT mandatory if &gt;&pound;90k turnover</td>
+              <td>B &mdash; commercial play</td>
+            </tr>
+            <tr>
+              <td>Rent-to-Rent (R2R)</td>
+              <td>5&ndash;15% margin on rent</td>
+              <td>5&ndash;10% margin</td>
+              <td><span class="c-best">Low</span></td>
+              <td>Med</td>
+              <td>Med</td>
+              <td style="text-align:left;">Sub-letting permission required; lease-not-licence issues; ASA arbitrage shrinking</td>
+              <td>B &mdash; capital-light</td>
+            </tr>
+            <tr>
+              <td>BRRR (Buy-Refurb-Rent-Refinance)</td>
+              <td>varies</td>
+              <td>infinite (post-refi)</td>
+              <td>Low (post-refi)</td>
+              <td>High</td>
+              <td>Med-High</td>
+              <td style="text-align:left;">Refinance lender list narrower for newly-refurbed; valuation risk; auction timeline pressure</td>
+              <td>A &mdash; expert</td>
+            </tr>
+            <tr>
+              <td>Lease Option / Vendor Finance</td>
+              <td>varies</td>
+              <td>varies</td>
+              <td>Very Low</td>
+              <td>Med</td>
+              <td>Med</td>
+              <td style="text-align:left;">Niche; FCA-regulated if structured wrong; mostly used for distressed sellers</td>
+              <td>C &mdash; niche</td>
+            </tr>
+            <tr>
+              <td>Buy-below-value at auction</td>
+              <td>varies</td>
+              <td>varies</td>
+              <td>Med-Low</td>
+              <td>High</td>
+              <td>High</td>
+              <td style="text-align:left;">28-day completion; bridging loan often needed; legal pack DD critical</td>
+              <td>B &mdash; volatile</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="section-title">Yield Multipliers &mdash; rough rule of thumb</div>
+      <table style="width:100%;">
+        <tr><td style="color:var(--text);">Same property as LTR</td><td>1.0&times; baseline yield</td></tr>
+        <tr><td style="color:var(--text);">Same property as HMO (4&ndash;6 rooms)</td><td>~1.6&times; LTR yield</td></tr>
+        <tr><td style="color:var(--text);">Same property as STR (well-managed)</td><td>~2.0&ndash;2.5&times; LTR yield (gross)</td></tr>
+        <tr><td style="color:var(--text);">Same property as STR (after costs)</td><td>~1.5&ndash;1.8&times; LTR yield (net)</td></tr>
+        <tr><td style="color:var(--text);">BRRR cycle done well</td><td>Effectively infinite IRR (capital recycled)</td></tr>
+      </table>
+
+      <div class="section-title">Decision Framework: which strategy for me?</div>
+      <table style="width:100%;">
+        <tr class="bold"><td>If you want&hellip;</td><td>Strategy</td></tr>
+        <tr><td style="color:var(--text);">Lowest effort, predictable cashflow</td><td>LTR (Long-term AST)</td></tr>
+        <tr><td style="color:var(--text);">Highest yield with one property, willing to manage</td><td>STR (in compliant zone) or HMO</td></tr>
+        <tr><td style="color:var(--text);">Build a portfolio with limited capital</td><td>BRRR cycle</td></tr>
+        <tr><td style="color:var(--text);">Optionality &mdash; pivot LTR / STR by season or demand</td><td>Period 1-2 bed conversion in central borough (Cheshire-type)</td></tr>
+        <tr><td style="color:var(--text);">Capital preservation, accept low yield</td><td>Super-prime LTR (K&amp;C, Westminster)</td></tr>
+        <tr><td style="color:var(--text);">Capital-light with mgmt skill</td><td>R2R or Lease Option</td></tr>
+      </table>
+    </div>
+
+    <!-- ============= RISKS & REGULATION PANEL ============= -->
+    <div id="panel-risks" class="hidden">
+      <div class="section-title" style="margin-top:0">UK BTL Regulatory Landmines</div>
+      <table style="width:100%;border-collapse:collapse;">
+        <tr class="bold"><td>Regulation</td><td style="text-align:left;">What it does</td></tr>
+        <tr><td style="color:var(--red);min-width:200px;">Section 24 (FA 2017)</td><td style="text-align:left;">Mortgage interest no longer fully deductible from rental income for personal landlords; replaced by 20% basic-rate tax credit. Pushes higher-rate taxpayers into Ltd Co. <strong>The single biggest reason UK BTL is now an SPV game.</strong></td></tr>
+        <tr><td style="color:var(--red);">SDLT 5% surcharge</td><td style="text-align:left;">Additional dwellings: +5% over standard rates (up from 3% in Oct 2024 Autumn Budget). Plus +2% non-resident surcharge from Apr 2021. Combined non-resident SDLT on a &pound;700k purchase: ~&pound;72k.</td></tr>
+        <tr><td style="color:var(--red);">Renters' Rights Bill (2024&ndash;25)</td><td style="text-align:left;">Abolishes Section 21 ("no-fault") evictions. Fixed-term tenancies replaced with periodic. Introduces decent-homes standard for PRS. Strengthens tenant grounds for repair/possession disputes. <strong>Reshapes LTR landlord-tenant balance.</strong> In passage as of late 2025.</td></tr>
+        <tr><td style="color:var(--red);">London 90-night rule (Deregulation Act 2015 + GLA Act 2007)</td><td style="text-align:left;">STR of an entire dwelling &gt; 90 nights/yr requires planning permission for change of use to C1 or sui generis. Borough enforcement varies; Tower Hamlets toughened 2025; Westminster permissive in some commercial blocks.</td></tr>
+        <tr><td style="color:var(--red);">MEES (Minimum Energy Efficiency Standards)</td><td style="text-align:left;">Current EPC E required to let. <strong>EPC C target by 2028&ndash;2030</strong> in active consultation; expected retrofit costs &pound;3k&ndash;&pound;15k per flat. Pre-1980 conversions hardest hit.</td></tr>
+        <tr><td style="color:var(--accent);">Selective Licensing</td><td style="text-align:left;">Borough-level licence for ALL private rental properties in designated areas. &pound;600&ndash;&pound;1,500 per property, 5-yr renewal. Newham (first), Waltham Forest, Croydon, Tower Hamlets, Hackney, Lewisham, Brent, others.</td></tr>
+        <tr><td style="color:var(--accent);">HMO Mandatory Licensing</td><td style="text-align:left;">5+ unrelated tenants in 2+ households &mdash; mandatory licence, all of England since 2018. &pound;600&ndash;&pound;1,200 typical. Plus borough Additional Licensing for smaller HMOs in many areas.</td></tr>
+        <tr><td style="color:var(--accent);">Article 4 directions</td><td style="text-align:left;">Restrict permitted-development conversion C3 (single dwelling) &rarr; C4 (small HMO). Most inner London boroughs now have Article 4 in force or pending. Plan ahead for HMO strategy.</td></tr>
+        <tr><td style="color:var(--accent);">Right to Rent (Immigration Act 2014)</td><td style="text-align:left;">Landlords must verify tenant immigration status before letting. Civil penalties up to &pound;3k per tenant. Now a routine reference-check item.</td></tr>
+        <tr><td style="color:var(--accent);">Tenant Fees Act 2019</td><td style="text-align:left;">Bans most landlord/agent fees to tenants; caps deposit at 5 weeks rent; restricts holding deposits. Pricing must be all-in.</td></tr>
+        <tr><td style="color:var(--accent);">ATED (Annual Tax on Enveloped Dwellings)</td><td style="text-align:left;">Annual charge for properties &gt;&pound;500k held in company wrapper. <strong>Letting Relief</strong> exempts genuine rental businesses, but you must file the relief claim each year.</td></tr>
+        <tr><td style="color:var(--accent);">Building Safety Act 2022</td><td style="text-align:left;">Cladding and structural safety post-Grenfell. Affects flats &gt;7 storeys / 18m. Service-charge cost-cap protections for qualifying leaseholders. Pre-purchase: get a fire risk appraisal (FRAEW) and EWS1 form.</td></tr>
+        <tr><td style="color:var(--accent);">Leasehold and Freehold Reform Act 2024</td><td style="text-align:left;">Lease extension simpler/cheaper; ground rent caps; service charge transparency. Ongoing implementation through 2025&ndash;26.</td></tr>
+        <tr><td style="color:var(--accent);">Ground Rent Reform Act 2022</td><td style="text-align:left;">New leases granted post-30 Jun 2022 must have peppercorn ground rent. Older leases unaffected (so ground rent on existing flats remains a risk).</td></tr>
+      </table>
+
+      <div class="section-title">Tax Stack &mdash; non-resident SPV (Allegra+James assumed)</div>
+      <table style="width:100%;">
+        <tr><td style="color:var(--text);min-width:220px;">SDLT on purchase</td><td>5% additional dwelling + 2% non-resident = +7% over standard residential rates</td></tr>
+        <tr><td style="color:var(--text);">Corp Tax</td><td>25% flat (no small profits relief for non-resident companies)</td></tr>
+        <tr><td style="color:var(--text);">NRLS withholding</td><td>20% of gross rent withheld at source unless registered for gross payment via NRL2 form</td></tr>
+        <tr><td style="color:var(--text);">ATED</td><td>&pound;0&ndash;&pound;287k+ p.a. depending on band; full Letting Relief if commercially let</td></tr>
+        <tr><td style="color:var(--text);">CGT on disposal</td><td>From Apr 2019, non-residents pay CGT on UK property disposals. Rebased to 2019 value. 24% higher-rate.</td></tr>
+        <tr><td style="color:var(--text);">UK-CA Double Tax Agreement</td><td>Credit mechanism prevents double-tax on rental income and gains</td></tr>
+        <tr><td style="color:var(--text);">Dividend extraction</td><td>0% UK withholding on dividends out of Ltd Co (no UK CT charge); CRA personal taxation applies on Canadian end</td></tr>
+      </table>
+
+      <div class="section-title">Climate &amp; Physical Risks</div>
+      <table style="width:100%;">
+        <tr><td style="color:var(--text);min-width:200px;">Flooding</td><td>Thames flood-zone properties: insurance-difficult in zone 3 without Flood Re coverage. Check Environment Agency map pre-purchase.</td></tr>
+        <tr><td style="color:var(--text);">Subsidence</td><td>Clay soils across south London; mature trees + clay = subsidence risk. Specialist policies costlier.</td></tr>
+        <tr><td style="color:var(--text);">Air quality / ULEZ</td><td>ULEZ extended Aug 2023 to all 32 boroughs. Affects letting demand from car-dependent tenants. EVs now more common.</td></tr>
+        <tr><td style="color:var(--text);">Cladding / fire safety</td><td>Post-Grenfell scrutiny; ACM, HPL, timber-clad blocks remediation ongoing. EWS1 form often required by lender.</td></tr>
+      </table>
+
+      <div class="section-title">Hidden Costs Checklist</div>
+      <table style="width:100%;">
+        <tr><td style="color:var(--text);min-width:200px;">SDLT + legal + survey + refurb</td><td>~10&ndash;15% of purchase price for a non-resident SPV, all-in</td></tr>
+        <tr><td style="color:var(--text);">Mortgage arrangement fees</td><td>1&ndash;2% of loan; sometimes added to loan vs paid upfront</td></tr>
+        <tr><td style="color:var(--text);">Furnishing (if STR)</td><td>&pound;8k&ndash;&pound;25k for a 1-2 bed turnkey STR setup</td></tr>
+        <tr><td style="color:var(--text);">EPC retrofit (looming)</td><td>&pound;3k&ndash;&pound;15k per flat to hit C target if pre-1980 conversion</td></tr>
+        <tr><td style="color:var(--text);">Selective licensing</td><td>&pound;600&ndash;&pound;1,500 per 5 yrs per property, depending on borough</td></tr>
+        <tr><td style="color:var(--text);">Letting agent (if used)</td><td>10&ndash;15% of gross rent (full management); 6&ndash;8% (let-only); 18&ndash;25% (STR managed)</td></tr>
+        <tr><td style="color:var(--text);">Annual accountancy (Ltd Co)</td><td>&pound;1,200&ndash;&pound;3,000/yr depending on volume</td></tr>
+        <tr><td style="color:var(--text);">Service charge surprises</td><td>Cladding levies, major works funds, lift replacement, roof works &mdash; can run into &pound;10k+ unexpectedly</td></tr>
+      </table>
+    </div>
+
+    <!-- ============= SOURCES PANEL ============= -->
+    <div id="panel-sources" class="hidden">
+      <div class="section-title" style="margin-top:0">Sources &amp; Tools</div>
+
+      <div class="section-title">Listings &amp; Search</div>
+      <table style="width:100%;">
+        <tr><td style="color:var(--text);">Rightmove &mdash; primary residential portal</td><td><a class="tbl-link" href="https://www.rightmove.co.uk/" target="_blank" rel="noopener">rightmove.co.uk &rarr;</a></td></tr>
+        <tr><td style="color:var(--text);">Zoopla &mdash; secondary; better historical sold-price data</td><td><a class="tbl-link" href="https://www.zoopla.co.uk/" target="_blank" rel="noopener">zoopla.co.uk &rarr;</a></td></tr>
+        <tr><td style="color:var(--text);">OnTheMarket &mdash; agent-friendly; some exclusive listings</td><td><a class="tbl-link" href="https://www.onthemarket.com/" target="_blank" rel="noopener">onthemarket.com &rarr;</a></td></tr>
+        <tr><td style="color:var(--text);">PropertyData &mdash; investor analytics (paid)</td><td><a class="tbl-link" href="https://propertydata.co.uk/" target="_blank" rel="noopener">propertydata.co.uk &rarr;</a></td></tr>
+        <tr><td style="color:var(--text);">Hometrack &mdash; valuation + market data (lender-grade)</td><td><a class="tbl-link" href="https://www.hometrack.com/" target="_blank" rel="noopener">hometrack.com &rarr;</a></td></tr>
+        <tr><td style="color:var(--text);">Auction Passed In &mdash; auction lot tracking</td><td><a class="tbl-link" href="https://www.eigpropertyauctions.co.uk/" target="_blank" rel="noopener">EIG (Essential Information Group) &rarr;</a></td></tr>
+      </table>
+
+      <div class="section-title">Official / Legal</div>
+      <table style="width:100%;">
+        <tr><td style="color:var(--text);">HM Land Registry &mdash; title check, sold price index</td><td><a class="tbl-link" href="https://www.gov.uk/government/organisations/land-registry" target="_blank" rel="noopener">gov.uk/land-registry &rarr;</a></td></tr>
+        <tr><td style="color:var(--text);">Environment Agency &mdash; flood map</td><td><a class="tbl-link" href="https://flood-warning-information.service.gov.uk/long-term-flood-risk/map" target="_blank" rel="noopener">flood-warning-information.service.gov.uk &rarr;</a></td></tr>
+        <tr><td style="color:var(--text);">EPC register &mdash; check existing rating</td><td><a class="tbl-link" href="https://www.gov.uk/find-energy-certificate" target="_blank" rel="noopener">gov.uk/find-energy-certificate &rarr;</a></td></tr>
+        <tr><td style="color:var(--text);">Borough planning portals &mdash; STR / HMO planning use class</td><td>Search "[borough name] planning portal"</td></tr>
+        <tr><td style="color:var(--text);">UK HPI &mdash; ONS House Price Index by borough</td><td><a class="tbl-link" href="https://landregistry.data.gov.uk/app/ukhpi" target="_blank" rel="noopener">landregistry.data.gov.uk/ukhpi &rarr;</a></td></tr>
+        <tr><td style="color:var(--text);">Renters' Rights Bill progress</td><td><a class="tbl-link" href="https://bills.parliament.uk/bills/3764" target="_blank" rel="noopener">bills.parliament.uk &rarr;</a></td></tr>
+      </table>
+
+      <div class="section-title">Forums &amp; Community</div>
+      <table style="width:100%;">
+        <tr><td style="color:var(--text);">Property Tribes &mdash; UK landlord forum</td><td><a class="tbl-link" href="https://www.propertytribes.com/" target="_blank" rel="noopener">propertytribes.com &rarr;</a></td></tr>
+        <tr><td style="color:var(--text);">r/HousingUK &mdash; general UK property discussion</td><td><a class="tbl-link" href="https://www.reddit.com/r/HousingUK/" target="_blank" rel="noopener">reddit.com/r/HousingUK &rarr;</a></td></tr>
+        <tr><td style="color:var(--text);">r/UKPersonalFinance &mdash; BTL tax/structure threads</td><td><a class="tbl-link" href="https://www.reddit.com/r/UKPersonalFinance/" target="_blank" rel="noopener">reddit.com/r/UKPersonalFinance &rarr;</a></td></tr>
+        <tr><td style="color:var(--text);">Property Hub &mdash; podcast + courses</td><td><a class="tbl-link" href="https://propertyhub.net/" target="_blank" rel="noopener">propertyhub.net &rarr;</a></td></tr>
+      </table>
+
+      <div class="section-title">STR-specific Tools</div>
+      <table style="width:100%;">
+        <tr><td style="color:var(--text);">AirDNA &mdash; STR market data, daily rate / occupancy by area</td><td><a class="tbl-link" href="https://www.airdna.co/" target="_blank" rel="noopener">airdna.co &rarr;</a></td></tr>
+        <tr><td style="color:var(--text);">Inside Airbnb &mdash; market stats, oversupply check</td><td><a class="tbl-link" href="http://insideairbnb.com/london/" target="_blank" rel="noopener">insideairbnb.com/london &rarr;</a></td></tr>
+        <tr><td style="color:var(--text);">Booking.com partner area &mdash; rate research</td><td><a class="tbl-link" href="https://join.booking.com/" target="_blank" rel="noopener">join.booking.com &rarr;</a></td></tr>
+        <tr><td style="color:var(--text);">London Plan &mdash; STR planning policy framework</td><td><a class="tbl-link" href="https://www.london.gov.uk/programmes-strategies/planning/london-plan" target="_blank" rel="noopener">london.gov.uk/london-plan &rarr;</a></td></tr>
+      </table>
+
+      <div class="section-title">Recommended Next Steps</div>
+      <table style="width:100%;">
+        <tr><td style="color:var(--text);">1. Pick 2 boroughs from short list</td><td>Tower Hamlets fringe + Newham/Stratford OR Greenwich/Woolwich + Hackney</td></tr>
+        <tr><td style="color:var(--text);">2. Set up Rightmove + Zoopla saved searches</td><td>Filters: 1-2 bed, &pound;450k&ndash;&pound;900k, leasehold/freehold, 90+ yrs lease</td></tr>
+        <tr><td style="color:var(--text);">3. Verify STR planning per shortlisted property</td><td>Borough planning portal: change-of-use C3&rarr;C1 or sui generis history; existing certificate of lawful use</td></tr>
+        <tr><td style="color:var(--text);">4. Drop listings in this tab</td><td>Paste Rightmove/KFH/Foxtons URLs; I'll add each to a dual-mode (LTR + STR) panel like Cheshire</td></tr>
+        <tr><td style="color:var(--text);">5. Lender pre-approval</td><td>Non-resident SPV BTL lenders: Paragon, Aldermore, Kent Reliance, Vida Homeloans, Castle Trust</td></tr>
+        <tr><td style="color:var(--text);">6. Solicitor + accountant onboard</td><td>Specialist non-resident SPV team essential. Reflist available on request.</td></tr>
+      </table>
     </div>
 
     <!-- Individual property panels — injected by JS -->
@@ -418,47 +1008,48 @@ td:last-child { text-align: right; }
     <div class="results">
       <div class="section-title" style="margin-top:0">Three-way Verdict</div>
       <div class="verdict" id="rvb-verdict">
-        <div class="verdict-icon" id="rvb-icon">&#127968;</div>
-        <div>
-          <div class="verdict-title" id="rvb-title">&mdash;</div>
-          <div class="verdict-detail" id="rvb-detail">&mdash;</div>
-          <div class="verdict-break" id="rvb-break">&mdash;</div>
-        </div>
+        <div class="verdict-eyebrow" id="rvb-eyebrow">Winner over chosen hold period</div>
+        <div class="verdict-title" id="rvb-title">&mdash;</div>
+        <div class="verdict-detail" id="rvb-detail">&mdash;</div>
+        <div class="verdict-break" id="rvb-break">&mdash;</div>
       </div>
 
-      <!-- Three scenario cards side-by-side -->
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:20px;">
+      <!-- Three scenario cards side-by-side, ranked -->
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:22px;">
         <div class="rvb-scenario" id="rvb-card-buy">
-          <div class="rvb-scenario-label">Scenario 1</div>
-          <div class="rvb-scenario-title">&#127968; Buy <span id="rvb-buy-badge"></span></div>
+          <div class="rvb-scenario-rank" id="rvb-buy-rank">&mdash;</div>
+          <div class="rvb-scenario-title">Buy <span class="rvb-win-badge" id="rvb-buy-badge" style="display:none;">Winner</span></div>
           <div class="rvb-scenario-wealth" id="rvb-buy-wealth">&mdash;</div>
-          <div class="rvb-scenario-sub">terminal wealth (property equity)</div>
-          <div style="margin-top:10px;font-size:11px;color:var(--muted);line-height:1.5;">
-            <div>Annual housing: <span id="rvb-buy-ann">&mdash;</span></div>
-            <div>Cumulative outflow: <span id="rvb-buy-cum">&mdash;</span></div>
-            <div>Net position: <span id="rvb-buy-net" style="color:var(--text-dim);font-weight:700;">&mdash;</span></div>
+          <div class="rvb-scenario-sub">terminal wealth = property equity at exit</div>
+          <div class="rvb-scenario-meta">
+            <div>Annual housing &mdash; <span id="rvb-buy-ann">&mdash;</span></div>
+            <div>Cumulative outflow &mdash; <span id="rvb-buy-cum">&mdash;</span></div>
+            <div>Net position &mdash; <strong id="rvb-buy-net">&mdash;</strong></div>
+            <div id="rvb-buy-gap" style="margin-top:4px;"></div>
           </div>
         </div>
         <div class="rvb-scenario" id="rvb-card-inv">
-          <div class="rvb-scenario-label">Scenario 2</div>
-          <div class="rvb-scenario-title">&#128202; Rent + Invest <span id="rvb-inv-badge"></span></div>
+          <div class="rvb-scenario-rank" id="rvb-inv-rank">&mdash;</div>
+          <div class="rvb-scenario-title">Rent + Invest <span class="rvb-win-badge" id="rvb-inv-badge" style="display:none;">Winner</span></div>
           <div class="rvb-scenario-wealth" id="rvb-inv-wealth">&mdash;</div>
-          <div class="rvb-scenario-sub">deposit + surplus compounded passively</div>
-          <div style="margin-top:10px;font-size:11px;color:var(--muted);line-height:1.5;">
-            <div>Annual housing: <span id="rvb-inv-ann">&mdash;</span></div>
-            <div>Cumulative outflow: <span id="rvb-inv-cum">&mdash;</span></div>
-            <div>Net position: <span id="rvb-inv-net" style="color:var(--text-dim);font-weight:700;">&mdash;</span></div>
+          <div class="rvb-scenario-sub">deposit + annual surplus compounded passively</div>
+          <div class="rvb-scenario-meta">
+            <div>Annual housing &mdash; <span id="rvb-inv-ann">&mdash;</span></div>
+            <div>Cumulative outflow &mdash; <span id="rvb-inv-cum">&mdash;</span></div>
+            <div>Net position &mdash; <strong id="rvb-inv-net">&mdash;</strong></div>
+            <div id="rvb-inv-gap" style="margin-top:4px;"></div>
           </div>
         </div>
         <div class="rvb-scenario" id="rvb-card-lend">
-          <div class="rvb-scenario-label">Scenario 3</div>
-          <div class="rvb-scenario-title">&#128176; Rent + Private Lend <span id="rvb-lend-badge"></span></div>
+          <div class="rvb-scenario-rank" id="rvb-lend-rank">&mdash;</div>
+          <div class="rvb-scenario-title">Rent + Private Lend <span class="rvb-win-badge" id="rvb-lend-badge" style="display:none;">Winner</span></div>
           <div class="rvb-scenario-wealth" id="rvb-lend-wealth">&mdash;</div>
-          <div class="rvb-scenario-sub">deposit + surplus deployed as private loans</div>
-          <div style="margin-top:10px;font-size:11px;color:var(--muted);line-height:1.5;">
-            <div>Annual housing: <span id="rvb-lend-ann">&mdash;</span></div>
-            <div>Cumulative outflow: <span id="rvb-lend-cum">&mdash;</span></div>
-            <div>Net position: <span id="rvb-lend-net" style="color:var(--text-dim);font-weight:700;">&mdash;</span></div>
+          <div class="rvb-scenario-sub">deposit + annual surplus deployed as private loans</div>
+          <div class="rvb-scenario-meta">
+            <div>Annual housing &mdash; <span id="rvb-lend-ann">&mdash;</span></div>
+            <div>Cumulative outflow &mdash; <span id="rvb-lend-cum">&mdash;</span></div>
+            <div>Net position &mdash; <strong id="rvb-lend-net">&mdash;</strong></div>
+            <div id="rvb-lend-gap" style="margin-top:4px;"></div>
           </div>
         </div>
       </div>
@@ -467,6 +1058,14 @@ td:last-child { text-align: right; }
         <div class="metric-card"><div class="metric-label">Monthly Mortgage</div><div class="metric-value" id="rvb-m-mtg">&mdash;</div><div class="metric-sub">P&amp;I @ chosen rate</div></div>
         <div class="metric-card"><div class="metric-label">Monthly Rent</div><div class="metric-value" id="rvb-m-rent">&mdash;</div><div class="metric-sub">equivalent property</div></div>
         <div class="metric-card highlight"><div class="metric-label">Renter's Monthly Surplus</div><div class="metric-value" id="rvb-m-surplus">&mdash;</div><div class="metric-sub" id="rvb-m-surplus-sub">vs buyer's all-in cost</div></div>
+      </div>
+
+      <div class="section-title">Wealth Trajectory by Year</div>
+      <div style="overflow-x:auto;">
+        <table class="traj-tbl" id="rvb-traj-tbl"><!-- populated by calcRVB --></table>
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-top:8px;line-height:1.6;">
+        Terminal wealth at end of each year. Highlighted column = leading scenario that year. Crossover rows are flagged when the leader changes.
       </div>
 
       <div class="section-title">Detailed Component Breakdown</div>
@@ -483,7 +1082,7 @@ td:last-child { text-align: right; }
       </div>
 
       <div style="font-size:11px;color:var(--muted);margin-top:14px;line-height:1.7;">
-        <strong style="color:var(--text-dim);">Methodology:</strong> All three scenarios start with the same capital W<sub>0</sub> = deposit + acquisition costs. The buyer commits W<sub>0</sub> to the property; renters deploy W<sub>0</sub> to passive investment or private lending. Each year, both renters have a <em>surplus</em> equal to (mortgage + running) &minus; rent &mdash; that surplus is reinvested at the same yield as the principal, so all three scenarios consume an equal annual housing budget. Terminal wealth = property equity (Buy) or compounded W<sub>0</sub> + compounded surplus (Rent scenarios). <strong style="color:var(--text-dim);">Net position</strong> = terminal wealth &minus; cumulative housing outflow &mdash; the highest is the winner. UK primary residence assumed (no CGT on capital gain).
+        <strong style="color:var(--text-dim);">Methodology.</strong> All three scenarios start with the same capital W<sub>0</sub> = deposit + acquisition costs. The buyer commits W<sub>0</sub> to the property; renters deploy W<sub>0</sub> to passive investment or private lending. Each year, both renters have a <em>surplus</em> equal to (mortgage + running) &minus; rent &mdash; that surplus is reinvested at the same yield as the principal, so all three scenarios consume an equal annual housing budget. Terminal wealth = property equity at exit (Buy) or compounded W<sub>0</sub> + compounded annual surplus (Rent scenarios). <strong style="color:var(--text-dim);">Net position</strong> = terminal wealth &minus; total cash deployed; the highest wins. UK primary residence assumed (PRR &mdash; no CGT on capital gain). Lending yield is treated as net (post-tax, post-cost) &mdash; for a higher-rate UK taxpayer outside a wrapper, gross 9% becomes ~5.4% after income tax.
       </div>
     </div>
   </div><!-- /tab-rvb -->
@@ -2522,146 +3121,11 @@ function getATEDBand(value) {
 // =====================================================================
 const PROPS = [
   {
-    id: 'p2', badge: '2', ref: false,
-    name: 'Woodhill, Greenwich SE18',
-    sub: '4 flats (3x1-bed + 1x2-bed) · Woolwich Elizabeth line · Zone 4',
-    agent_name: 'Kallars, Sidcup',
-    note: 'Guide price \u00a31,000,000. Freehold period conversion: 3 x 1-bed + 1 x 2-bed apartments. Confirmed \u00a360,000 p.a. rental income (6.0% gross yield). Listed by Kallars, Sidcup (Aug 2025). Walking distance Woolwich Elizabeth line station.',
-    url: 'https://www.rightmove.co.uk/properties/166341395',
-    url_label: 'Rightmove',
-    price: 1000000, dep: 25, rate: 5.5, term: 25,
-    rent: 5000, void_: 0.5,
-    agent: 10, maint: 1.5, ins: 2000, gr: 0, sc: 0,
-    legal: 3000, survey: 1000, refurb: 5000,
-    growth: 3.5, hold: 10, tax: 25,
-    price_est: false, rent_est: false, units: 4
-  },
-  {
-    id: 'p3', badge: '3', ref: false,
-    name: 'Cumberland Road, Reading',
-    sub: '3 self-contained apartments · Reading Elizabeth line',
-    agent_name: 'Adams Estates',
-    note: 'Guide price \u00a3749,500. Freehold block of 3 self-contained apartments. Listed by Adams Estates. Reading Elizabeth line station to Paddington ~25 min. Est. \u00a31,200/flat/mo.',
-    url: 'https://www.rightmove.co.uk/properties/87281379',
-    url_label: 'Rightmove',
-    price: 749500, dep: 25, rate: 5.5, term: 25,
-    rent: 3600, void_: 1,
-    agent: 10, maint: 1.5, ins: 1500, gr: 0, sc: 0,
-    legal: 2500, survey: 800, refurb: 8000,
-    growth: 3.0, hold: 10, tax: 25,
-    price_est: false, rent_est: true, units: 3
-  },
-  {
-    id: 'p4', badge: '4', ref: false,
-    name: 'Goodmayes Lane, Ilford IG3',
-    sub: '3 flats freehold · Goodmayes Elizabeth line · Zone 4',
-    agent_name: 'Brian Thomas',
-    note: 'Guide price \u00a3700,000. Freehold property comprising 3 flats. Walking distance Goodmayes Elizabeth line station (~15 min to Liverpool St). East London growth corridor. Est. \u00a31,200/flat/mo.',
-    url: 'https://www.rightmove.co.uk/properties/164939270',
-    url_label: 'Rightmove',
-    price: 700000, dep: 25, rate: 5.5, term: 25,
-    rent: 3600, void_: 1,
-    agent: 10, maint: 1.5, ins: 1400, gr: 0, sc: 0,
-    legal: 2500, survey: 800, refurb: 8000,
-    growth: 4.0, hold: 10, tax: 25,
-    price_est: false, rent_est: true, units: 3
-  },
-  {
-    id: 'p5', badge: '5', ref: false,
-    name: '19-23 Market Street, Maidenhead',
-    sub: '4 apartments · Maidenhead Elizabeth line',
-    agent_name: "Sotheby's International Realty",
-    note: 'Guide price \u00a31,250,000. Freehold block of 4 apartments. Confirmed rental income \u00a353,220 p.a. (4.3% gross yield). Listed by Sotheby\u2019s. Maidenhead Elizabeth line station to Paddington ~18 min.',
-    url: 'https://www.rightmove.co.uk/properties/160046981',
-    url_label: 'Rightmove',
-    price: 1250000, dep: 25, rate: 5.5, term: 25,
-    rent: 4435, void_: 0.5,
-    agent: 10, maint: 1.5, ins: 2200, gr: 0, sc: 0,
-    legal: 3500, survey: 1000, refurb: 5000,
-    growth: 3.0, hold: 10, tax: 25,
-    price_est: false, rent_est: false, units: 4
-  },
-  {
-    id: 'p6', badge: '6', ref: false,
-    name: 'Singapore Road, West Ealing W13',
-    sub: '4 flats freehold · West Ealing Elizabeth line · Zone 3',
-    agent_name: 'Dexters Development & Investment',
-    note: 'Guide price \u00a31,550,000. Freehold block of 4 self-contained flats. Listed by Dexters Development & Investment. Walking distance West Ealing Elizabeth line station. Est. \u00a31,400/flat/mo.',
-    url: 'https://www.rightmove.co.uk/properties/171511634',
-    url_label: 'Rightmove',
-    price: 1550000, dep: 25, rate: 5.5, term: 25,
-    rent: 5600, void_: 1,
-    agent: 10, maint: 1.5, ins: 2400, gr: 0, sc: 0,
-    legal: 3500, survey: 1200, refurb: 10000,
-    growth: 3.5, hold: 10, tax: 25,
-    price_est: false, rent_est: true, units: 4
-  },
-  {
-    id: 'p7', badge: '7', ref: false,
-    name: 'Mattock Lane, Ealing W5',
-    sub: 'Semi-detached · ~6 flats · Ealing Broadway Elizabeth line · Zone 3',
-    agent_name: 'Dexters Development & Investment',
-    note: 'Guide price \u00a32,250,000. One of a pair of semi-detached houses overlooking a park, currently arranged as flats. Listed by Dexters D&I. Walking distance Ealing Broadway Elizabeth line station. Est. \u00a31,400/flat/mo for ~6 units.',
-    url: 'https://homemove.com/property/8e1b9a35-b5ef-4773-8506-64629a7c8ba2',
-    url_label: 'Homemove',
-    price: 2250000, dep: 25, rate: 5.5, term: 25,
-    rent: 8400, void_: 1,
-    agent: 10, maint: 1.5, ins: 3500, gr: 0, sc: 0,
-    legal: 5000, survey: 1500, refurb: 20000,
-    growth: 3.5, hold: 10, tax: 25,
-    price_est: false, rent_est: true, units: 6
-  },
-  {
-    id: 'p8', badge: '8', ref: false,
-    name: 'Woodseer Street, Shoreditch E1',
-    sub: '7-bed HMO freehold · 156m\u00b2 · Whitechapel Elizabeth line · Zone 1',
-    agent_name: 'Dexters Development & Investment',
-    note: 'Guide price \u00a31,750,000. Freehold residential building with HMO licence. 6 double rooms all with en-suite (156m\u00b2). Listed by Dexters D&I (Apr 2026). Near Whitechapel Elizabeth line station. Est. \u00a31,100/room/mo.',
-    url: 'https://homemove.com/property/7f11bfb9-9396-41f6-a1e5-48e9ed0cb405',
-    url_label: 'Homemove',
-    price: 1750000, dep: 25, rate: 5.5, term: 25,
-    rent: 6600, void_: 0.5,
-    agent: 10, maint: 1.5, ins: 2800, gr: 0, sc: 0,
-    legal: 4000, survey: 1200, refurb: 10000,
-    growth: 3.0, hold: 10, tax: 25,
-    price_est: false, rent_est: true, units: 6
-  },
-  {
-    id: 'p9', badge: '9', ref: false,
-    name: 'Lea Bridge Road, Leyton E10',
-    sub: '9-bed Victorian · 247m\u00b2 · Stratford Elizabeth line · Zone 3',
-    agent_name: 'Dexters Development & Investment',
-    note: 'Guide price \u00a31,500,000. Victorian detached house (247m\u00b2 / 3,300+ sq ft). Conversion potential into flats or HMO (STPP). Listed by Dexters D&I (Mar 2026). Nearest Elizabeth line: Stratford (~1.5 mi). Est. 4 flats at \u00a31,400/mo.',
-    url: 'https://homemove.com/property/14c550bd-e9f9-4530-89fe-56de9f75fd41',
-    url_label: 'Homemove',
-    price: 1500000, dep: 25, rate: 5.5, term: 25,
-    rent: 5600, void_: 1,
-    agent: 10, maint: 1.5, ins: 2400, gr: 0, sc: 0,
-    legal: 3500, survey: 1200, refurb: 40000,
-    growth: 3.5, hold: 10, tax: 25,
-    price_est: false, rent_est: true, units: 4
-  },
-  {
-    id: 'p10', badge: '10', ref: false,
-    name: 'Newburgh Road, Acton W3',
-    sub: '3 flats (1-bed) · 278m\u00b2 · Acton Main Line Elizabeth line · Zone 3',
-    agent_name: 'Dexters Development & Investment',
-    note: 'Guide price \u00a31,400,000. Spacious semi-detached freehold (278m\u00b2), currently arranged as 3 x 1-bed flats. Listed by Dexters D&I (Feb 2026). Walking distance Acton Main Line Elizabeth line station. Est. \u00a31,400/flat/mo.',
-    url: 'https://homemove.com/property/3b7775db-d8fb-4be5-aa03-bb23d30da84b',
-    url_label: 'Homemove',
-    price: 1400000, dep: 25, rate: 5.5, term: 25,
-    rent: 4200, void_: 1,
-    agent: 10, maint: 1.5, ins: 2400, gr: 0, sc: 0,
-    legal: 3500, survey: 1200, refurb: 15000,
-    growth: 3.5, hold: 10, tax: 25,
-    price_est: false, rent_est: true, units: 3
-  },
-  {
-    id: 'p11', badge: '11', ref: false,
+    id: 'p11', badge: 'Ref', ref: true,
     name: 'Cheshire Street, Bethnal Green E2',
     sub: '1 \u00d7 2-bed apartment \u00b7 Shoreditch / Brick Lane area \u00b7 Zone 1/2 border',
     agent_name: 'Kinleigh Folkard & Hayward (KFH)',
-    note: 'Single 2-bed apartment in E2 (Cheshire St runs off Brick Lane). Listed by KFH (ref 6138). Unlike portfolio peers this is a single-unit leasehold, not a freehold flat block \u2014 different risk/return shape (lower cash yield, lower entry, simpler management). Walking to Bethnal Green (Central), Shoreditch High St (Overground), Whitechapel/Liverpool St (Elizabeth line). Price &amp; rent est. \u2014 confirm with agent.',
+    note: 'Worked example. Single 2-bed apartment in E2 (Cheshire St runs off Brick Lane). Listed by KFH (ref 6138). Walking to Bethnal Green (Central), Shoreditch High St (Overground), Whitechapel/Liverpool St (Elizabeth line). Price &amp; rent est. \u2014 confirm with agent.',
     url: 'https://www.kfh.co.uk/property-for-sale/2-bedroom-apartment-for-sale-in-cheshire-street-clerkenwell-london-e2-6138/',
     url_label: 'KFH',
     price: 700000, dep: 25, rate: 5.5, term: 25,
@@ -2963,7 +3427,7 @@ function buildPropPanel(p) {
 <div id="panel-${pid}" class="hidden">
   <div class="prop-banner">
     <div class="prop-banner-left">
-      <div class="prop-banner-name">${p.badge === '\u2b50' ? '\u2b50 ' : p.badge + '. '}${p.name}</div>
+      <div class="prop-banner-name">${p.ref ? `<span style="font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);font-weight:700;border:1px solid var(--accent);padding:2px 8px;border-radius:3px;margin-right:10px;vertical-align:middle;">Reference</span>` : ''}${p.name}</div>
       <div class="prop-banner-sub">${p.sub}</div>
       <div class="prop-banner-note">${p.note}</div>
     </div>
@@ -3459,7 +3923,7 @@ function buildCompareTable() {
     const anyEst = r.price_est || r.rent_est
       ? '<br><span style="font-size:10px;color:var(--accent-dim)">some figures est.</span>' : '';
     h += `<tr${r.ref ? ' class="ref-row"' : ''}>
-      <td><strong>${r.badge === '\u2b50' ? '\u2b50 ' : r.badge+'. '}${r.name}</strong>${r.url ? ` <a class="tbl-link" href="${r.url}" target="_blank" rel="noopener" title="View listing: ${r.url_label || r.agent_name}">\u2197</a>` : ''}${anyEst}</td>
+      <td><strong>${r.name}</strong>${r.ref ? ` <span style="font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);font-weight:700;">[Ref]</span>` : ''}${r.url ? ` <a class="tbl-link" href="${r.url}" target="_blank" rel="noopener" title="View listing: ${r.url_label || r.agent_name}">[link]</a>` : ''}${anyEst}</td>
       <td>${priceStr}</td>
       <td style="text-align:center">${r.units}</td>
       <td>${gbp(r.totalCashIn)}</td>
@@ -3484,7 +3948,16 @@ function buildCompareTable() {
 // NAVIGATION
 // =====================================================================
 function showProp(pid, btn) {
-  el('panel-compare').classList.toggle('hidden', pid !== 'compare');
+  // Research panels (Boroughs / Types / Strategies / Risks / Sources)
+  const researchPanels = ['boroughs','types','strategies','risks','sources'];
+  researchPanels.forEach(rp => {
+    const panel = el('panel-'+rp);
+    if (panel) panel.classList.toggle('hidden', rp !== pid);
+  });
+  // Show/hide the shared framing banner — only for research panels, not the property
+  const banner = el('panel-research-banner');
+  if (banner) banner.classList.toggle('hidden', !researchPanels.includes(pid));
+  // Property panels (Cheshire is the only one)
   PROPS.forEach(p => {
     const panel = el('panel-'+p.id);
     if (panel) panel.classList.toggle('hidden', p.id !== pid);
@@ -3514,14 +3987,16 @@ function showBtlSection(section, btn) {
   document.querySelectorAll('#btl-subtabs .btl-subtab').forEach(b => b.classList.remove('active'));
   if (btn) btn.classList.add('active');
 
-  const subnav  = el('btl-subnav');     // property selector chips
-  const compare = el('panel-compare');
-  const mkt     = el('panel-mkt');
+  const subnav = el('btl-subnav');     // research/property selector chips
+  const banner = el('panel-research-banner');
+  const mkt    = el('panel-mkt');
+  const researchPanels = ['boroughs','types','strategies','risks','sources'];
 
   if (section === 'mkt') {
-    // Market Projections & Tax view — hide all property panels and the property selector
+    // Market Projections & Tax view — hide everything else
     if (subnav) subnav.classList.add('hidden');
-    if (compare) compare.classList.add('hidden');
+    if (banner) banner.classList.add('hidden');
+    researchPanels.forEach(rp => { const n = el('panel-'+rp); if (n) n.classList.add('hidden'); });
     PROPS.forEach(p => {
       const panel = el('panel-'+p.id);
       if (panel) panel.classList.add('hidden');
@@ -3529,12 +4004,11 @@ function showBtlSection(section, btn) {
     if (mkt) mkt.classList.remove('hidden');
     try { drawPriceChart(); drawBarChart(); } catch(e){}
   } else {
-    // Real Estate view — show selector, hide market panel, default to Compare All
+    // Real Estate view — show selector, hide market panel, default to Boroughs
     if (subnav) subnav.classList.remove('hidden');
     if (mkt) mkt.classList.add('hidden');
-    // Restore Compare All as the active property view
     const firstChip = subnav ? subnav.querySelector('.pnav') : null;
-    if (firstChip) showProp('compare', firstChip);
+    if (firstChip) showProp('boroughs', firstChip);
   }
 }
 
@@ -3643,7 +4117,7 @@ function calcRVB() {
   const lendTerminal = W0Lend + surplusFV_lend;
   const lendNetPos   = lendTerminal - W0 - annRent * hold - annSurplus * hold;
 
-  // ===== Determine winner =====
+  // ===== Determine winner & ranking =====
   const positions = [
     { key:'buy',  name:'Buy',                wealth: buyTerminal,  net: buyNetPos,  ann: annHousingBuy },
     { key:'inv',  name:'Rent + Invest',      wealth: invTerminal,  net: invNetPos,  ann: annRent + annSurplus },
@@ -3652,52 +4126,99 @@ function calcRVB() {
   const sorted = [...positions].sort((a,b) => b.net - a.net);
   const winner = sorted[0];
   const second = sorted[1];
+  const last   = sorted[2];
+  const rankByKey = {};
+  sorted.forEach((p, i) => { rankByKey[p.key] = i + 1; });
+  const ordinal = n => (n === 1 ? '1st' : (n === 2 ? '2nd' : '3rd'));
 
   // Deposit display
   const dv = el('rvb-deposit-val'); if (dv) dv.textContent = '= \u00a3' + f(deposit);
 
-  // Verdict box
+  // Verdict bar (no icons; left-stripe colour carries the verdict)
   const verdict = el('rvb-verdict');
   const verClass = winner.key === 'buy' ? 'buy' : (winner.key === 'lend' ? 'lend' : 'rent');
   verdict.className = 'verdict ' + verClass;
-  const icons = { buy: '\u{1F3E0}', inv: '\u{1F4C8}', lend: '\u{1F4B0}' };
-  set('rvb-icon', icons[winner.key]);
-  set('rvb-title', winner.name + ' wins over ' + hold + ' years');
+  set('rvb-eyebrow', 'Winner over ' + hold + '-year hold');
+  set('rvb-title', winner.name);
   el('rvb-detail').innerHTML = winner.name + ' leaves you <strong>' + gbp(winner.net - second.net) +
-                               '</strong> better off than ' + second.name + ' (next-best).';
-  el('rvb-break').innerHTML = 'Terminal wealth gap: <strong>' + gbp(winner.wealth - sorted[2].wealth) +
-                              '</strong> between best and worst';
+                               '</strong> better off than ' + second.name + ' (2nd place).';
+  el('rvb-break').innerHTML = 'Spread between best and worst &mdash; <strong>' + gbp(winner.net - last.net) + '</strong> in net position over the period.';
 
   // Headline metric cards
   set('rvb-m-mtg',   gbp(mtgMonthly));
   set('rvb-m-rent',  gbp(rent));
   set('rvb-m-surplus', gbp(monthlySurplus));
-  set('rvb-m-surplus-sub', annSurplus > 0 ? 'renter has ' + gbp(monthlySurplus) + '/mo to invest' : 'mortgage cheaper than rent (rare)');
+  set('rvb-m-surplus-sub', annSurplus > 0 ? 'extra ' + gbp(monthlySurplus) + '/mo for renter to deploy' : 'mortgage cheaper than rent (uncommon)');
 
-  // Scenario cards — populate each
+  // Scenario cards — populate ranks, badges, gaps
   const cards = [
-    { key:'buy',  prefix:'rvb-buy',  card:'rvb-card-buy',  badge:'rvb-buy-badge'  },
-    { key:'inv',  prefix:'rvb-inv',  card:'rvb-card-inv',  badge:'rvb-inv-badge'  },
-    { key:'lend', prefix:'rvb-lend', card:'rvb-card-lend', badge:'rvb-lend-badge' }
+    { key:'buy',  prefix:'rvb-buy',  card:'rvb-card-buy',  badge:'rvb-buy-badge',  rank:'rvb-buy-rank',  gap:'rvb-buy-gap'  },
+    { key:'inv',  prefix:'rvb-inv',  card:'rvb-card-inv',  badge:'rvb-inv-badge',  rank:'rvb-inv-rank',  gap:'rvb-inv-gap'  },
+    { key:'lend', prefix:'rvb-lend', card:'rvb-card-lend', badge:'rvb-lend-badge', rank:'rvb-lend-rank', gap:'rvb-lend-gap' }
   ];
   cards.forEach(c => {
     const p = positions.find(x => x.key === c.key);
+    const r = rankByKey[c.key];
     set(`${c.prefix}-wealth`, gbp(p.wealth));
     set(`${c.prefix}-ann`,    gbp(p.ann));
-    set(`${c.prefix}-cum`,    gbp(p.ann * hold + (c.key === 'buy' ? W0 : W0)));
-    const netSpan = el(`${c.prefix}-net`);
-    if (netSpan) {
-      netSpan.textContent = (p.net >= 0 ? '+' : '') + gbp(p.net);
-      netSpan.style.color = p.net >= 0 ? 'var(--green)' : 'var(--red)';
+    set(`${c.prefix}-cum`,    gbp(W0 + p.ann * hold));
+    const netEl = el(`${c.prefix}-net`);
+    if (netEl) {
+      netEl.textContent = (p.net >= 0 ? '+' : '') + gbp(p.net);
+      netEl.style.color = p.net >= 0 ? 'var(--green)' : 'var(--red)';
     }
+    set(c.rank, ordinal(r) + ' place');
+    // Card win-state styling
     const cardEl = el(c.card);
     if (cardEl) {
       cardEl.classList.toggle('win',  c.key === winner.key);
       cardEl.classList.toggle('lose', c.key !== winner.key);
     }
     const badgeEl = el(c.badge);
-    if (badgeEl) badgeEl.innerHTML = (c.key === winner.key) ? '<span class="rvb-win-badge">Winner</span>' : '';
+    if (badgeEl) badgeEl.style.display = (c.key === winner.key) ? '' : 'none';
+    // Gap text relative to winner (or to next-best for the winner)
+    const gapEl = el(c.gap);
+    if (gapEl) {
+      if (c.key === winner.key) {
+        gapEl.innerHTML = '<strong style="color:var(--accent);">+' + gbp(winner.net - second.net) + '</strong> ahead of 2nd';
+      } else {
+        gapEl.innerHTML = '<strong style="color:var(--red);">&minus;' + gbp(winner.net - p.net) + '</strong> behind 1st';
+      }
+    }
   });
+
+  // ===== Year-by-year wealth trajectory =====
+  const trajTbl = el('rvb-traj-tbl');
+  if (trajTbl) {
+    let trH = `<thead><tr>
+      <th>Year</th><th>Buy</th><th>Rent + Invest</th><th>Rent + Lend</th><th>Leader</th>
+    </tr></thead><tbody>`;
+    let prevLeaderKey = null;
+    for (let y = 1; y <= hold; y++) {
+      const balY = amortBalance(loan, rate, term, y * 12);
+      const valY = price * Math.pow(1 + growth/100, y);
+      const buyY = valY - balY;
+      const annuityFV = (rt) => (rt === 0) ? annSurplus * y : annSurplus * (Math.pow(1+rt, y) - 1) / rt;
+      const invY = W0 * Math.pow(1+r1, y) + annuityFV(r1);
+      const lendY = W0 * Math.pow(1+r2, y) + annuityFV(r2);
+      const trio = [['buy',buyY],['inv',invY],['lend',lendY]];
+      trio.sort((a,b) => b[1] - a[1]);
+      const leaderKey = trio[0][0];
+      const leaderName = leaderKey === 'buy' ? 'Buy' : (leaderKey === 'inv' ? 'Rent+Invest' : 'Rent+Lend');
+      const cls = (key, val) => leaderKey === key ? 'lead' : '';
+      const isCross = (prevLeaderKey !== null && prevLeaderKey !== leaderKey);
+      trH += `<tr${isCross ? ' class="cross-row"' : ''}>
+        <td>${y}</td>
+        <td class="${cls('buy', buyY)}">${gbp(buyY)}</td>
+        <td class="${cls('inv', invY)}">${gbp(invY)}</td>
+        <td class="${cls('lend', lendY)}">${gbp(lendY)}</td>
+        <td style="text-align:right;font-weight:700;${isCross?'color:var(--accent);':'color:var(--text-dim);'}">${leaderName}${isCross ? ' (crossover)' : ''}</td>
+      </tr>`;
+      prevLeaderKey = leaderKey;
+    }
+    trH += '</tbody>';
+    trajTbl.innerHTML = trH;
+  }
 
   // Detailed component breakdown table
   const tbl = el('rvb-detail-tbl');
@@ -4254,7 +4775,7 @@ function buildTaxCards() {
 
     html += `
     <div class="tax-card" style="border-left: 3px solid ${PROP_COLORS[i]}">
-      <div class="tax-card-title">${p.badge === '\u2b50' ? '\u2b50 ' : p.badge+'. '}${p.name}</div>
+      <div class="tax-card-title">${p.name}</div>
       <table>
         <tr><td>Purchase Price</td><td>${gbp(p.price)}</td></tr>
         <tr class="divider"><td colspan="2"></td></tr>
@@ -4339,8 +4860,6 @@ document.addEventListener('DOMContentLoaded', () => {
   el('prop-panels').innerHTML = PROPS.map(p => buildPropPanel(p)).join('');
   // Restore any saved input edits BEFORE first calc
   restoreInputs();
-  // Build comparison table
-  el('compare-tbl').innerHTML = buildCompareTable();
   // Calc all property panels
   PROPS.forEach(p => calcProp(p.id));
   // Init other tabs
