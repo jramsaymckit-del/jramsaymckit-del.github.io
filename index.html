@@ -150,14 +150,26 @@ td:last-child { text-align: right; }
 
 /* Verdict (RVB) */
 .verdict { border-radius: 8px; padding: 20px; margin-bottom: 20px; display: flex; align-items: center; gap: 20px; }
-.verdict.buy { background: #0e1f17; border: 1px solid var(--green); }
-.verdict.rent { background: #1f0e0e; border: 1px solid var(--red); }
+.verdict.buy  { background: rgba(76,175,130,0.08); border: 1px solid var(--green); }
+.verdict.rent { background: rgba(224,92,92,0.08);  border: 1px solid var(--red); }
+.verdict.lend { background: var(--accent-soft);     border: 1px solid var(--accent); }
 .verdict-icon { font-size: 36px; }
 .verdict-title { font-size: 16px; font-weight: 700; }
-.verdict.buy .verdict-title { color: var(--green); }
+.verdict.buy .verdict-title  { color: var(--green); }
 .verdict.rent .verdict-title { color: var(--red); }
+.verdict.lend .verdict-title { color: var(--accent); }
 .verdict-detail { font-size: 13px; color: var(--text-dim); margin-top: 4px; }
 .verdict-break { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+/* RVB scenario cards */
+.rvb-scenario { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 18px; transition: border-color .15s; }
+.rvb-scenario.win { border-color: var(--green); border-width: 2px; padding: 17px; }
+.rvb-scenario.lose { opacity: .85; }
+.rvb-scenario-label { font-size: 11px; color: var(--accent); letter-spacing: .12em; text-transform: uppercase; margin-bottom: 6px; }
+.rvb-scenario-title { font-size: 15px; font-weight: 700; color: var(--text); margin-bottom: 10px; }
+.rvb-scenario-wealth { font-size: 22px; font-weight: 700; color: var(--text); }
+.rvb-scenario-sub { font-size: 11px; color: var(--muted); margin-top: 4px; }
+.rvb-win-badge { display: inline-block; background: var(--green); color: var(--bg); font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 10px; letter-spacing: .08em; text-transform: uppercase; margin-left: 6px; vertical-align: middle; }
 
 /* Market & Tax tab */
 .mkt-layout { display: grid; grid-template-columns: 1fr; gap: 24px; }
@@ -382,9 +394,14 @@ td:last-child { text-align: right; }
       <div class="field"><label>Deposit</label><div class="field-row"><span class="field-prefix">%</span><input type="number" id="rvb-deposit" value="20" step="1" oninput="calcRVB()"><span class="field-suffix" id="rvb-deposit-val"></span></div></div>
       <div class="field"><label>Mortgage Rate</label><div class="field-row"><span class="field-prefix">%</span><input type="number" id="rvb-rate" value="5.5" step="0.1" oninput="calcRVB()"></div></div>
       <div class="field"><label>Mortgage Term</label><div class="field-row"><input type="number" id="rvb-term" value="25" step="1" oninput="calcRVB()"><span class="field-suffix">years</span></div></div>
+
       <div class="section-title">Renting Alternative</div>
       <div class="field"><label>Equivalent Monthly Rent</label><div class="field-row"><span class="field-prefix">&pound;</span><input type="number" id="rvb-rent" value="2800" step="50" oninput="calcRVB()"></div></div>
-      <div class="field"><label>Investment Return (on deposit)</label><div class="field-row"><span class="field-prefix">%</span><input type="number" id="rvb-invest" value="7" step="0.5" oninput="calcRVB()"></div><div class="field-note">e.g. S&amp;P 500 or ISA return</div></div>
+
+      <div class="section-title">Capital Allocation if Renting</div>
+      <div class="field"><label>Passive Investment Yield</label><div class="field-row"><span class="field-prefix">%</span><input type="number" id="rvb-invest" value="7" step="0.5" oninput="calcRVB()"></div><div class="field-note">S&amp;P 500 / global tracker / ISA</div></div>
+      <div class="field"><label>Private Lending Net Yield</label><div class="field-row"><span class="field-prefix">%</span><input type="number" id="rvb-lend" value="9" step="0.5" oninput="calcRVB()"></div><div class="field-note">~9.5% gross less admin &amp; expected loss</div></div>
+
       <div class="section-title">Ownership Costs</div>
       <div class="field"><label>Maintenance</label><div class="field-row"><span class="field-prefix">%</span><input type="number" id="rvb-maint" value="1" step="0.1" oninput="calcRVB()"></div><div class="field-note">% of value p.a.</div></div>
       <div class="field"><label>Buildings Insurance</label><div class="field-row"><span class="field-prefix">&pound;</span><input type="number" id="rvb-ins" value="1500" step="100" oninput="calcRVB()"></div></div>
@@ -392,12 +409,14 @@ td:last-child { text-align: right; }
       <div class="field"><label>Service Charge</label><div class="field-row"><span class="field-prefix">&pound;</span><input type="number" id="rvb-sc" value="2400" step="100" oninput="calcRVB()"></div></div>
       <div class="field"><label>Legal Fees</label><div class="field-row"><span class="field-prefix">&pound;</span><input type="number" id="rvb-legal" value="3000" step="100" oninput="calcRVB()"></div></div>
       <div class="field"><label>Survey</label><div class="field-row"><span class="field-prefix">&pound;</span><input type="number" id="rvb-survey" value="800" step="100" oninput="calcRVB()"></div></div>
+
       <div class="section-title">Assumptions</div>
       <div class="field"><label>Capital Growth p.a.</label><div class="field-row"><span class="field-prefix">%</span><input type="number" id="rvb-growth" value="3" step="0.5" oninput="calcRVB()"></div></div>
       <div class="field"><label>Comparison Period</label><div class="field-row"><input type="number" id="rvb-hold" value="10" step="1" oninput="calcRVB()"><span class="field-suffix">years</span></div></div>
     </div>
+
     <div class="results">
-      <div class="section-title" style="margin-top:0">Verdict</div>
+      <div class="section-title" style="margin-top:0">Three-way Verdict</div>
       <div class="verdict" id="rvb-verdict">
         <div class="verdict-icon" id="rvb-icon">&#127968;</div>
         <div>
@@ -406,36 +425,65 @@ td:last-child { text-align: right; }
           <div class="verdict-break" id="rvb-break">&mdash;</div>
         </div>
       </div>
-      <div class="metrics">
-        <div class="metric-card"><div class="metric-label">Monthly Mortgage</div><div class="metric-value" id="rvb-m-mtg">&mdash;</div><div class="metric-sub">P&amp;I</div></div>
-        <div class="metric-card"><div class="metric-label">Monthly Rent</div><div class="metric-value" id="rvb-m-rent">&mdash;</div><div class="metric-sub">equivalent property</div></div>
-        <div class="metric-card highlight"><div class="metric-label">Break-even Year</div><div class="metric-value" id="rvb-m-be">&mdash;</div></div>
+
+      <!-- Three scenario cards side-by-side -->
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:20px;">
+        <div class="rvb-scenario" id="rvb-card-buy">
+          <div class="rvb-scenario-label">Scenario 1</div>
+          <div class="rvb-scenario-title">&#127968; Buy <span id="rvb-buy-badge"></span></div>
+          <div class="rvb-scenario-wealth" id="rvb-buy-wealth">&mdash;</div>
+          <div class="rvb-scenario-sub">terminal wealth (property equity)</div>
+          <div style="margin-top:10px;font-size:11px;color:var(--muted);line-height:1.5;">
+            <div>Annual housing: <span id="rvb-buy-ann">&mdash;</span></div>
+            <div>Cumulative outflow: <span id="rvb-buy-cum">&mdash;</span></div>
+            <div>Net position: <span id="rvb-buy-net" style="color:var(--text-dim);font-weight:700;">&mdash;</span></div>
+          </div>
+        </div>
+        <div class="rvb-scenario" id="rvb-card-inv">
+          <div class="rvb-scenario-label">Scenario 2</div>
+          <div class="rvb-scenario-title">&#128202; Rent + Invest <span id="rvb-inv-badge"></span></div>
+          <div class="rvb-scenario-wealth" id="rvb-inv-wealth">&mdash;</div>
+          <div class="rvb-scenario-sub">deposit + surplus compounded passively</div>
+          <div style="margin-top:10px;font-size:11px;color:var(--muted);line-height:1.5;">
+            <div>Annual housing: <span id="rvb-inv-ann">&mdash;</span></div>
+            <div>Cumulative outflow: <span id="rvb-inv-cum">&mdash;</span></div>
+            <div>Net position: <span id="rvb-inv-net" style="color:var(--text-dim);font-weight:700;">&mdash;</span></div>
+          </div>
+        </div>
+        <div class="rvb-scenario" id="rvb-card-lend">
+          <div class="rvb-scenario-label">Scenario 3</div>
+          <div class="rvb-scenario-title">&#128176; Rent + Private Lend <span id="rvb-lend-badge"></span></div>
+          <div class="rvb-scenario-wealth" id="rvb-lend-wealth">&mdash;</div>
+          <div class="rvb-scenario-sub">deposit + surplus deployed as private loans</div>
+          <div style="margin-top:10px;font-size:11px;color:var(--muted);line-height:1.5;">
+            <div>Annual housing: <span id="rvb-lend-ann">&mdash;</span></div>
+            <div>Cumulative outflow: <span id="rvb-lend-cum">&mdash;</span></div>
+            <div>Net position: <span id="rvb-lend-net" style="color:var(--text-dim);font-weight:700;">&mdash;</span></div>
+          </div>
+        </div>
       </div>
-      <div class="results-grid">
-        <div>
-          <div class="section-title">Total Cost of Buying</div>
-          <table>
-            <tr><td>Acquisition Costs</td><td id="rvb-t-acq">&mdash;</td></tr>
-            <tr><td>Mortgage Payments</td><td id="rvb-t-mtg">&mdash;</td></tr>
-            <tr><td>Maintenance &amp; Running</td><td id="rvb-t-run">&mdash;</td></tr>
-            <tr class="divider"><td colspan="2"></td></tr>
-            <tr class="bold"><td>Gross Cost</td><td id="rvb-t-gross">&mdash;</td></tr>
-            <tr><td>Capital Gain</td><td id="rvb-t-cg">&mdash;</td></tr>
-            <tr class="divider"><td colspan="2"></td></tr>
-            <tr class="bold"><td>Net Cost of Buying</td><td id="rvb-t-netbuy">&mdash;</td></tr>
-          </table>
-        </div>
-        <div>
-          <div class="section-title">Total Cost of Renting</div>
-          <table>
-            <tr><td>Total Rent Paid</td><td id="rvb-t-rent">&mdash;</td></tr>
-            <tr class="divider"><td colspan="2"></td></tr>
-            <tr class="bold"><td>Gross Cost</td><td id="rvb-t-rgross">&mdash;</td></tr>
-            <tr><td>Investment Return on Deposit</td><td id="rvb-t-inv">&mdash;</td></tr>
-            <tr class="divider"><td colspan="2"></td></tr>
-            <tr class="bold"><td>Net Cost of Renting</td><td id="rvb-t-netrent">&mdash;</td></tr>
-          </table>
-        </div>
+
+      <div class="metrics" style="grid-template-columns:repeat(3,1fr);">
+        <div class="metric-card"><div class="metric-label">Monthly Mortgage</div><div class="metric-value" id="rvb-m-mtg">&mdash;</div><div class="metric-sub">P&amp;I @ chosen rate</div></div>
+        <div class="metric-card"><div class="metric-label">Monthly Rent</div><div class="metric-value" id="rvb-m-rent">&mdash;</div><div class="metric-sub">equivalent property</div></div>
+        <div class="metric-card highlight"><div class="metric-label">Renter's Monthly Surplus</div><div class="metric-value" id="rvb-m-surplus">&mdash;</div><div class="metric-sub" id="rvb-m-surplus-sub">vs buyer's all-in cost</div></div>
+      </div>
+
+      <div class="section-title">Detailed Component Breakdown</div>
+      <div style="overflow-x:auto;">
+        <table class="compare-tbl">
+          <thead><tr>
+            <th style="text-align:left;">Component</th>
+            <th>Buy</th>
+            <th>Rent + Invest</th>
+            <th>Rent + Lend</th>
+          </tr></thead>
+          <tbody id="rvb-detail-tbl"><!-- populated by calcRVB --></tbody>
+        </table>
+      </div>
+
+      <div style="font-size:11px;color:var(--muted);margin-top:14px;line-height:1.7;">
+        <strong style="color:var(--text-dim);">Methodology:</strong> All three scenarios start with the same capital W<sub>0</sub> = deposit + acquisition costs. The buyer commits W<sub>0</sub> to the property; renters deploy W<sub>0</sub> to passive investment or private lending. Each year, both renters have a <em>surplus</em> equal to (mortgage + running) &minus; rent &mdash; that surplus is reinvested at the same yield as the principal, so all three scenarios consume an equal annual housing budget. Terminal wealth = property equity (Buy) or compounded W<sub>0</sub> + compounded surplus (Rent scenarios). <strong style="color:var(--text-dim);">Net position</strong> = terminal wealth &minus; cumulative housing outflow &mdash; the highest is the winner. UK primary residence assumed (no CGT on capital gain).
       </div>
     </div>
   </div><!-- /tab-rvb -->
@@ -2796,6 +2844,25 @@ function sdlt(price, nonResident = true) {
 // SDLT without non-resident surcharge (for comparison)
 function sdltUK(price) { return sdlt(price, false); }
 
+// SDLT for a PRIMARY RESIDENCE (no additional-dwelling surcharge, no NR surcharge).
+// Standard residential rates from April 2025.
+function sdltPrimary(price) {
+  const bands = [
+    {l: 125000,  r: 0.00},
+    {l: 250000,  r: 0.02},
+    {l: 925000,  r: 0.05},
+    {l: 1500000, r: 0.10},
+    {l: Infinity,r: 0.12}
+  ];
+  let tax = 0, prev = 0;
+  for (const b of bands) {
+    if (price <= prev) break;
+    tax += (Math.min(price, b.l) - prev) * b.r;
+    prev = b.l;
+  }
+  return tax;
+}
+
 function mortgage(loan, ratePct, termYrs) {
   const mr = ratePct / 100 / 12, n = termYrs * 12;
   if (mr === 0) return loan / n;
@@ -3525,39 +3592,146 @@ function showEuDirt(id, btn) {
 // =====================================================================
 function calcRVB() {
   const price=gv('rvb-price'), depPct=gv('rvb-deposit'), rate=gv('rvb-rate'),
-        term=gv('rvb-term'), rent=gv('rvb-rent'), investR=gv('rvb-invest'),
+        term=gv('rvb-term'), rent=gv('rvb-rent'),
+        investR=gv('rvb-invest'), lendR=gv('rvb-lend'),
         maint=gv('rvb-maint'), ins=gv('rvb-ins'), gr=gv('rvb-gr'),
         sc=gv('rvb-sc'), legal=gv('rvb-legal'), survey=gv('rvb-survey'),
         growth=gv('rvb-growth'), hold=gv('rvb-hold');
-  const deposit=price*(depPct/100), loan=price-deposit;
-  const stax=sdlt(price), acq=stax+legal+survey, totalCashIn=deposit+acq;
-  const mtg=mortgage(loan,rate,term), annMtg=mtg*12;
-  const annRun=price*(maint/100)+ins+gr+sc, annOwn=annMtg+annRun, annRent=rent*12;
-  const exitVal=price*Math.pow(1+growth/100,hold), capGain=exitVal-price;
-  const invPot=totalCashIn*Math.pow(1+investR/100,hold), invGain=invPot-totalCashIn;
-  const totalBuy=annOwn*hold+acq-capGain, totalRent=annRent*hold-invGain;
-  const advantage=totalRent-totalBuy;
-  let beYear='>30';
-  for(let y=1;y<=30;y++){
-    const ev=price*Math.pow(1+growth/100,y);
-    const cb=annOwn*y+acq-(ev-price);
-    const cr=annRent*y-(totalCashIn*Math.pow(1+investR/100,y)-totalCashIn);
-    if(cb<cr){beYear=y;break;}
+
+  const deposit = price * (depPct/100);
+  const loan    = price - deposit;
+  const stax    = sdltPrimary(price);                // standard residential SDLT (no surcharge)
+  const acq     = stax + legal + survey;
+  const W0      = deposit + acq;                     // starting capital, identical across scenarios
+
+  // Annual cashflows
+  const mtgMonthly = mortgage(loan, rate, term);
+  const annMtg     = mtgMonthly * 12;
+  const annRun     = price*(maint/100) + ins + gr + sc;
+  const annHousingBuy  = annMtg + annRun;
+  const annRent        = rent * 12;
+  const annSurplus     = Math.max(0, annHousingBuy - annRent);  // renter's annual surplus
+  const monthlySurplus = annSurplus / 12;
+
+  // ===== BUY scenario =====
+  const exitVal       = price * Math.pow(1 + growth/100, hold);
+  const balAtExit     = amortBalance(loan, rate, term, hold * 12);
+  const principalPaid = loan - balAtExit;
+  const propertyEquity = exitVal - balAtExit;        // terminal wealth (Buy)
+  const buyTerminal   = propertyEquity;
+  const buyCumOut     = annHousingBuy * hold + acq;  // includes acq once at year 0
+  const buyNet        = buyTerminal - (buyCumOut + W0 - acq);  // terminal wealth - net cash deployed
+  // Equivalent: net = propertyEquity - (deposit + (annHousingBuy * hold) + acq)
+  // We'll express "net position" as: (terminal wealth) - (cumulative housing outflow)
+  // For BUY: housing outflow = annHousingBuy × hold; cumulative cash deployed (incl. W0) = W0 + annHousingBuy × hold
+  const buyNetPos = buyTerminal - W0 - annHousingBuy * hold;
+
+  // ===== RENT + INVEST =====
+  // W0 invested at investR; annSurplus added each year, also at investR
+  const r1 = investR / 100;
+  const W0Inv = W0 * Math.pow(1 + r1, hold);
+  // Future value of an annuity — surplus deposited end-of-year
+  const surplusFV_inv = (r1 === 0) ? annSurplus * hold : annSurplus * (Math.pow(1+r1, hold) - 1) / r1;
+  const invTerminal = W0Inv + surplusFV_inv;
+  const invNetPos   = invTerminal - W0 - annRent * hold - annSurplus * hold;
+  // Note: annRent + annSurplus = annHousingBuy (the "equal annual housing budget" we set)
+
+  // ===== RENT + LEND =====
+  const r2 = lendR / 100;
+  const W0Lend = W0 * Math.pow(1 + r2, hold);
+  const surplusFV_lend = (r2 === 0) ? annSurplus * hold : annSurplus * (Math.pow(1+r2, hold) - 1) / r2;
+  const lendTerminal = W0Lend + surplusFV_lend;
+  const lendNetPos   = lendTerminal - W0 - annRent * hold - annSurplus * hold;
+
+  // ===== Determine winner =====
+  const positions = [
+    { key:'buy',  name:'Buy',                wealth: buyTerminal,  net: buyNetPos,  ann: annHousingBuy },
+    { key:'inv',  name:'Rent + Invest',      wealth: invTerminal,  net: invNetPos,  ann: annRent + annSurplus },
+    { key:'lend', name:'Rent + Private Lend',wealth: lendTerminal, net: lendNetPos, ann: annRent + annSurplus }
+  ];
+  const sorted = [...positions].sort((a,b) => b.net - a.net);
+  const winner = sorted[0];
+  const second = sorted[1];
+
+  // Deposit display
+  const dv = el('rvb-deposit-val'); if (dv) dv.textContent = '= \u00a3' + f(deposit);
+
+  // Verdict box
+  const verdict = el('rvb-verdict');
+  const verClass = winner.key === 'buy' ? 'buy' : (winner.key === 'lend' ? 'lend' : 'rent');
+  verdict.className = 'verdict ' + verClass;
+  const icons = { buy: '\u{1F3E0}', inv: '\u{1F4C8}', lend: '\u{1F4B0}' };
+  set('rvb-icon', icons[winner.key]);
+  set('rvb-title', winner.name + ' wins over ' + hold + ' years');
+  el('rvb-detail').innerHTML = winner.name + ' leaves you <strong>' + gbp(winner.net - second.net) +
+                               '</strong> better off than ' + second.name + ' (next-best).';
+  el('rvb-break').innerHTML = 'Terminal wealth gap: <strong>' + gbp(winner.wealth - sorted[2].wealth) +
+                              '</strong> between best and worst';
+
+  // Headline metric cards
+  set('rvb-m-mtg',   gbp(mtgMonthly));
+  set('rvb-m-rent',  gbp(rent));
+  set('rvb-m-surplus', gbp(monthlySurplus));
+  set('rvb-m-surplus-sub', annSurplus > 0 ? 'renter has ' + gbp(monthlySurplus) + '/mo to invest' : 'mortgage cheaper than rent (rare)');
+
+  // Scenario cards — populate each
+  const cards = [
+    { key:'buy',  prefix:'rvb-buy',  card:'rvb-card-buy',  badge:'rvb-buy-badge'  },
+    { key:'inv',  prefix:'rvb-inv',  card:'rvb-card-inv',  badge:'rvb-inv-badge'  },
+    { key:'lend', prefix:'rvb-lend', card:'rvb-card-lend', badge:'rvb-lend-badge' }
+  ];
+  cards.forEach(c => {
+    const p = positions.find(x => x.key === c.key);
+    set(`${c.prefix}-wealth`, gbp(p.wealth));
+    set(`${c.prefix}-ann`,    gbp(p.ann));
+    set(`${c.prefix}-cum`,    gbp(p.ann * hold + (c.key === 'buy' ? W0 : W0)));
+    const netSpan = el(`${c.prefix}-net`);
+    if (netSpan) {
+      netSpan.textContent = (p.net >= 0 ? '+' : '') + gbp(p.net);
+      netSpan.style.color = p.net >= 0 ? 'var(--green)' : 'var(--red)';
+    }
+    const cardEl = el(c.card);
+    if (cardEl) {
+      cardEl.classList.toggle('win',  c.key === winner.key);
+      cardEl.classList.toggle('lose', c.key !== winner.key);
+    }
+    const badgeEl = el(c.badge);
+    if (badgeEl) badgeEl.innerHTML = (c.key === winner.key) ? '<span class="rvb-win-badge">Winner</span>' : '';
+  });
+
+  // Detailed component breakdown table
+  const tbl = el('rvb-detail-tbl');
+  if (tbl) {
+    const rows = [
+      ['Starting capital (W<sub>0</sub>)', gbp(W0), gbp(W0), gbp(W0)],
+      ['&nbsp;&nbsp;Deposit', gbp(deposit), '&mdash;', '&mdash;'],
+      ['&nbsp;&nbsp;Acq. costs (SDLT + legal + survey)', gbp(acq), '&mdash;', '&mdash;'],
+      ['Annual housing outflow', gbp(annHousingBuy), gbp(annRent + annSurplus), gbp(annRent + annSurplus)],
+      ['&nbsp;&nbsp;Mortgage', gbp(annMtg), '&mdash;', '&mdash;'],
+      ['&nbsp;&nbsp;Running costs', gbp(annRun), '&mdash;', '&mdash;'],
+      ['&nbsp;&nbsp;Rent', '&mdash;', gbp(annRent), gbp(annRent)],
+      ['&nbsp;&nbsp;Surplus invested/lent', '&mdash;', gbp(annSurplus), gbp(annSurplus)],
+      ['Total housing outflow over ' + hold + ' yrs', gbp(annHousingBuy * hold), gbp((annRent + annSurplus) * hold), gbp((annRent + annSurplus) * hold)],
+      ['Terminal wealth', gbp(buyTerminal), gbp(invTerminal), gbp(lendTerminal)],
+      ['&nbsp;&nbsp;Property value at exit', gbp(exitVal), '&mdash;', '&mdash;'],
+      ['&nbsp;&nbsp;Mortgage balance at exit', '(' + gbp(balAtExit) + ')', '&mdash;', '&mdash;'],
+      ['&nbsp;&nbsp;Capital gain', gbp(exitVal - price), '&mdash;', '&mdash;'],
+      ['&nbsp;&nbsp;Principal paid down', gbp(principalPaid), '&mdash;', '&mdash;'],
+      ['&nbsp;&nbsp;W<sub>0</sub> compounded', '&mdash;', gbp(W0Inv), gbp(W0Lend)],
+      ['&nbsp;&nbsp;Surplus compounded', '&mdash;', gbp(surplusFV_inv), gbp(surplusFV_lend)],
+      ['Net position (terminal wealth &minus; total cash deployed)',
+         '<strong>' + (buyNetPos >= 0 ? '+' : '') + gbp(buyNetPos) + '</strong>',
+         '<strong>' + (invNetPos >= 0 ? '+' : '') + gbp(invNetPos) + '</strong>',
+         '<strong>' + (lendNetPos >= 0 ? '+' : '') + gbp(lendNetPos) + '</strong>']
+    ];
+    let h = '';
+    rows.forEach((row, i) => {
+      const isHeader = i === 0 || i === 3 || i === 8 || i === 9 || i === 16;
+      const cls = isHeader ? ' class="bold"' : '';
+      h += `<tr${cls}><td style="text-align:left;">${row[0]}</td><td>${row[1]}</td><td>${row[2]}</td><td>${row[3]}</td></tr>`;
+    });
+    tbl.innerHTML = h;
   }
-  const dv=el('rvb-deposit-val'); if(dv) dv.textContent='= \u00a3'+f(deposit);
-  const buyWins=advantage>0;
-  const verdict=el('rvb-verdict');
-  verdict.className='verdict '+(buyWins?'buy':'rent');
-  set('rvb-icon',buyWins?'\u{1F3E0}':'\u{1F3E6}');
-  set('rvb-title',(buyWins?'Buying is cheaper':'Renting is cheaper')+' over '+hold+' years');
-  el('rvb-detail').innerHTML=(buyWins?'Buying saves':'Renting saves')+' <strong>'+gbp(Math.abs(advantage))+'</strong> vs the alternative';
-  el('rvb-break').innerHTML='Break-even: year <strong>'+beYear+'</strong>';
-  set('rvb-m-mtg',gbp(mtg)); set('rvb-m-rent',gbp(rent)); set('rvb-m-be','Yr '+beYear);
-  set('rvb-t-acq',gbp(acq)); set('rvb-t-mtg',gbp(annMtg*hold));
-  set('rvb-t-run',gbp(annRun*hold)); set('rvb-t-gross',gbp(annOwn*hold+acq));
-  set('rvb-t-cg','('+gbp(capGain)+')'); set('rvb-t-netbuy',gbp(totalBuy));
-  set('rvb-t-rent',gbp(annRent*hold)); set('rvb-t-rgross',gbp(annRent*hold));
-  set('rvb-t-inv','('+gbp(invGain)+')'); set('rvb-t-netrent',gbp(totalRent));
 }
 
 // =====================================================================
