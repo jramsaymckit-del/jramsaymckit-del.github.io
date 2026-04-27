@@ -51,6 +51,31 @@ input:focus { outline: 1px solid var(--accent); }
 .tab { background: none; border: none; border-bottom: 2px solid transparent; color: var(--muted); padding: 14px 22px; cursor: pointer; font-size: 13px; font-family: inherit; letter-spacing: .04em; transition: color .15s; }
 .tab.active { border-bottom-color: var(--accent); color: var(--accent); }
 
+/* BTL second-level subtabs (Real Estate / Market Projections & Tax) */
+.btl-subtabs { display: flex; background: var(--card); padding: 0 32px; border-bottom: 1px solid var(--border); }
+.btl-subtab { background: none; border: none; border-bottom: 2px solid transparent; color: var(--text-dim); padding: 11px 18px; cursor: pointer; font-size: 12px; font-family: inherit; letter-spacing: .06em; text-transform: uppercase; transition: color .15s; }
+.btl-subtab:hover { color: var(--text); }
+.btl-subtab.active { border-bottom-color: var(--accent); color: var(--accent); font-weight: 700; }
+
+/* Property panel view tabs (Snapshot / Schedule / Sensitivity / Stress) */
+.pview-tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--border); margin-bottom: 16px; flex-wrap: wrap; }
+.pview { background: none; border: none; border-bottom: 2px solid transparent; color: var(--muted); padding: 8px 14px; cursor: pointer; font-size: 11px; font-family: inherit; letter-spacing: .07em; text-transform: uppercase; transition: color .15s; }
+.pview:hover { color: var(--text-dim); }
+.pview.active { border-bottom-color: var(--accent); color: var(--accent); font-weight: 700; }
+
+/* Schedule / sensitivity / stress tables — slightly tighter than main tables */
+.sched-tbl, .sens-tbl, .stress-tbl { width: 100%; border-collapse: collapse; font-size: 12px; }
+.sched-tbl th, .sens-tbl th, .stress-tbl th { font-size: 10px; color: var(--accent); letter-spacing: .07em; text-transform: uppercase; text-align: right; padding: 8px 8px; border-bottom: 2px solid var(--border); white-space: nowrap; }
+.sched-tbl th:first-child, .sens-tbl th:first-child, .stress-tbl th:first-child { text-align: left; }
+.sched-tbl td, .sens-tbl td, .stress-tbl td { padding: 6px 8px; font-size: 12px; color: var(--text-dim); border-bottom: 1px solid var(--border); text-align: right; }
+.sched-tbl td:first-child, .sens-tbl td:first-child, .stress-tbl td:first-child { text-align: left; color: var(--text); }
+.sched-tbl tr.refi-row td { background: var(--accent-soft); color: var(--accent); font-weight: 700; }
+.sens-tbl td.bear { color: var(--red); }
+.sens-tbl td.bull { color: var(--green); }
+.stress-good { color: var(--green); font-weight: 700; }
+.stress-warn { color: var(--accent); font-weight: 700; }
+.stress-bad  { color: var(--red); font-weight: 700; }
+
 /* Property sub-nav */
 .prop-nav { display: flex; flex-wrap: wrap; gap: 8px; padding: 14px 32px; background: var(--surface); border-bottom: 1px solid var(--border); }
 .pnav { background: var(--card); border: 1px solid var(--border); border-radius: 20px; color: var(--muted); padding: 7px 16px; cursor: pointer; font-size: 12px; font-family: inherit; letter-spacing: .04em; transition: all .15s; white-space: nowrap; }
@@ -214,6 +239,7 @@ td:last-child { text-align: right; }
     <div>Market: Greater London · Elizabeth Line Corridor</div>
     <div>Buyer: Canadian Non-Resident</div>
     <div style="margin-top:8px;display:flex;gap:8px;justify-content:flex-end;">
+      <button onclick="resetInputs()" style="background:transparent;color:var(--muted);border:1px solid var(--border);border-radius:4px;padding:6px 12px;font-size:11px;font-family:inherit;cursor:pointer;letter-spacing:.04em;" title="Reset all inputs to defaults">Reset</button>
       <button id="theme-toggle" onclick="toggleTheme()" style="background:transparent;color:var(--accent);border:1px solid var(--accent-dim);border-radius:4px;padding:6px 12px;font-size:11px;font-family:inherit;cursor:pointer;letter-spacing:.04em;" title="Switch theme">Light mode</button>
       <button onclick="exportModel()" style="background:var(--accent);color:var(--bg);border:none;border-radius:4px;padding:6px 14px;font-size:11px;font-family:inherit;cursor:pointer;font-weight:700;letter-spacing:.04em;">Export / Print</button>
     </div>
@@ -226,16 +252,18 @@ td:last-child { text-align: right; }
   <button class="tab" onclick="switchTab('lend',this)">Private Lending London</button>
   <button class="tab" onclick="switchTab('cadirt',this)">Canada Dirt</button>
   <button class="tab" onclick="switchTab('crdirt',this)">Costa Rica Dirt</button>
+  <button class="tab" onclick="switchTab('amdirt',this)">American Dirt</button>
 </div>
 
-<!-- BTL sub-nav: portfolio views + individual properties -->
-<div id="btl-subnav" class="prop-nav" style="align-items:center;">
-  <!-- Portfolio-wide views -->
+<!-- BTL second-level subtabs: Real Estate vs Market Projections & Tax -->
+<div id="btl-subtabs" class="btl-subtabs">
+  <button class="btl-subtab active" onclick="showBtlSection('realestate',this)">Real Estate</button>
+  <button class="btl-subtab" onclick="showBtlSection('mkt',this)">Market Projections &amp; Tax</button>
+</div>
+
+<!-- Property selector — only visible when "Real Estate" subtab is active -->
+<div id="btl-subnav" class="prop-nav">
   <button class="pnav active" onclick="showProp('compare',this)">Compare All</button>
-  <button class="pnav" onclick="showProp('mkt',this)">Market &amp; Tax</button>
-  <!-- Visual divider between portfolio views and individual properties -->
-  <span style="display:inline-block;width:1px;height:20px;background:var(--border);margin:0 4px;"></span>
-  <!-- Individual property views -->
   <button class="pnav" onclick="showProp('p1',this)">Argyle Rd, W13</button>
   <button class="pnav" onclick="showProp('p2',this)">Woodhill, SE18</button>
   <button class="pnav" onclick="showProp('p3',this)">Cumberland Rd, Reading</button>
@@ -246,6 +274,7 @@ td:last-child { text-align: right; }
   <button class="pnav" onclick="showProp('p8',this)">Woodseer St, E1</button>
   <button class="pnav" onclick="showProp('p9',this)">Lea Bridge Rd, E10</button>
   <button class="pnav" onclick="showProp('p10',this)">Newburgh Rd, W3</button>
+  <button class="pnav" onclick="showProp('p11',this)">Cheshire St, E2</button>
 </div>
 
 <div class="content">
@@ -1337,6 +1366,426 @@ td:last-child { text-align: right; }
     </div><!-- /padding wrapper -->
   </div><!-- /tab-crdirt -->
 
+  <!-- AMERICAN DIRT — US Homesteading Research -->
+  <div id="tab-amdirt" class="hidden" style="padding:0;">
+
+    <!-- American Dirt sub-nav -->
+    <div class="prop-nav" id="amdirt-subnav">
+      <button class="pnav active" onclick="showAmDirt('overview',this)">Regional Ranking</button>
+      <button class="pnav" onclick="showAmDirt('tennessee',this)">Tennessee Deep Dive</button>
+      <button class="pnav" onclick="showAmDirt('voices',this)">Community Voices</button>
+      <button class="pnav" onclick="showAmDirt('risks',this)">Risks &amp; Regulation</button>
+      <button class="pnav" onclick="showAmDirt('sources',this)">Sources</button>
+    </div>
+
+    <div style="padding:24px 32px;">
+
+      <!-- Framing banner -->
+      <div class="prop-banner">
+        <div class="prop-banner-left">
+          <div class="prop-banner-name">American Dirt &mdash; US Homesteading Research</div>
+          <div class="prop-banner-sub">50-state landscape &middot; tax friction, climate risk, land affordability, regulatory permissiveness</div>
+          <div class="prop-banner-note">Working brief: how the US compares to Canada and Costa Rica for a homestead. The US has the most heterogeneous land/tax/regulatory landscape of the three &mdash; state choice matters more here than country choice does elsewhere. Source mix: agent blog (Heritage Skills USA), Reddit r/homestead state-by-state thread, plus widely-known state tax and disaster data.</div>
+        </div>
+        <div class="prop-banner-chips">
+          <span class="chip">Thesis: low-tax + low-reg states give the deepest homesteading freedom anywhere</span>
+        </div>
+      </div>
+
+      <!-- ================= OVERVIEW ================= -->
+      <div id="amdirt-overview">
+        <div class="section-title" style="margin-top:0">Regional Ranking &mdash; US Homestead States</div>
+        <div class="compare-wrap">
+          <table class="compare-tbl">
+            <thead>
+              <tr>
+                <th style="text-align:left;">State</th>
+                <th style="text-align:left;">Climate / Hazards</th>
+                <th style="text-align:left;">Land $/acre</th>
+                <th style="text-align:left;">Tax (income / sales / property)</th>
+                <th style="text-align:left;">Reg / Bylaw</th>
+                <th style="text-align:left;">Tier</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="ref-row">
+                <td>Tennessee<br><span style="color:var(--muted);font-size:11px;">East TN hills, Cumberland Plateau</span></td>
+                <td style="text-align:left;">Mild winters, hot humid summers; tornado risk W TN</td>
+                <td style="text-align:left;"><span class="c-best">~$3,500</span></td>
+                <td style="text-align:left;"><span class="c-best">No income</span> &middot; 9.55% sales (high) &middot; 0.71% property</td>
+                <td style="text-align:left;">Lax in rural; growing community</td>
+                <td style="text-align:left;"><span class="c-best">S &mdash; consensus #1</span></td>
+              </tr>
+              <tr>
+                <td>Idaho<br><span style="color:var(--muted);font-size:11px;">Panhandle, Magic Valley</span></td>
+                <td style="text-align:left;">Long harsh winters; wildfire risk; low humidity</td>
+                <td style="text-align:left;">$5,500 (rising)</td>
+                <td style="text-align:left;">5.8% income (flat) &middot; 6% sales &middot; <span class="c-best">0.69% property</span></td>
+                <td style="text-align:left;">Off-grid friendly; strong farming culture</td>
+                <td style="text-align:left;"><span class="c-best">S &mdash; off-grid pick</span></td>
+              </tr>
+              <tr>
+                <td>Missouri<br><span style="color:var(--muted);font-size:11px;">Ozarks, S. Missouri</span></td>
+                <td style="text-align:left;">Hot humid summers; <span class="c-worst">tornadoes</span></td>
+                <td style="text-align:left;"><span class="c-best">~$3,000</span></td>
+                <td style="text-align:left;">4.95% income &middot; 4.225% sales &middot; 0.97% property</td>
+                <td style="text-align:left;"><span class="c-best">Very lax rural codes</span></td>
+                <td style="text-align:left;">A &mdash; cheapest land</td>
+              </tr>
+              <tr>
+                <td>Kentucky<br><span style="color:var(--muted);font-size:11px;">Bluegrass region</span></td>
+                <td style="text-align:left;">Long growing season; humid summers; ice storms</td>
+                <td style="text-align:left;">$4,000</td>
+                <td style="text-align:left;">4% income &middot; 6% sales &middot; 0.83% property</td>
+                <td style="text-align:left;">Reasonable; tight rural communities</td>
+                <td style="text-align:left;">A &mdash; fertile soil</td>
+              </tr>
+              <tr>
+                <td>Montana<br><span style="color:var(--muted);font-size:11px;">Bitterroot, Flathead</span></td>
+                <td style="text-align:left;">Long harsh winters; wildfire; low humidity</td>
+                <td style="text-align:left;">$6,000 (rising)</td>
+                <td style="text-align:left;">5.9% income &middot; <span class="c-best">no sales</span> &middot; 0.83% property</td>
+                <td style="text-align:left;">Permissive; strong rancher culture</td>
+                <td style="text-align:left;">A &mdash; lifestyle pick</td>
+              </tr>
+              <tr>
+                <td>Wyoming<br><span style="color:var(--muted);font-size:11px;">Bighorn Basin, Star Valley</span></td>
+                <td style="text-align:left;">Brutal winters, wind; arid; wildfire</td>
+                <td style="text-align:left;">$4,500</td>
+                <td style="text-align:left;"><span class="c-best">No income</span> &middot; 4% sales &middot; 0.61% property</td>
+                <td style="text-align:left;">Lowest population density (49th); minimal rules</td>
+                <td style="text-align:left;">A &mdash; lowest tax burden</td>
+              </tr>
+              <tr>
+                <td>Texas<br><span style="color:var(--muted);font-size:11px;">Hill Country, East TX</span></td>
+                <td style="text-align:left;">Mild winters; <span class="c-worst">drought, hurricanes (coast), heat</span></td>
+                <td style="text-align:left;">$4,500</td>
+                <td style="text-align:left;"><span class="c-best">No income</span> &middot; 6.25% sales &middot; <span class="c-worst">1.8% property</span></td>
+                <td style="text-align:left;">Strong property rights; generous ag exemption</td>
+                <td style="text-align:left;">B &mdash; high property tax bites</td>
+              </tr>
+              <tr>
+                <td>Pennsylvania<br><span style="color:var(--muted);font-size:11px;">Endless Mountains, Lancaster</span></td>
+                <td style="text-align:left;">Cold winters; humid summers; mild overall</td>
+                <td style="text-align:left;">$4,500</td>
+                <td style="text-align:left;">3.07% income (flat) &middot; 6% sales &middot; 1.49% property</td>
+                <td style="text-align:left;">Mineral rights often <em>severed</em> &mdash; check carefully</td>
+                <td style="text-align:left;">B &mdash; vibrant ag, mineral pitfall</td>
+              </tr>
+              <tr>
+                <td>New Hampshire<br><span style="color:var(--muted);font-size:11px;">North Country, Lakes Region</span></td>
+                <td style="text-align:left;">Cold long winters; rocky soil; mild summers</td>
+                <td style="text-align:left;">$3,500&ndash;$8,000</td>
+                <td style="text-align:left;"><span class="c-best">No income, no sales</span> &middot; <span class="c-worst">2.09% property</span> (highest)</td>
+                <td style="text-align:left;"><span class="c-best">"Live Free or Die"</span> &mdash; many towns no zoning</td>
+                <td style="text-align:left;">B &mdash; tax wash, max freedom</td>
+              </tr>
+              <tr>
+                <td>Indiana<br><span style="color:var(--muted);font-size:11px;">Southern hills</span></td>
+                <td style="text-align:left;">Cold winters, hot humid summers; tornado risk</td>
+                <td style="text-align:left;">$4,500</td>
+                <td style="text-align:left;">3.05% income (flat) &middot; 7% sales &middot; 0.84% property</td>
+                <td style="text-align:left;"><span class="c-best">Very homeschool-friendly</span></td>
+                <td style="text-align:left;">B &mdash; balanced</td>
+              </tr>
+              <tr>
+                <td>Georgia<br><span style="color:var(--muted);font-size:11px;">NW GA mountains</span></td>
+                <td style="text-align:left;">Mild; little snow; hurricane fringe; <span class="c-worst">droughts</span></td>
+                <td style="text-align:left;">$4,500</td>
+                <td style="text-align:left;">5.39% income (flat) &middot; 7.99% sales &middot; 0.81% property</td>
+                <td style="text-align:left;"><span class="c-best">Strongest property rights</span>; easy ag exemption</td>
+                <td style="text-align:left;">A &mdash; underrated NW corner</td>
+              </tr>
+              <tr>
+                <td>Iowa</td>
+                <td style="text-align:left;">Cold winters, hot summers; tornadoes</td>
+                <td style="text-align:left;"><span class="c-worst">~$10,000+</span> tillable</td>
+                <td style="text-align:left;">3.8% income &middot; 6% sales &middot; 1.43% property</td>
+                <td style="text-align:left;">Reasonable</td>
+                <td style="text-align:left;">C &mdash; priced like investment</td>
+              </tr>
+              <tr>
+                <td>Alaska<br><span style="color:var(--muted);font-size:11px;">Mat-Su, Kenai</span></td>
+                <td style="text-align:left;"><span class="c-worst">Sub-arctic, short season</span>; some <span class="c-best">free land programs</span></td>
+                <td style="text-align:left;">$3,500 (cheaper remote)</td>
+                <td style="text-align:left;"><span class="c-best">No income, no sales</span> &middot; 1.19% property &middot; PFD dividend</td>
+                <td style="text-align:left;">Most permissive in US in remote areas</td>
+                <td style="text-align:left;">C &mdash; for the committed</td>
+              </tr>
+              <tr>
+                <td>West Virginia</td>
+                <td style="text-align:left;">Cool mountain; cheap; flooding in valleys</td>
+                <td style="text-align:left;"><span class="c-best">$2,500&ndash;$3,500</span></td>
+                <td style="text-align:left;">2.36&ndash;5.12% income &middot; 6% sales &middot; <span class="c-best">0.55% property (lowest)</span></td>
+                <td style="text-align:left;">Lax rural; mineral rights often severed</td>
+                <td style="text-align:left;">A &mdash; cheap value play</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="compare-legend" style="margin-top:14px;">
+          <strong style="color:var(--accent);">Starter short list:</strong>
+          Tennessee (S &mdash; consensus) &middot; Idaho (S &mdash; off-grid) &middot; NW Georgia (A &mdash; rights + climate) &middot; West Virginia (A &mdash; cheapest) &middot; Wyoming (A &mdash; lowest tax)
+        </div>
+
+        <div class="section-title">Criteria Snapshot</div>
+        <div class="metrics" style="grid-template-columns:repeat(4,1fr);">
+          <div class="metric-card highlight"><div class="metric-label">Best Climate</div><div class="metric-value" style="font-size:16px;">Tennessee</div><div class="metric-sub">Mild, long growing season, low fire</div></div>
+          <div class="metric-card highlight"><div class="metric-label">Lowest Land $</div><div class="metric-value" style="font-size:16px;">WV / MO</div><div class="metric-sub">$2,500&ndash;$3,000/acre rural</div></div>
+          <div class="metric-card highlight"><div class="metric-label">Lowest Tax</div><div class="metric-value" style="font-size:16px;">WY / NH / TN</div><div class="metric-sub">No income tax + low or zero sales</div></div>
+          <div class="metric-card highlight"><div class="metric-label">Most Permissive</div><div class="metric-value" style="font-size:16px;">NH / Alaska</div><div class="metric-sub">Many no-zoning municipalities</div></div>
+        </div>
+
+        <div class="section-title">Why US vs Canada vs Costa Rica</div>
+        <table>
+          <tr class="bold"><td>Factor</td><td>US position</td></tr>
+          <tr><td style="color:var(--text);">Foreign ownership</td><td>Foreigners can own land in fee simple in nearly all states. <span class="c-best">No federal restrictions</span> (some states limit foreign ag-land ownership: FL, MO, IA, IN since 2023&ndash;25). Property held by an LLC sidesteps most state rules.</td></tr>
+          <tr><td style="color:var(--text);">Visa / residency</td><td><span class="c-worst">No US equivalent of CR pensionado/inversionista.</span> Land ownership does NOT confer right to live there. Need E-2/EB-5 path or family-based.</td></tr>
+          <tr><td style="color:var(--text);">Climate diversity</td><td>From sub-arctic Alaska to subtropical Florida &mdash; pick your microclimate. Wider span than CA + CR combined.</td></tr>
+          <tr><td style="color:var(--text);">Land cost spread</td><td>$2,500/acre WV vs $10,000+/acre IA tillable &mdash; nearly 4&times; range within one country.</td></tr>
+          <tr><td style="color:var(--text);">Tax heterogeneity</td><td>Wyoming total tax burden ~7.5%; New York ~15.9%. State choice = 8 percentage points of effective tax.</td></tr>
+          <tr><td style="color:var(--text);">Disaster mix</td><td>Tornadoes (Plains), hurricanes (Gulf+Atlantic), wildfires (West), severe winters (North), earthquakes (West, New Madrid). Risk profile shapes state choice.</td></tr>
+          <tr><td style="color:var(--text);">Free land</td><td>Federal Homestead Act repealed 1976 (1986 Alaska). Some Alaska boroughs still run remote-staking programs; some Kansas / Nebraska towns offer free residential lots.</td></tr>
+          <tr><td style="color:var(--text);">Cottage food laws</td><td>Wyoming &amp; North Dakota the most permissive (sell direct from farm without inspection); CA / NY among most restrictive.</td></tr>
+        </table>
+      </div>
+
+      <!-- ================= TENNESSEE DEEP DIVE ================= -->
+      <div id="amdirt-tennessee" class="hidden">
+        <div class="section-title" style="margin-top:0">Tennessee Deep Dive &mdash; East TN &amp; Cumberland Plateau</div>
+        <div class="panel" style="grid-template-columns:1fr 1fr;">
+          <div>
+            <div class="section-title" style="margin-top:0">Why Tennessee is the consensus pick</div>
+            <table>
+              <tr><td style="color:var(--text);">Tax</td><td><span class="c-best">No state income tax</span>; investment income (Hall tax) repealed 2021. Property tax 0.71% &mdash; among lowest. Sales tax high (9.55%) but only hits consumption.</td></tr>
+              <tr><td style="color:var(--text);">Climate</td><td>Hardiness zones 6b&ndash;8a. Long growing season (180&ndash;220 frost-free days). Mild winters, warm humid summers.</td></tr>
+              <tr><td style="color:var(--text);">Soil</td><td>Cumberland Plateau &amp; East TN valleys: limestone-rich, fertile. Western lowlands variable.</td></tr>
+              <tr><td style="color:var(--text);">Water</td><td>Abundant rainfall (50&ndash;55"/yr); springs, creeks, rivers everywhere in East/Middle TN.</td></tr>
+              <tr><td style="color:var(--text);">Land</td><td>~$3,500/acre rural average. Sub-$2,500 possible in remote Plateau counties (Fentress, Pickett, Scott).</td></tr>
+              <tr><td style="color:var(--text);">Community</td><td>Strong homesteading + Mennonite/Amish presence. 100+ farmers' markets statewide.</td></tr>
+              <tr><td style="color:var(--text);">Greenbelt program</td><td>Ag-use property tax assessment (15+ acres farm OR 25+ acres forest) &mdash; can drop assessed value by 50&ndash;75%.</td></tr>
+            </table>
+
+            <div class="section-title">Red Flags</div>
+            <table>
+              <tr><td style="color:var(--red);">Tornadoes</td><td>Middle &amp; West TN in tornado alley extension. Storm shelter / safe room essential.</td></tr>
+              <tr><td style="color:var(--red);">Humidity</td><td>July&ndash;August oppressive; mold pressure on buildings, food storage</td></tr>
+              <tr><td style="color:var(--red);">Ticks &amp; chiggers</td><td>Heavy load. Lyme + alpha-gal allergy (red meat trigger from lone star tick) increasingly diagnosed.</td></tr>
+              <tr><td style="color:var(--red);">Price creep near Nashville/Knoxville</td><td>Within 60 mi of either, land prices have doubled 2020&ndash;2025</td></tr>
+              <tr><td style="color:var(--red);">Sales tax</td><td>9.55% (4% on groceries) &mdash; hidden cost on every purchase. Plan to source feed/equipment carefully.</td></tr>
+              <tr><td style="color:var(--red);">Hot summers + drought spells</td><td>Late summer drought common; irrigation planning needed for vegetable production</td></tr>
+              <tr><td style="color:var(--red);">School quality (rural)</td><td>Some rural districts struggle academically &mdash; bigger issue if not homeschooling</td></tr>
+            </table>
+          </div>
+
+          <div>
+            <div class="section-title" style="margin-top:0">Practical Start-Small Playbook</div>
+            <table>
+              <tr><td style="color:var(--text);">Pick your sub-region</td><td>East TN (Appalachian foothills) &mdash; cooler, more water, scenic. Cumberland Plateau &mdash; cheapest, milder summers. Middle TN &mdash; near Nashville, pricier. West TN &mdash; flatter, hotter, cheaper.</td></tr>
+              <tr><td style="color:var(--text);">Title + minerals</td><td>Get a full title search; verify mineral rights status. Coal/gas extraction has happened on the Plateau.</td></tr>
+              <tr><td style="color:var(--text);">Greenbelt application</td><td>Apply Year-1 if eligible &mdash; 15+ ac farm or 25+ ac forest. Saves $1,000s annually.</td></tr>
+              <tr><td style="color:var(--text);">LLC ownership</td><td>If foreign buyer (TN allows free): hold via TN LLC for liability + simplified non-resident handling.</td></tr>
+              <tr><td style="color:var(--text);">Septic perc test</td><td>East TN clay soils can fail; budget for engineered alt systems on marginal sites.</td></tr>
+              <tr><td style="color:var(--text);">Power hookup</td><td>TVA electric co-ops generally responsive; ~$4&ndash;15/ft typical. Solar excellent backup.</td></tr>
+              <tr><td style="color:var(--text);">Storm shelter</td><td>FEMA-spec safe room ~$5&ndash;10k; partial federal grant programs exist.</td></tr>
+            </table>
+
+            <div class="section-title">Starter Crops (zone 6b/7a)</div>
+            <table>
+              <tr><td style="color:var(--text);">Tomato, pepper, squash, beans</td><td>Long warm season; abundant yields with irrigation</td></tr>
+              <tr><td style="color:var(--text);">Sweet potato, peanuts</td><td>Thrive in TN heat; calorie-dense; long storage</td></tr>
+              <tr><td style="color:var(--text);">Berries</td><td>Blueberry, blackberry, muscadine grape &mdash; wild-collected too</td></tr>
+              <tr><td style="color:var(--text);">Tree crops</td><td>Apple, peach, pear, persimmon, pawpaw (native), pecan</td></tr>
+              <tr><td style="color:var(--text);">Cool-season</td><td>Garlic, brassicas, lettuce, peas (Oct&ndash;Apr)</td></tr>
+              <tr><td style="color:var(--text);">Cover &amp; soil-build</td><td>Crimson clover, daikon, buckwheat &mdash; classic TN regen rotations</td></tr>
+            </table>
+
+            <div class="section-title">Livestock Starter</div>
+            <table>
+              <tr><td style="color:var(--text);">Chickens + meat birds</td><td>Year-round; minimal winter care</td></tr>
+              <tr><td style="color:var(--text);">Hair sheep (Katahdin)</td><td>Heat-tolerant; no shearing; parasite resistance crucial in humid south</td></tr>
+              <tr><td style="color:var(--text);">Pigs (heritage)</td><td>Tamworth, Berkshire &mdash; foraging on oak/hickory mast = signature meat</td></tr>
+              <tr><td style="color:var(--text);">Cattle</td><td>Angus or Hereford; ~1.5 ac/cow rule on improved pasture</td></tr>
+              <tr><td style="color:var(--text);">Bees</td><td>Strong nectar flow (clover, tulip poplar, sourwood premium honey)</td></tr>
+              <tr><td style="color:var(--text);">Trout (cool springs)</td><td>Cold East TN springs &mdash; rainbow / brown trout pond aquaculture viable</td></tr>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ================= COMMUNITY VOICES ================= -->
+      <div id="amdirt-voices" class="hidden">
+        <div class="section-title" style="margin-top:0">Community Voices &mdash; Region by Region</div>
+        <div style="color:var(--muted);font-size:12px;margin-bottom:16px;font-style:italic;">Curated quotes from r/homestead state-by-state thread (3y old but evergreen) and Heritage Skills USA blog. Treated as lived-experience signal.</div>
+
+        <div class="section-title">Pennsylvania</div>
+        <div style="background:var(--card);border-left:3px solid var(--red);padding:12px 16px;margin-bottom:10px;border-radius:4px;">
+          <div style="color:var(--text);">"One thing to keep in mind, and the reason we bought in NY is that many rural PA properties do NOT sell with their mineral rights. I don't know how big of a problem that may be for you but it was a deal breaker for us."</div>
+          <div style="color:var(--muted);font-size:11px;margin-top:6px;">&mdash; r/homestead, Jodie_fosters_beard</div>
+        </div>
+        <div style="background:var(--card);border-left:3px solid var(--green);padding:12px 16px;margin-bottom:10px;border-radius:4px;">
+          <div style="color:var(--text);">"PA has a very vibrant agricultural community in general and good access to all sorts of tools needed. People also love to buy/shop local here."</div>
+          <div style="color:var(--muted);font-size:11px;margin-top:6px;">&mdash; r/homestead, Anxiety_Potato</div>
+        </div>
+        <div style="background:var(--card);border-left:3px solid var(--accent);padding:12px 16px;margin-bottom:10px;border-radius:4px;">
+          <div style="color:var(--text);">"One thing I've noticed is an undercurrent issue with addiction/opioid abuse in the area &mdash; you'd see addiction issues in the community in any of the states on your list."</div>
+          <div style="color:var(--muted);font-size:11px;margin-top:6px;">&mdash; r/homestead, TractorSupplyCuntry</div>
+        </div>
+
+        <div class="section-title">New Hampshire</div>
+        <div style="background:var(--card);border-left:3px solid var(--green);padding:12px 16px;margin-bottom:10px;border-radius:4px;">
+          <div style="color:var(--text);">"There are some towns with no zoning or building permits or anything, very live free or die. I've spent the past 3 years doing a complete rebuild of an old farmhouse and the only thing I've needed a permit for so far was to pave my driveway. Property taxes can be very low for homesteaders with at least 11 acres &mdash; the state's <em>current use</em> conservation-incentive tax law. Our 20 acres + 2400sqft home + barn pays just under $600/month."</div>
+          <div style="color:var(--muted);font-size:11px;margin-top:6px;">&mdash; r/homestead</div>
+        </div>
+        <div style="background:var(--card);border-left:3px solid var(--red);padding:12px 16px;margin-bottom:10px;border-radius:4px;">
+          <div style="color:var(--text);">"Downside from a social worker who works with the elderly &mdash; as you age, NH is terrible in regards to services you may need. When they say 'live free or die' they mean it."</div>
+          <div style="color:var(--muted);font-size:11px;margin-top:6px;">&mdash; r/homestead, Fraggle-of-the-rock</div>
+        </div>
+
+        <div class="section-title">Indiana</div>
+        <div style="background:var(--card);border-left:3px solid var(--green);padding:12px 16px;margin-bottom:10px;border-radius:4px;">
+          <div style="color:var(--text);">"Most berries (blueberry, blackberry, raspberry, gooseberry) grow very well. Grapes, apples, peaches, pears, plums, tomatoes, corn, peppers, onions, garlic, carrots, greens. The ground here is very good. Tornadoes are a concern but only 1 in my lifetime has been close enough to worry about. Great state for homesteading and homeschooling."</div>
+          <div style="color:var(--muted);font-size:11px;margin-top:6px;">&mdash; r/homestead OP (homesteading + homeschooling in Indiana)</div>
+        </div>
+
+        <div class="section-title">Georgia (NW corner)</div>
+        <div style="background:var(--card);border-left:3px solid var(--green);padding:12px 16px;margin-bottom:10px;border-radius:4px;">
+          <div style="color:var(--text);">"Strongest private property rights of any state. Low property tax with an easy ag exemption. My total property tax for almost 300 acres and a 2400sf 4br home is around $4k/yr. Lots of water. Plenty of rain. Summers trending cooler with climate change and winters milder. Long generous hunting seasons &mdash; 12 deer per season."</div>
+          <div style="color:var(--muted);font-size:11px;margin-top:6px;">&mdash; r/homestead, pwsmoketrail (NW GA, 50 mi from Atlanta)</div>
+        </div>
+
+        <div class="section-title">Iowa</div>
+        <div style="background:var(--card);border-left:3px solid var(--red);padding:12px 16px;margin-bottom:10px;border-radius:4px;">
+          <div style="color:var(--text);">"Land is getting insanely expensive there. $10,200 per acre and it was 50:50 wooded to tillable. I couldn't even afford my families farm when my grandfather passed away."</div>
+          <div style="color:var(--muted);font-size:11px;margin-top:6px;">&mdash; r/homestead, born2bfi</div>
+        </div>
+
+        <div class="section-title">Tennessee &mdash; Heritage Skills USA take</div>
+        <div style="background:var(--card);border-left:3px solid var(--green);padding:12px 16px;margin-bottom:10px;border-radius:4px;">
+          <div style="color:var(--text);">"Tennessee's rolling hills and friendly neighbors make it a solid choice for homesteading &mdash; just don't be surprised if you find yourself picking ticks off your livestock (and yourself) more often than you'd like." Pros: no state income tax, long growing season, mild winters, affordable land, strong community. Cons: high humidity (mold/mildew); property prices near cities rising.</div>
+          <div style="color:var(--muted);font-size:11px;margin-top:6px;">&mdash; Heritage Skills USA blog (Apr 2025)</div>
+        </div>
+
+        <div class="section-title">Idaho &mdash; Heritage Skills take</div>
+        <div style="background:var(--card);border-left:3px solid var(--accent);padding:12px 16px;margin-bottom:10px;border-radius:4px;">
+          <div style="color:var(--text);">"Lots of remote land for off-grid living. Strong farming and ranching communities. Low crime rates. If you love mountains, solitude, and the idea of chopping wood all winter, Idaho is calling your name." Cons: long harsh winters; land prices rising fast.</div>
+          <div style="color:var(--muted);font-size:11px;margin-top:6px;">&mdash; Heritage Skills USA blog (Apr 2025)</div>
+        </div>
+      </div>
+
+      <!-- ================= RISKS & REGULATION ================= -->
+      <div id="amdirt-risks" class="hidden">
+        <div class="section-title" style="margin-top:0">Climate &amp; Geophysical Risks (by region)</div>
+        <table>
+          <tr class="bold"><td>Risk</td><td>Where it hits</td></tr>
+          <tr><td style="color:var(--text);">Tornadoes</td><td>"Tornado Alley": OK, KS, NE, MO, AR, plus AL, MS, TN, KY, IN. Storm shelter + insurance non-negotiable.</td></tr>
+          <tr><td style="color:var(--text);">Hurricanes</td><td>Gulf &amp; Atlantic coasts: TX (south), LA, MS, AL, FL, GA (coast), SC, NC. Inland fringe damage 50+ mi inland in big storms.</td></tr>
+          <tr><td style="color:var(--text);">Wildfire</td><td>West: CA, OR, WA, ID, MT, CO, NM, AZ, NV, parts of TX. Fire season expanding annually.</td></tr>
+          <tr><td style="color:var(--text);">Drought</td><td>SW + Plains chronic; CO River basin in long-term decline. Water-rights states (Western "first in time, first in right") critical due diligence.</td></tr>
+          <tr><td style="color:var(--text);">Flooding</td><td>Mississippi/Missouri/Ohio basins; Atlantic coast (SLR). Avoid floodplains; flood insurance can double premiums.</td></tr>
+          <tr><td style="color:var(--text);">Severe winters</td><td>North: ND, MN, WI, MI, NY upstate, VT, NH, ME, AK. Long heating seasons inflate operating costs.</td></tr>
+          <tr><td style="color:var(--text);">Earthquakes</td><td>West Coast (CA, OR, WA, AK); New Madrid fault (MO, AR, TN, KY, IL); Wasatch (UT). Most homestead insurance excludes &mdash; rider needed.</td></tr>
+          <tr><td style="color:var(--text);">Tick-borne disease</td><td>Lyme: NE/MidAtlantic. Alpha-gal: South + spreading. Rocky Mountain spotted fever: Plains.</td></tr>
+        </table>
+
+        <div class="section-title">Tax Landscape (2026)</div>
+        <table>
+          <tr class="bold"><td>States with NO state income tax</td><td colspan="2">AK, FL, NH (interest/div phased out 2024), NV, SD, TN, TX, WA (cap gains tax), WY</td></tr>
+          <tr class="bold"><td>States with NO sales tax</td><td colspan="2">AK, DE, MT, NH, OR</td></tr>
+          <tr class="bold"><td>Lowest property tax rates</td><td colspan="2">HI 0.32%, AL 0.41%, CO 0.51%, LA 0.56%, WV 0.55%, WY 0.61%</td></tr>
+          <tr class="bold"><td>Highest property tax rates</td><td colspan="2">NJ 2.46%, IL 2.29%, NH 2.09%, CT 2.14%, VT 1.83%, TX 1.80%</td></tr>
+          <tr class="bold"><td>Best total tax burden</td><td colspan="2">AK ~5.4%, WY ~7.5%, TN ~7.6%, FL ~9.1%, SD ~8.4%</td></tr>
+        </table>
+
+        <div class="section-title">Regulatory &amp; Legal Friction</div>
+        <table>
+          <tr class="bold"><td>Issue</td><td>What to know</td></tr>
+          <tr><td style="color:var(--green);">Right-to-Farm laws</td><td>All 50 states have these &mdash; protect agricultural use from nuisance claims by neighbors. Strength varies; MO, NC, IN have strongest.</td></tr>
+          <tr><td style="color:var(--accent);">Mineral rights</td><td>Often <em>severed</em> from surface in PA, WV, OK, TX, KY. Can mean drilling rights belong to someone else &mdash; can't refuse access. <strong>Always title-search minerals.</strong></td></tr>
+          <tr><td style="color:var(--accent);">Water rights</td><td>East = riparian (own creek, get water). West (CO River + 17 western states) = prior appropriation ("first in time"). In dry states water rights can cost more than the land.</td></tr>
+          <tr><td style="color:var(--accent);">Cottage food laws</td><td>WY + ND best (sell direct from farm); CA + NY most restrictive. Affects ability to monetize jam, baked goods, eggs.</td></tr>
+          <tr><td style="color:var(--accent);">Foreign ownership of ag land</td><td>Banned/restricted: FL (2023, on certain countries), MO (2013), IA, IN, ND, NE, OK, MS, KS &mdash; rules vary, mostly target Chinese / "adversary" nationals. <strong>Canadian buyers generally exempt.</strong></td></tr>
+          <tr><td style="color:var(--accent);">Homeschool laws</td><td>Most permissive: TX, ID, MI, OK. Most restrictive: NY, MA, PA, OH, ND. Matters if family is part of the homestead plan.</td></tr>
+          <tr><td style="color:var(--red);">Visa &amp; residency</td><td>US has no homesteader visa. Land ownership confers ZERO right to live there. EB-5 ($800k&ndash;$1.05M investor visa), E-2 (treaty trader, requires Canadian citizen + active business), or family-based are the realistic paths.</td></tr>
+          <tr><td style="color:var(--red);">Squatter / adverse possession</td><td>Statute varies 5&ndash;20 yrs by state. Lower-risk than CR but absentee owners still need caretaker presence.</td></tr>
+          <tr><td style="color:var(--accent);">HOA / zoning</td><td>Outside no-zoning rural counties, expect zoning. Many counties prohibit livestock under X acres. <strong>Verify before purchase.</strong></td></tr>
+        </table>
+
+        <div class="section-title">Hidden Costs Checklist</div>
+        <table>
+          <tr><td style="color:var(--text);">Title insurance + closing</td><td>1&ndash;2% of price; lender's policy + owner's policy</td></tr>
+          <tr><td style="color:var(--text);">Survey</td><td>$500&ndash;$3,500 depending on acreage &amp; terrain</td></tr>
+          <tr><td style="color:var(--text);">Well + septic</td><td>$10k&ndash;$30k where municipal unavailable; perc test required</td></tr>
+          <tr><td style="color:var(--text);">Power line extension</td><td>$10&ndash;$30/ft beyond ~500 ft from existing line; can total $30k+</td></tr>
+          <tr><td style="color:var(--text);">Health insurance</td><td>No universal system &mdash; ACA marketplace plans $400&ndash;$1500/mo for a family without employer plan. Single biggest hidden cost vs CA/CR.</td></tr>
+          <tr><td style="color:var(--text);">Flood / wind / earthquake riders</td><td>Standard insurance excludes; can add $1,500&ndash;$5,000/yr in risk zones</td></tr>
+          <tr><td style="color:var(--text);">Property tax escrow</td><td>Often paid monthly with mortgage; in NJ/NH/IL can be 3&ndash;5&times; the mortgage interest</td></tr>
+          <tr><td style="color:var(--text);">Visa / immigration legal</td><td>$5k&ndash;$50k+ for E-2 / EB-5 attorney work if pursuing residency</td></tr>
+        </table>
+      </div>
+
+      <!-- ================= SOURCES ================= -->
+      <div id="amdirt-sources" class="hidden">
+        <div class="section-title" style="margin-top:0">Sources &amp; Further Reading</div>
+
+        <div class="section-title">Agent / Blog</div>
+        <table>
+          <tr>
+            <td style="color:var(--text);">Heritage Skills USA &mdash; <em>The Best States for Homesteading</em> (Apr 2025)</td>
+            <td><a class="tbl-link" href="https://www.heritageskillsusa.com/" target="_blank" rel="noopener">heritageskillsusa.com &rarr;</a></td>
+          </tr>
+          <tr>
+            <td style="color:var(--text);">Homebiogas &mdash; <em>10 Best States for Homesteading</em></td>
+            <td><a class="tbl-link" href="https://www.homebiogas.com/blog/10-best-states-for-homesteading/" target="_blank" rel="noopener">homebiogas.com &rarr;</a></td>
+          </tr>
+        </table>
+
+        <div class="section-title">Community Threads</div>
+        <table>
+          <tr>
+            <td style="color:var(--text);">r/homestead &mdash; <em>Best state for homesteading?</em> (state-by-state mega-thread)</td>
+            <td><a class="tbl-link" href="https://www.reddit.com/r/homestead/" target="_blank" rel="noopener">reddit.com/r/homestead &rarr;</a></td>
+          </tr>
+          <tr>
+            <td style="color:var(--text);">r/Homesteading &mdash; ongoing US discussions</td>
+            <td><a class="tbl-link" href="https://www.reddit.com/r/Homesteading/" target="_blank" rel="noopener">reddit.com/r/Homesteading &rarr;</a></td>
+          </tr>
+          <tr>
+            <td style="color:var(--text);">r/OffGrid &mdash; off-grid build experience</td>
+            <td><a class="tbl-link" href="https://www.reddit.com/r/OffGrid/" target="_blank" rel="noopener">reddit.com/r/OffGrid &rarr;</a></td>
+          </tr>
+        </table>
+
+        <div class="section-title">Reference / Data</div>
+        <table>
+          <tr>
+            <td style="color:var(--text);">USDA NASS &mdash; state-by-state ag land prices</td>
+            <td><a class="tbl-link" href="https://www.nass.usda.gov/" target="_blank" rel="noopener">nass.usda.gov &rarr;</a></td>
+          </tr>
+          <tr>
+            <td style="color:var(--text);">Tax Foundation &mdash; state &amp; local tax burden rankings</td>
+            <td><a class="tbl-link" href="https://taxfoundation.org/" target="_blank" rel="noopener">taxfoundation.org &rarr;</a></td>
+          </tr>
+          <tr>
+            <td style="color:var(--text);">Forage cottage-food law map (HSLDA &amp; state extensions)</td>
+            <td><span style="color:var(--muted);font-size:11px;">search "[state] cottage food law"</span></td>
+          </tr>
+        </table>
+
+        <div class="section-title">Next Research Steps</div>
+        <table>
+          <tr><td style="color:var(--text);">1. Drop more research dumps</td><td>Same workflow as Canada / CR &mdash; paste agent posts, Reddit threads, tax-foundation tables and they'll be folded in</td></tr>
+          <tr><td style="color:var(--text);">2. Visa path triage</td><td>US is unique &mdash; without a residency path, the homestead is a vacation home. EB-5 vs E-2 vs family-based decision precedes property choice.</td></tr>
+          <tr><td style="color:var(--text);">3. Shortlist 2 states</td><td>Tennessee + Idaho or Tennessee + NW Georgia are natural pairs (climate &middot; community &middot; tax)</td></tr>
+          <tr><td style="color:var(--text);">4. County-level zoning audit</td><td>State is a starting point; county/township codes determine livestock, building, off-grid feasibility</td></tr>
+          <tr><td style="color:var(--text);">5. Title + minerals + water</td><td>Three separate searches required &mdash; especially in PA / WV / KY / OK / TX</td></tr>
+          <tr><td style="color:var(--text);">6. Cross-compare</td><td>Side-by-side P&amp;L tab vs Canada Dirt &amp; Costa Rica Dirt once shortlists firm</td></tr>
+        </table>
+      </div>
+
+    </div><!-- /padding wrapper -->
+  </div><!-- /tab-amdirt -->
+
 </div><!-- /content -->
 
 <div class="footer">
@@ -1582,8 +2031,151 @@ const PROPS = [
     legal: 3500, survey: 1200, refurb: 15000,
     growth: 3.5, hold: 10, tax: 25,
     price_est: false, rent_est: true, units: 3
+  },
+  {
+    id: 'p11', badge: '11', ref: false,
+    name: 'Cheshire Street, Bethnal Green E2',
+    sub: '1 \u00d7 2-bed apartment \u00b7 Shoreditch / Brick Lane area \u00b7 Zone 1/2 border',
+    agent_name: 'Kinleigh Folkard & Hayward (KFH)',
+    note: 'Single 2-bed apartment in E2 (Cheshire St runs off Brick Lane). Listed by KFH (ref 6138). Unlike portfolio peers this is a single-unit leasehold, not a freehold flat block \u2014 different risk/return shape (lower cash yield, lower entry, simpler management). Walking to Bethnal Green (Central), Shoreditch High St (Overground), Whitechapel/Liverpool St (Elizabeth line). Price &amp; rent est. \u2014 confirm with agent.',
+    url: 'https://www.kfh.co.uk/property-for-sale/2-bedroom-apartment-for-sale-in-cheshire-street-clerkenwell-london-e2-6138/',
+    url_label: 'KFH',
+    price: 700000, dep: 25, rate: 5.5, term: 25,
+    rent: 2500, void_: 1,
+    agent: 10, maint: 1.5, ins: 600, gr: 250, sc: 2400,
+    legal: 2500, survey: 800, refurb: 5000,
+    growth: 3.5, hold: 10, tax: 25,
+    price_est: true, rent_est: true, units: 1
   }
 ];
+
+// =====================================================================
+// ANALYTICS HELPERS — break-even, DSCR, sensitivity, year-by-year schedule
+// =====================================================================
+
+// DSCR (Debt Service Coverage Ratio) = NOI / annual debt service
+// UK BTL lenders typically require ICR ≥ 125% (basic rate) or 145% (higher rate)
+function dscrFor(rate, price, dep, rent, void_, agent, maint, ins, gr, sc, term) {
+  const loan = price * (1 - dep/100);
+  const grossRent = rent * (12 - void_);
+  const opex = grossRent*(agent/100) + price*(maint/100) + ins + gr + sc;
+  const noi = grossRent - opex;
+  const debtService = mortgage(loan, rate, term) * 12;
+  return debtService > 0 ? (noi / debtService) * 100 : 0;
+}
+
+// Year-1 cashflow at a given rate (used by break-even solver)
+function cashflowAtRate(testRate, p) {
+  const r = computeBTL(p.price, p.dep, testRate, p.term, p.rent, p.void_, p.agent,
+                       p.maint, p.ins, p.gr, p.sc, p.legal, p.survey, p.refurb,
+                       p.growth, p.hold, p.tax);
+  return r.cashflow;
+}
+
+// Bisection solver: find the mortgage rate at which year-1 cashflow = £0
+function breakEvenRate(p) {
+  let lo = 0.5, hi = 25.0;
+  if (cashflowAtRate(lo, p) <= 0) return null;     // already negative at floor
+  if (cashflowAtRate(hi, p) >= 0) return null;     // never breaks even
+  for (let i = 0; i < 40; i++) {
+    const mid = (lo + hi) / 2;
+    if (cashflowAtRate(mid, p) >= 0) lo = mid; else hi = mid;
+    if (hi - lo < 0.005) break;
+  }
+  return (lo + hi) / 2;
+}
+
+// Max void months tolerable before year-1 cashflow turns negative
+function maxVoidMonths(p) {
+  for (let v = 0; v <= 12; v += 0.25) {
+    const r = computeBTL(p.price, p.dep, p.rate, p.term, p.rent, v, p.agent,
+                         p.maint, p.ins, p.gr, p.sc, p.legal, p.survey, p.refurb,
+                         p.growth, p.hold, p.tax);
+    if (r.cashflow < 0) return v;
+  }
+  return 12;
+}
+
+// Wrap computeBTL with scenario modifiers (used for bear/base/bull)
+function scenarioBTL(p, deltas) {
+  // deltas: { rate: +, growth: -, void_: +, rent_pct: + (% change to rent) }
+  const d = deltas || {};
+  const rate    = p.rate    + (d.rate    || 0);
+  const growth  = p.growth  + (d.growth  || 0);
+  const void_   = Math.max(0, p.void_ + (d.void_ || 0));
+  const rent    = p.rent * (1 + ((d.rent_pct || 0) / 100));
+  return computeBTL(p.price, p.dep, rate, p.term, rent, void_, p.agent,
+                    p.maint, p.ins, p.gr, p.sc, p.legal, p.survey, p.refurb,
+                    growth, p.hold, p.tax);
+}
+
+// Personal-name comparison: same property held in personal name (higher-rate UK taxpayer)
+// — Section 24: mortgage interest no longer deductible from rental income, replaced by 20% basic-rate tax credit
+// — Personal income tax at 40% on rental profit (assumes higher-rate band)
+function personalNameBTL(p) {
+  const baseR = computeBTL(p.price, p.dep, p.rate, p.term, p.rent, p.void_, p.agent,
+                           p.maint, p.ins, p.gr, p.sc, p.legal, p.survey, p.refurb,
+                           p.growth, p.hold, p.tax);
+  // Personal: profit = grossRent - opex (no interest deduction); tax @ 40% on that; then 20% credit on interest
+  const taxableProfit = baseR.grossRent - baseR.opex;
+  const personalTax   = Math.max(0, taxableProfit * 0.40 - baseR.annInt * 0.20);
+  const personalNet   = taxableProfit - personalTax - baseR.annInt - (baseR.annMtg - baseR.annInt);
+  return { ltdNet: baseR.cashflow, personalNet, ltdTax: baseR.taxAmt, personalTax };
+}
+
+// Year-by-year cashflow schedule with rent escalation, amortizing interest, growing property value
+function buildSchedule(p, rentEscPct, optionalRefiYear, optionalRefiLTV) {
+  const rentEsc = (rentEscPct || 3) / 100;          // default 3% p.a. rent escalation
+  const r0 = computeBTL(p.price, p.dep, p.rate, p.term, p.rent, p.void_, p.agent,
+                        p.maint, p.ins, p.gr, p.sc, p.legal, p.survey, p.refurb,
+                        p.growth, p.hold, p.tax);
+  const out = [];
+  let loan = r0.loan;
+  let value = p.price;
+  const purchaseYear = 2026;
+
+  for (let y = 1; y <= p.hold; y++) {
+    // Property value growth (use forecast if available, else user input)
+    const yr = purchaseYear + y - 1;
+    const g = (typeof LONDON_PRICE_DATA !== 'undefined' && LONDON_PRICE_DATA[yr])
+              ? LONDON_PRICE_DATA[yr].pct : p.growth;
+    value *= (1 + g/100);
+
+    // Compute interest for this year (avg of start & end balance × rate is a clean approximation)
+    const balStart = amortBalance(r0.loan, p.rate, p.term, (y-1)*12);
+    const balEnd   = amortBalance(r0.loan, p.rate, p.term, y*12);
+    const avgBal   = (balStart + balEnd) / 2;
+    const intYr    = avgBal * (p.rate / 100);
+    const principalYr = balStart - balEnd;
+
+    // Rent escalates each year
+    const rentYr = (p.rent * Math.pow(1 + rentEsc, y - 1)) * (12 - p.void_);
+    const opex   = rentYr*(p.agent/100) + p.price*(p.maint/100) + p.ins + p.gr + p.sc;
+    const ebitda = rentYr - opex;
+    const ebt    = ebitda - intYr;
+    const tax    = Math.max(0, ebt * (p.tax/100));
+    const netProfit = ebt - tax;
+    const cashflow  = netProfit - principalYr;
+    const ltv       = (balEnd / value) * 100;
+
+    out.push({
+      year: y, calendarYear: yr, rent: rentYr, opex, interest: intYr, principal: principalYr,
+      tax, cashflow, balance: balEnd, value, ltv,
+      equity: value - balEnd
+    });
+
+    loan = balEnd;
+
+    // Optional refi at chosen year
+    if (optionalRefiYear && y === optionalRefiYear && optionalRefiLTV) {
+      // Releases cash up to new LTV
+      const newLoan = value * (optionalRefiLTV/100);
+      // (Display only — we don't compound the refi forward in this version, just flag it)
+      out[out.length-1].refi = { released: newLoan - balEnd, newLoan, newLTV: optionalRefiLTV };
+    }
+  }
+  return out;
+}
 
 const PROP_COLORS = ['#c9a84c','#4caf82','#5b9bd5','#e05c5c','#b07cd8','#e8a960','#5ccfcf','#d4785c','#7cc95b','#c95ba8'];
 
@@ -1809,6 +2401,16 @@ function buildPropPanel(p) {
     </div><!-- /inputs -->
 
     <div class="results">
+      <!-- Sub-tab strip: Snapshot / Schedule / Sensitivity / Stress -->
+      <div class="pview-tabs">
+        <button class="pview active" onclick="showPropView('${pid}','snap',this)">Snapshot</button>
+        <button class="pview" onclick="showPropView('${pid}','sched',this)">Year-by-Year</button>
+        <button class="pview" onclick="showPropView('${pid}','sens',this)">Sensitivity</button>
+        <button class="pview" onclick="showPropView('${pid}','stress',this)">Stress &amp; Risk</button>
+      </div>
+
+      <!-- =============== SNAPSHOT VIEW (default) =============== -->
+      <div id="${pid}-view-snap">
       <div class="section-title" style="margin-top:0">Key Metrics</div>
       <div class="metrics">
         <div class="metric-card"><div class="metric-label">Gross Yield</div><div class="metric-value" id="${pid}-m-gy">&mdash;</div><div class="metric-sub">rent &div; price &mdash; unlevered</div></div>
@@ -1885,6 +2487,70 @@ function buildPropPanel(p) {
           </table>
         </div>
       </div>
+      </div><!-- /view-snap -->
+
+      <!-- =============== YEAR-BY-YEAR SCHEDULE VIEW =============== -->
+      <div id="${pid}-view-sched" class="hidden">
+        <div class="section-title" style="margin-top:0">Year-by-Year Cashflow Schedule</div>
+        <div style="display:flex;gap:16px;align-items:center;margin-bottom:12px;flex-wrap:wrap;">
+          <div class="field" style="margin:0;min-width:180px;"><label>Rent Escalation (p.a.)</label>
+            <div class="field-row"><span class="field-prefix">%</span>
+              <input type="number" id="${pid}-rentesc" value="3.0" step="0.5" oninput="calcProp('${pid}')"></div></div>
+          <div class="field" style="margin:0;min-width:180px;"><label>Refi Year (0 = none)</label>
+            <div class="field-row"><input type="number" id="${pid}-refiyr" value="0" step="1" min="0" max="${p.hold}" oninput="calcProp('${pid}')"></div></div>
+          <div class="field" style="margin:0;min-width:180px;"><label>Refi LTV</label>
+            <div class="field-row"><span class="field-prefix">%</span>
+              <input type="number" id="${pid}-refiltv" value="65" step="5" oninput="calcProp('${pid}')"></div></div>
+        </div>
+        <div style="overflow-x:auto;">
+          <table class="sched-tbl" id="${pid}-sched-tbl"><!-- populated --></table>
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-top:10px;line-height:1.5">
+          Rent escalates each year at the chosen rate. Mortgage interest declines as principal amortises (real schedule, not flat year-1). Property value follows London HPI forecast where available, then your <em>Market Growth</em> input. If a Refi year is set, the row is highlighted &mdash; "Released" = cash freed by refinancing to the new LTV at that year's value (display only; not compounded forward).
+        </div>
+      </div><!-- /view-sched -->
+
+      <!-- =============== SENSITIVITY VIEW =============== -->
+      <div id="${pid}-view-sens" class="hidden">
+        <div class="section-title" style="margin-top:0">Bear / Base / Bull Scenarios</div>
+        <div style="overflow-x:auto;">
+          <table class="sens-tbl" id="${pid}-sens-tbl"><!-- populated --></table>
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-top:10px;line-height:1.6">
+          <strong style="color:var(--text-dim)">Bear:</strong> rate +2%, growth &minus;1.5%, void +2 mo, rent &minus;10% &nbsp;&middot;&nbsp;
+          <strong style="color:var(--text-dim)">Base:</strong> current inputs &nbsp;&middot;&nbsp;
+          <strong style="color:var(--text-dim)">Bull:</strong> rate &minus;0.5%, growth +1%, void &minus;0.5 mo, rent +5%
+        </div>
+
+        <div class="section-title" style="margin-top:18px">Tax Structure: Ltd Co (current) vs Personal Name</div>
+        <table class="sens-tbl" id="${pid}-struct-tbl"><!-- populated --></table>
+        <div style="font-size:11px;color:var(--muted);margin-top:10px;line-height:1.6">
+          <strong>Personal name modelling:</strong> Section 24 (FA 2017) restricts mortgage-interest deduction to a 20% basic-rate tax credit. Assumes higher-rate taxpayer (40% MTR) on rental profit. Ltd Co stays at 25% Corp Tax, full interest deductible. Validates the structuring choice for higher-rate UK earners or non-residents extracting via dividends.
+        </div>
+      </div><!-- /view-sens -->
+
+      <!-- =============== STRESS & RISK VIEW =============== -->
+      <div id="${pid}-view-stress" class="hidden">
+        <div class="section-title" style="margin-top:0">Break-Even &amp; Resilience</div>
+        <div class="metrics" style="grid-template-columns:repeat(3,1fr);">
+          <div class="metric-card highlight"><div class="metric-label">Break-Even Rate</div><div class="metric-value" id="${pid}-st-be">&mdash;</div><div class="metric-sub">rate at which year-1 cashflow = 0</div></div>
+          <div class="metric-card highlight"><div class="metric-label">Max Void Tolerable</div><div class="metric-value" id="${pid}-st-void">&mdash;</div><div class="metric-sub">months before cashflow turns negative</div></div>
+          <div class="metric-card highlight"><div class="metric-label">Rate Headroom</div><div class="metric-value" id="${pid}-st-headroom">&mdash;</div><div class="metric-sub">break-even rate &minus; current rate</div></div>
+        </div>
+
+        <div class="section-title">Debt Service Coverage Ratio (DSCR / ICR)</div>
+        <table class="stress-tbl" id="${pid}-dscr-tbl"><!-- populated --></table>
+        <div style="font-size:11px;color:var(--muted);margin-top:10px;line-height:1.6">
+          UK BTL lender benchmarks: <span style="color:var(--green)">&ge;145%</span> typically required for higher-rate taxpayers / Ltd Co; <span style="color:var(--accent)">125&ndash;145%</span> for basic-rate. Lenders also stress-test at +2% over current rate. DSCR below the threshold means a lender is unlikely to finance at the requested LTV.
+        </div>
+
+        <div class="section-title">Payment Shock Analysis</div>
+        <table class="stress-tbl" id="${pid}-shock-tbl"><!-- populated --></table>
+        <div style="font-size:11px;color:var(--muted);margin-top:10px;line-height:1.5">
+          Shows annual cashflow impact of rate moves &mdash; useful for thinking about fix-end refix risk. Most BTL fixes are 2 or 5 years; at expiry the loan reverts to whatever rate environment exists.
+        </div>
+      </div><!-- /view-stress -->
+
     </div><!-- /results -->
   </div><!-- /panel -->
 </div>`;
@@ -1961,19 +2627,172 @@ function calcProp(pid) {
 
   set(`${pid}-x-nrls`,  gbp(r.nrlsWithholding) + '/yr');
   set(`${pid}-x-ated`,  r.atedAnnual > 0 ? gbp(r.atedAnnual) + '/yr' : 'N/A (< \u00a3500k)');
+
+  // Populate the three deeper views
+  populateScheduleView(pid);
+  populateSensitivityView(pid);
+  populateStressView(pid);
+}
+
+// =====================================================================
+// VIEW POPULATORS — Schedule, Sensitivity, Stress
+// =====================================================================
+function getPropFromInputs(pid) {
+  return {
+    id: pid, price: gv(`${pid}-price`), dep: gv(`${pid}-dep`),
+    rate: gv(`${pid}-rate`), term: gv(`${pid}-term`),
+    rent: gv(`${pid}-rent`), void_: gv(`${pid}-void`),
+    agent: gv(`${pid}-agent`), maint: gv(`${pid}-maint`),
+    ins: gv(`${pid}-ins`), gr: gv(`${pid}-gr`), sc: gv(`${pid}-sc`),
+    legal: gv(`${pid}-legal`), survey: gv(`${pid}-survey`), refurb: gv(`${pid}-refurb`),
+    growth: gv(`${pid}-growth`), hold: gv(`${pid}-hold`), tax: gv(`${pid}-tax`)
+  };
+}
+
+function populateScheduleView(pid) {
+  const p = getPropFromInputs(pid);
+  const rentEsc = gv(`${pid}-rentesc`) || 3;
+  const refiYr  = gv(`${pid}-refiyr`)  || 0;
+  const refiLTV = gv(`${pid}-refiltv`) || 65;
+  const sched = buildSchedule(p, rentEsc, refiYr, refiLTV);
+
+  let h = `<thead><tr>
+    <th>Year</th><th>Cal.</th><th>Rent</th><th>Opex</th><th>Interest</th>
+    <th>Principal</th><th>Tax</th><th>Cashflow</th>
+    <th>Mortgage Bal</th><th>Property Val</th><th>LTV</th><th>Equity</th>
+  </tr></thead><tbody>`;
+  sched.forEach(s => {
+    const refiCls = s.refi ? ' class="refi-row"' : '';
+    h += `<tr${refiCls}>
+      <td>${s.year}</td>
+      <td>${s.calendarYear}</td>
+      <td>${gbp(s.rent)}</td>
+      <td>(${gbp(s.opex)})</td>
+      <td>(${gbp(s.interest)})</td>
+      <td>${gbp(s.principal)}</td>
+      <td>(${gbp(s.tax)})</td>
+      <td>${gbp(s.cashflow)}</td>
+      <td>${gbp(s.balance)}</td>
+      <td>${gbp(s.value)}</td>
+      <td>${s.ltv.toFixed(1)}%</td>
+      <td>${gbp(s.equity)}</td>
+    </tr>`;
+    if (s.refi) {
+      h += `<tr class="refi-row"><td colspan="6" style="text-align:left;">&nbsp;&nbsp;&rarr; Refi at year ${s.year} to ${s.refi.newLTV}% LTV</td>
+        <td colspan="3">Released: ${gbp(s.refi.released)}</td>
+        <td colspan="3">New loan: ${gbp(s.refi.newLoan)}</td></tr>`;
+    }
+  });
+  h += '</tbody>';
+  const tbl = el(`${pid}-sched-tbl`);
+  if (tbl) tbl.innerHTML = h;
+}
+
+function populateSensitivityView(pid) {
+  const p = getPropFromInputs(pid);
+  const bear = scenarioBTL(p, { rate: +2.0, growth: -1.5, void_: +2.0, rent_pct: -10 });
+  const base = scenarioBTL(p, {});
+  const bull = scenarioBTL(p, { rate: -0.5, growth: +1.0, void_: -0.5, rent_pct: +5 });
+
+  const rows = [
+    ['Year-1 Net Cashflow',  gbp(bear.cashflow),    gbp(base.cashflow),    gbp(bull.cashflow)],
+    ['Cash-on-Cash',         pct(bear.coc),         pct(base.coc),         pct(bull.coc)],
+    ['Capital Gain (gross)', gbp(bear.capGain),     gbp(base.capGain),     gbp(bull.capGain)],
+    ['Principal Paydown',    gbp(bear.principalPaidDown), gbp(base.principalPaidDown), gbp(bull.principalPaidDown)],
+    ['Total Return (post-tax)', gbp(bear.totalReturn), gbp(base.totalReturn), gbp(bull.totalReturn)],
+    ['Equity Multiple',      bear.equityMultiple.toFixed(2)+'\u00d7', base.equityMultiple.toFixed(2)+'\u00d7', bull.equityMultiple.toFixed(2)+'\u00d7'],
+    ['IRR',                  pct(bear.irr),         pct(base.irr),         pct(bull.irr)]
+  ];
+
+  let h = `<thead><tr><th>Metric</th><th class="bear">Bear</th><th>Base</th><th class="bull">Bull</th></tr></thead><tbody>`;
+  rows.forEach(r => {
+    h += `<tr><td>${r[0]}</td>
+      <td class="bear">${r[1]}</td>
+      <td><strong>${r[2]}</strong></td>
+      <td class="bull">${r[3]}</td></tr>`;
+  });
+  h += '</tbody>';
+  const tbl = el(`${pid}-sens-tbl`);
+  if (tbl) tbl.innerHTML = h;
+
+  // Tax structure comparison
+  const struct = personalNameBTL(p);
+  const ltdAdv = struct.ltdNet - struct.personalNet;
+  let sh = `<thead><tr><th>Metric</th><th>Ltd Co (current)</th><th>Personal Name (40% MTR)</th><th>Ltd Co Advantage</th></tr></thead><tbody>`;
+  sh += `<tr><td>Year-1 Tax Charge</td><td>${gbp(struct.ltdTax)}</td><td>${gbp(struct.personalTax)}</td><td class="${struct.personalTax > struct.ltdTax ? 'bull' : 'bear'}">${gbp(struct.personalTax - struct.ltdTax)}</td></tr>`;
+  sh += `<tr><td>Year-1 Net Cashflow</td><td><strong>${gbp(struct.ltdNet)}</strong></td><td>${gbp(struct.personalNet)}</td><td class="${ltdAdv > 0 ? 'bull' : 'bear'}">${gbp(ltdAdv)}/yr</td></tr>`;
+  sh += '</tbody>';
+  const stbl = el(`${pid}-struct-tbl`);
+  if (stbl) stbl.innerHTML = sh;
+}
+
+function populateStressView(pid) {
+  const p = getPropFromInputs(pid);
+  const be = breakEvenRate(p);
+  const beCls = be == null ? 'stress-good' : (be - p.rate < 1.5 ? 'stress-bad' : (be - p.rate < 3 ? 'stress-warn' : 'stress-good'));
+  set(`${pid}-st-be`, be == null ? 'n/a' : be.toFixed(2)+'%');
+  el(`${pid}-st-be`).className = 'metric-value ' + beCls;
+
+  const mv = maxVoidMonths(p);
+  const mvCls = mv >= 6 ? 'stress-good' : (mv >= 3 ? 'stress-warn' : 'stress-bad');
+  set(`${pid}-st-void`, mv >= 12 ? '12+ mo' : mv.toFixed(1)+' mo');
+  el(`${pid}-st-void`).className = 'metric-value ' + mvCls;
+
+  const headroom = be == null ? null : be - p.rate;
+  const hrCls = headroom == null ? 'stress-good' : (headroom < 1 ? 'stress-bad' : (headroom < 2 ? 'stress-warn' : 'stress-good'));
+  set(`${pid}-st-headroom`, headroom == null ? 'n/a' : '+'+headroom.toFixed(2)+'%');
+  el(`${pid}-st-headroom`).className = 'metric-value ' + hrCls;
+
+  // DSCR table — at current rate, +2% stress, +4% stress
+  const dscrNow    = dscrFor(p.rate, p.price, p.dep, p.rent, p.void_, p.agent, p.maint, p.ins, p.gr, p.sc, p.term);
+  const dscrPlus2  = dscrFor(p.rate + 2, p.price, p.dep, p.rent, p.void_, p.agent, p.maint, p.ins, p.gr, p.sc, p.term);
+  const dscrPlus4  = dscrFor(p.rate + 4, p.price, p.dep, p.rent, p.void_, p.agent, p.maint, p.ins, p.gr, p.sc, p.term);
+  const dCls = (d) => d >= 145 ? 'stress-good' : (d >= 125 ? 'stress-warn' : 'stress-bad');
+
+  let dh = `<thead><tr><th>Scenario</th><th>Mortgage Rate</th><th>DSCR / ICR</th><th>Lender Verdict</th></tr></thead><tbody>`;
+  dh += `<tr><td>Current</td><td>${p.rate.toFixed(2)}%</td><td class="${dCls(dscrNow)}">${dscrNow.toFixed(0)}%</td><td class="${dCls(dscrNow)}">${dscrNow >= 145 ? 'Higher-rate OK' : dscrNow >= 125 ? 'Basic-rate OK' : 'Below threshold'}</td></tr>`;
+  dh += `<tr><td>Stress +2%</td><td>${(p.rate+2).toFixed(2)}%</td><td class="${dCls(dscrPlus2)}">${dscrPlus2.toFixed(0)}%</td><td class="${dCls(dscrPlus2)}">${dscrPlus2 >= 145 ? 'Higher-rate OK' : dscrPlus2 >= 125 ? 'Basic-rate OK' : 'Below threshold'}</td></tr>`;
+  dh += `<tr><td>Stress +4%</td><td>${(p.rate+4).toFixed(2)}%</td><td class="${dCls(dscrPlus4)}">${dscrPlus4.toFixed(0)}%</td><td class="${dCls(dscrPlus4)}">${dscrPlus4 >= 145 ? 'Higher-rate OK' : dscrPlus4 >= 125 ? 'Basic-rate OK' : 'Below threshold'}</td></tr>`;
+  dh += '</tbody>';
+  const dtbl = el(`${pid}-dscr-tbl`);
+  if (dtbl) dtbl.innerHTML = dh;
+
+  // Payment shock — annual cashflow impact at various rates
+  const r0 = computeBTL(p.price, p.dep, p.rate, p.term, p.rent, p.void_, p.agent,
+                        p.maint, p.ins, p.gr, p.sc, p.legal, p.survey, p.refurb,
+                        p.growth, p.hold, p.tax);
+  let sh = `<thead><tr><th>Rate Scenario</th><th>Mortgage Rate</th><th>Year-1 Cashflow</th><th>&Delta; vs Current</th></tr></thead><tbody>`;
+  [-1.0, 0, 1.0, 2.0, 3.0, 4.0].forEach(d => {
+    const rNew = p.rate + d;
+    if (rNew < 0.5) return;
+    const sc = computeBTL(p.price, p.dep, rNew, p.term, p.rent, p.void_, p.agent,
+                          p.maint, p.ins, p.gr, p.sc, p.legal, p.survey, p.refurb,
+                          p.growth, p.hold, p.tax);
+    const delta = sc.cashflow - r0.cashflow;
+    const cls = delta < 0 ? 'bear' : (delta > 0 ? 'bull' : '');
+    const label = d === 0 ? 'Current' : (d > 0 ? `+${d.toFixed(1)}%` : `${d.toFixed(1)}%`);
+    sh += `<tr><td>${label}</td><td>${rNew.toFixed(2)}%</td><td>${gbp(sc.cashflow)}</td><td class="${cls}">${delta >= 0 ? '+' : ''}${gbp(delta)}</td></tr>`;
+  });
+  sh += '</tbody>';
+  const stbl = el(`${pid}-shock-tbl`);
+  if (stbl) stbl.innerHTML = sh;
 }
 
 // =====================================================================
 // COMPARISON TABLE
 // =====================================================================
 function buildCompareTable() {
-  const R = PROPS.map(p =>
-    ({ ...p, ...computeBTL(p.price, p.dep, p.rate, p.term, p.rent, p.void_, p.agent, p.maint, p.ins, p.gr, p.sc, p.legal, p.survey, p.refurb, p.growth, p.hold, p.tax) })
-  );
+  const R = PROPS.map(p => {
+    const computed = computeBTL(p.price, p.dep, p.rate, p.term, p.rent, p.void_, p.agent, p.maint, p.ins, p.gr, p.sc, p.legal, p.survey, p.refurb, p.growth, p.hold, p.tax);
+    const dscr = dscrFor(p.rate, p.price, p.dep, p.rent, p.void_, p.agent, p.maint, p.ins, p.gr, p.sc, p.term);
+    const be   = breakEvenRate(p);
+    return { ...p, ...computed, dscr, breakEven: (be == null ? 99 : be) };
+  });
 
   const best = key => Math.max(...R.map(r => r[key]));
   const worst = key => Math.min(...R.map(r => r[key]));
   const cls = (val, key) => val === best(key) ? 'c-best' : val === worst(key) ? 'c-worst' : '';
+  const dscrCls = d => d >= 145 ? 'c-best' : (d >= 125 ? '' : 'c-worst');
 
   let h = `<thead><tr>
     <th style="text-align:left;min-width:170px">Property</th>
@@ -1986,6 +2805,8 @@ function buildCompareTable() {
     <th title="Cashflow + Gain + Paydown, post-tax">Total Return</th>
     <th title="(cash-in + total return) &div; cash-in">Equity Mult.</th>
     <th>IRR</th>
+    <th title="Debt Service Coverage Ratio at year 1 — lender threshold 145% higher-rate / 125% basic-rate">DSCR</th>
+    <th title="Mortgage rate at which year-1 cashflow = 0">Break-Even Rate</th>
   </tr></thead><tbody>`;
 
   R.forEach(r => {
@@ -2007,6 +2828,8 @@ function buildCompareTable() {
       <td class="${cls(r.totalReturn,'totalReturn')}">${gbp(r.totalReturn)}</td>
       <td class="${cls(r.equityMultiple,'equityMultiple')}">${r.equityMultiple.toFixed(2)}\u00d7</td>
       <td class="${cls(r.irr,'irr')}">${pct(r.irr)}</td>
+      <td class="${dscrCls(r.dscr)}">${r.dscr.toFixed(0)}%</td>
+      <td class="${cls(r.breakEven,'breakEven')}">${r.breakEven >= 99 ? '\u2014' : r.breakEven.toFixed(2)+'%'}</td>
     </tr>`;
   });
 
@@ -2023,23 +2846,65 @@ function showProp(pid, btn) {
     const panel = el('panel-'+p.id);
     if (panel) panel.classList.toggle('hidden', p.id !== pid);
   });
-  const mkt = el('panel-mkt');
-  if (mkt) mkt.classList.toggle('hidden', pid !== 'mkt');
   // BTL sub-nav only — don't clobber active states on other tabs' sub-navs
   const subnav = el('btl-subnav');
   if (subnav) subnav.querySelectorAll('.pnav').forEach(b => b.classList.remove('active'));
   if (btn) btn.classList.add('active');
-  // Redraw charts when entering Market & Tax sub-view
-  if (pid === 'mkt') { try { drawPriceChart(); drawBarChart(); } catch(e){} }
+}
+
+// Per-property view switcher (Snapshot / Schedule / Sensitivity / Stress)
+function showPropView(pid, view, btn) {
+  ['snap','sched','sens','stress'].forEach(v => {
+    const n = el(`${pid}-view-${v}`);
+    if (n) n.classList.toggle('hidden', v !== view);
+  });
+  const panel = el('panel-'+pid);
+  if (panel) panel.querySelectorAll('.pview').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+}
+
+// =====================================================================
+// BTL second-level subtabs: Real Estate vs Market Projections & Tax
+// =====================================================================
+function showBtlSection(section, btn) {
+  // Toggle the two btl-subtab buttons
+  document.querySelectorAll('#btl-subtabs .btl-subtab').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+
+  const subnav  = el('btl-subnav');     // property selector chips
+  const compare = el('panel-compare');
+  const mkt     = el('panel-mkt');
+
+  if (section === 'mkt') {
+    // Market Projections & Tax view — hide all property panels and the property selector
+    if (subnav) subnav.classList.add('hidden');
+    if (compare) compare.classList.add('hidden');
+    PROPS.forEach(p => {
+      const panel = el('panel-'+p.id);
+      if (panel) panel.classList.add('hidden');
+    });
+    if (mkt) mkt.classList.remove('hidden');
+    try { drawPriceChart(); drawBarChart(); } catch(e){}
+  } else {
+    // Real Estate view — show selector, hide market panel, default to Compare All
+    if (subnav) subnav.classList.remove('hidden');
+    if (mkt) mkt.classList.add('hidden');
+    // Restore Compare All as the active property view
+    const firstChip = subnav ? subnav.querySelector('.pnav') : null;
+    if (firstChip) showProp('compare', firstChip);
+  }
 }
 
 function switchTab(id, btn) {
-  ['btl','rvb','lend','cadirt','crdirt'].forEach(t => {
+  ['btl','rvb','lend','cadirt','crdirt','amdirt'].forEach(t => {
     const node = el('tab-'+t);
     if (node) node.classList.toggle('hidden', t !== id);
   });
   document.querySelectorAll('.tabs > .tab').forEach(b => b.classList.remove('active'));
   if (btn) btn.classList.add('active');
+  // BTL second-level navs (subtabs + property chips) only when BTL is active
+  const subtabs = el('btl-subtabs');
+  if (subtabs) subtabs.classList.toggle('hidden', id !== 'btl');
   const sn = el('btl-subnav');
   if (sn) sn.classList.toggle('hidden', id !== 'btl');
   // Trigger lending calc when switching to lending tab
@@ -2059,6 +2924,14 @@ function showCrDirt(id, btn) {
     const n = el('crdirt-'+s); if (n) n.classList.toggle('hidden', s !== id);
   });
   const sub = el('crdirt-subnav');
+  if (sub) sub.querySelectorAll('.pnav').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+}
+function showAmDirt(id, btn) {
+  ['overview','tennessee','voices','risks','sources'].forEach(s => {
+    const n = el('amdirt-'+s); if (n) n.classList.toggle('hidden', s !== id);
+  });
+  const sub = el('amdirt-subnav');
   if (sub) sub.querySelectorAll('.pnav').forEach(b => b.classList.remove('active'));
   if (btn) btn.classList.add('active');
 }
@@ -2706,6 +3579,8 @@ function exportModel() {
 document.addEventListener('DOMContentLoaded', () => {
   // Inject property panels
   el('prop-panels').innerHTML = PROPS.map(p => buildPropPanel(p)).join('');
+  // Restore any saved input edits BEFORE first calc
+  restoreInputs();
   // Build comparison table
   el('compare-tbl').innerHTML = buildCompareTable();
   // Calc all property panels
@@ -2720,7 +3595,46 @@ document.addEventListener('DOMContentLoaded', () => {
   buildHistoryTable();
   // Apply persisted theme
   initTheme();
+  // Wire up auto-save on every input change (delegated)
+  document.addEventListener('input', (e) => {
+    if (e.target && e.target.matches('input[type=number], input[type=text]')) {
+      saveInputs();
+    }
+  });
 });
+
+// =====================================================================
+// INPUT PERSISTENCE — localStorage save/restore
+// =====================================================================
+const LS_KEY = 'lpfm-inputs-v1';
+
+function saveInputs() {
+  try {
+    const snap = {};
+    document.querySelectorAll('input[type=number], input[type=text]').forEach(inp => {
+      if (inp.id) snap[inp.id] = inp.value;
+    });
+    localStorage.setItem(LS_KEY, JSON.stringify(snap));
+  } catch (e) { /* localStorage unavailable */ }
+}
+
+function restoreInputs() {
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (!raw) return;
+    const snap = JSON.parse(raw);
+    Object.keys(snap).forEach(id => {
+      const inp = document.getElementById(id);
+      if (inp) inp.value = snap[id];
+    });
+  } catch (e) { /* corrupt or unavailable — ignore */ }
+}
+
+function resetInputs() {
+  if (!confirm('Reset all inputs to defaults? This will discard your edits.')) return;
+  try { localStorage.removeItem(LS_KEY); } catch(e) {}
+  location.reload();
+}
 
 // =====================================================================
 // THEME — Light / Dark toggle
