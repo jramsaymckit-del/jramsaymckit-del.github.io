@@ -1,0 +1,7 @@
+# generated outputs and caches; copy a finished report into reports/ deliberately if you want it published
+avgweek_out/
+reports/
+__pycache__/
+.cache/
+iv_log.csv
+*.pyc
