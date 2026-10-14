@@ -67,6 +67,8 @@ ASTS  $52.10 on 2026-10-09   IV 105% (screener), 1.14x realized   283 weeks sinc
 
 Run it with no arguments for a prompt (`ASTS=105`, `RKLB 80`, `q`). `--why` adds one line per row with the sample size, standard errors, win rates and credits. `--asof 2025-10-10` shows what it would have said a year ago. Index ETFs are refused as candidates.
 
+Every run also writes a page: `decide.html` with one card per ticker (the verdict, the strikes, and the two sides' expectancies as bars against the hurdle tick; "numbers behind this card" unfolds the full text), or `decide_test.html` for `--test`. It follows your system's light or dark theme, needs no network, and in prompt mode grows as you type, so open it once and refresh. `--html path` renames it, `--no-html` skips it.
+
 The determinant, the same for all three rows:
 
 1. The stock's own weekly closes. For horizon h (1 week, 4 weeks) every past h-week return in the trailing window (3 years; all data for the year row) is rescaled from the realized vol at its own start to today's realized vol (filtered historical simulation), so the shape of the past (rips, grinds, gaps) is measured in today's units.

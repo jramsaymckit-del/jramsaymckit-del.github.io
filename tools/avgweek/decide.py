@@ -28,6 +28,7 @@ IV = m x realized throughout (--m, or --m-grid for 1.0 / 1.15 / 1.3).
 from __future__ import annotations
 
 import argparse
+import html as _html
 import math
 import sys
 from dataclasses import replace
@@ -273,6 +274,171 @@ def test_report(pooled: dict[str, list[dict]], names: int, m: float, hurdle_pts:
     return "\n".join(L)
 
 
+# ----------------------------------------------------------------------------------------------------- the page
+PAGE_CSS = """
+:root{color-scheme:light;--plane:#f9f9f7;--surface:#fcfcfb;--ink:#0b0b0b;--ink2:#52514e;--muted:#898781;--grid:#e1e0d9;--base:#c3c2b7;
+--ring:rgba(11,11,11,.10);--pcs:#2a78d6;--ccs:#eb6834;--good:#006300;--bad:#d03b3b}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){color-scheme:dark;--plane:#0d0d0d;--surface:#1a1a19;--ink:#f0efec;--ink2:#c3c2b7;
+--muted:#898781;--grid:#2c2c2a;--base:#383835;--ring:rgba(255,255,255,.10);--pcs:#3987e5;--ccs:#d95926;--good:#0ca30c;--bad:#d03b3b}}
+:root[data-theme="dark"]{color-scheme:dark;--plane:#0d0d0d;--surface:#1a1a19;--ink:#f0efec;--ink2:#c3c2b7;--muted:#898781;--grid:#2c2c2a;--base:#383835;
+--ring:rgba(255,255,255,.10);--pcs:#3987e5;--ccs:#d95926;--good:#0ca30c;--bad:#d03b3b}
+*{box-sizing:border-box}
+body{margin:0;background:var(--plane);color:var(--ink);font:15px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif;padding:28px 16px 48px}
+.wrap{max-width:1100px;margin:0 auto}
+header{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 18px;margin:0 0 18px}
+header h1{font-size:15px;font-weight:600;margin:0;letter-spacing:.04em;text-transform:uppercase}
+header .meta{color:var(--ink2);font-size:13px}
+.legend{display:flex;gap:16px;color:var(--ink2);font-size:13px;margin-left:auto}
+.legend i{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:-1px;margin-right:6px}
+.card{background:var(--surface);border:1px solid var(--ring);border-radius:12px;padding:18px 20px 10px;margin:0 0 14px}
+.head{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 14px;margin:0 0 8px}
+.head .t{font-size:24px;font-weight:600}
+.head .p{font-size:17px}
+.head .meta{color:var(--ink2);font-size:13px}
+.row{display:grid;grid-template-columns:60px 124px minmax(150px,1fr) 330px;gap:6px 18px;align-items:center;padding:10px 0;border-top:1px solid var(--grid)}
+.row .h{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.08em}
+.row .v{font-size:19px;font-weight:600}
+.row .v.none{color:var(--ink2);font-weight:500}
+.row .v i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:8px;vertical-align:1px}
+.row .a{color:var(--ink2);font-size:14px}
+.bars{display:grid;gap:6px}
+.bar{display:grid;grid-template-columns:30px 1fr 56px;gap:8px;align-items:center;font-size:12.5px}
+.bar.dim .fill{opacity:.4}
+.bar .k{color:var(--muted)}
+.bar .val{text-align:right;font-variant-numeric:tabular-nums}
+.bar .val.na{color:var(--muted)}
+.track{position:relative;height:10px}
+.track .zero{position:absolute;left:50%;top:-3px;bottom:-3px;width:1px;background:var(--base)}
+.track .fill{position:absolute;top:0;height:10px}
+.track .fill.pos{border-radius:0 4px 4px 0}
+.track .fill.neg{border-radius:4px 0 0 4px}
+.track .hurdle{position:absolute;top:-4px;bottom:-4px;width:1px;background:var(--muted)}
+.scale{grid-column:4;display:flex;justify-content:space-between;color:var(--muted);font-size:11px;margin:0 64px 0 38px}
+.scalerow{padding:2px 0 8px;border-top:0}
+details{margin:6px 0 4px;color:var(--ink2);font-size:13px}
+details summary{cursor:pointer;color:var(--muted);font-size:12.5px}
+pre{font:12.5px/1.45 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;white-space:pre-wrap;color:var(--ink2);margin:8px 0 0}
+h2{font-size:15px;font-weight:600;margin:26px 0 4px}
+.sub{color:var(--ink2);font-size:13px;margin:0 0 6px}
+table{border-collapse:collapse;width:100%;font-size:13px;margin:6px 0 0}
+th,td{text-align:right;padding:7px 8px;border-top:1px solid var(--grid);font-variant-numeric:tabular-nums;white-space:nowrap}
+th{color:var(--muted);font-weight:500;font-size:11.5px;text-transform:uppercase;letter-spacing:.06em;border-top:0}
+th:first-child,td:first-child{text-align:left}
+td.ok{color:var(--good)} td.no{color:var(--bad)} td .se{color:var(--muted);font-size:12px}
+.tablewrap{overflow-x:auto}
+.note{color:var(--muted);font-size:12.5px;margin:12px 0 0}
+@media (max-width:820px){.row{grid-template-columns:60px 1fr}.row .a,.row .bars{grid-column:1/-1}.scale{grid-column:1/-1}.legend{margin-left:0}}
+"""
+
+
+def _bar_html(ev: dict, lim: float, hurdle: float, var: str, label: str, emphasized: bool, h: int) -> str:
+    E = ev["E"]
+    tip = (f"{label}: n={ev['n']} analog {h}-week returns, SE {_upct(ev['SE'])}, wins {_upct(ev['win'], 0)}, "
+           f"credit {ev.get('credit_frac', float('nan'))*100:.0f}% of width" + (f", {ev['skipped']}" if ev.get("skipped") else ""))
+    hl = 50.0 + min(hurdle / lim, 1.0) * 50.0
+    cls = "bar" + ("" if emphasized else " dim")
+    if E != E:
+        return (f'<div class="{cls}" title="{_html.escape(tip)}"><span class="k">{label}</span><span class="track"><span class="zero"></span>'
+                f'<span class="hurdle" style="left:{hl:.2f}%"></span></span><span class="val na">n/a</span></div>')
+    w = min(abs(E) / lim, 1.0) * 50.0
+    left = 50.0 if E >= 0 else 50.0 - w
+    return (f'<div class="{cls}" title="{_html.escape(tip)}"><span class="k">{label}</span><span class="track"><span class="zero"></span>'
+            f'<span class="fill {"pos" if E >= 0 else "neg"}" style="left:{left:.2f}%;width:{w:.2f}%;background:var({var})"></span>'
+            f'<span class="hurdle" style="left:{hl:.2f}%"></span></span><span class="val">{_pct(E)}</span></div>')
+
+
+def card_html(c: dict) -> str:
+    rows, iv, m = c["rows"], c["iv"], c["m"]
+    S0, rv = rows[0]["S0"], rows[0]["rv"]
+    iv_txt = (f"IV {iv*100:.0f}% (screener), {iv/rv:.2f}&times; realized" if iv and rv == rv and rv > 0 else f"IV assumed {m:.2f}&times; realized {rv*100:.0f}%")
+    vals = [abs(x) for r in rows for x in (r["call"]["E"], r["put"]["E"], r["hurdle"]) if x == x]
+    lim = max(0.05, 1.15 * max(vals)) if vals else 0.05
+    out = [f'<section class="card"><div class="head"><span class="t">{_html.escape(c["ticker"])}</span><span class="p">${S0:,.2f}</span>'
+           f'<span class="meta">{c["asof"]} &middot; {iv_txt} &middot; {c["n_weeks"]} weeks since {c["first_year"]}</span></div>']
+    for r in rows:
+        v = r["verdict"]
+        chosen = r["call"] if v == "CCS" else r["put"] if v == "PCS" else None
+        act = strikes_text(chosen) if chosen else ("not enough history" if v == "n/a" else "")
+        if r["row"] == "year" and chosen:
+            act = "every week; this week " + act
+        unit = "per trade" if r["row"] != "year" else "per week"
+        if chosen:
+            vcell = f'<span class="v"><i style="background:var(--{v.lower()})"></i>{v}</span>'
+        else:
+            vcell = f'<span class="v none">{"NEITHER" if v == "NEITHER" else "n/a"}</span>'
+        out.append(f'<div class="row"><span class="h">{r["row"]}</span>{vcell}<span class="a">{_html.escape(act)}</span><div class="bars">'
+                   + _bar_html(r["call"], lim, r["hurdle"], "--ccs", "CCS", v == "CCS", r["h"])
+                   + _bar_html(r["put"], lim, r["hurdle"], "--pcs", "PCS", v == "PCS", r["h"])
+                   + f'<div class="bar"><span class="k"></span><span class="scale" style="grid-column:auto;margin:0"><span>{_pct(-lim, 0)}</span>'
+                   f'<span>hurdle {_pct(r["hurdle"])} of risk {unit}</span><span>{_pct(lim, 0)}</span></span><span></span></div></div></div>')
+    out.append(f'<details><summary>numbers behind this card</summary><pre>{_html.escape(c["text"])}</pre></details></section>')
+    return "".join(out)
+
+
+def test_block_html(b: dict, hurdle_pts: float) -> str:
+    out = [f'<h2>Walk-forward test &middot; IV assumed {b["m"]:.2f}&times; realized</h2>',
+           f'<p class="sub">{b["names"]} name(s): {_html.escape(", ".join(b["tickers"]))}. The same rule at every past Friday from data up to that Friday, '
+           f'scored on what the chosen side did next; weeks it stood aside count as zero.</p>',
+           '<div class="tablewrap"><table><tr><th>horizon</th><th>rule &plusmn; SE</th><th>n</th><th>traded (CCS / PCS)</th><th>chosen &minus; other</th>'
+           '<th>always CCS</th><th>always PCS</th><th>hindsight best</th><th>SPY</th><th>rule &minus; SPY</th><th>vs target</th></tr>']
+    for name, h, _ in ROWS:
+        s = b["scores"].get(name, {"n": 0})
+        if not s.get("n"):
+            out.append(f'<tr><td>{name}</td><td colspan="10" style="text-align:left;color:var(--muted)">no trades</td></tr>')
+            continue
+        spy = (b.get("spy") or {}).get(name)
+        has_spy = spy is not None and spy == spy
+        diff = s["rule"] - spy if has_spy else float("nan")
+        ok = has_spy and diff >= hurdle_pts
+        unit = "trade" if name != "year" else "week"
+        out.append(f'<tr><td>{name} <span style="color:var(--muted)">per {unit}</span></td><td><b>{_pct(s["rule"])}</b> <span class="se">&plusmn;{_upct(s["se"])}</span></td><td>{s["n"]:,}</td>'
+                   f'<td>{(s["frac_ccs"]+s["frac_pcs"])*100:.0f}% <span class="se">({s["frac_ccs"]*100:.0f} / {s["frac_pcs"]*100:.0f})</span></td>'
+                   f'<td>{_pct(s["edge"])} <span class="se">&plusmn;{_upct(s["edge_se"])}</span></td>'
+                   f'<td>{_pct(s["ccs"])}</td><td>{_pct(s["pcs"])}</td><td>{_pct(s["best"])}</td>'
+                   f'<td>{_pct(spy) if has_spy else "n/a"}</td><td>{f"{diff*100:+.1f} pts" if has_spy else "n/a"}</td>'
+                   + (f'<td class="{"ok" if ok else "no"}">{"&#10003; clears" if ok else "&#10007; below"} +{hurdle_pts*100:.1f}</td>' if has_spy else '<td style="color:var(--muted)">no SPY data</td>')
+                   + '</tr>')
+    out.append('</table></div>')
+    if b.get("per_name"):
+        out.append('<details><summary>per name, weekly</summary><div class="tablewrap"><table><tr><th>name</th><th>rule</th><th>always CCS</th><th>always PCS</th><th>traded</th><th>weeks</th></tr>')
+        for r in b["per_name"]:
+            out.append(f'<tr><td>{_html.escape(r["ticker"])}</td><td>{_pct(r["rule"])}</td><td>{_pct(r["ccs"])}</td><td>{_pct(r["pcs"])}</td>'
+                       f'<td>{(r["frac_ccs"]+r["frac_pcs"])*100:.0f}%</td><td>{r["n"]}</td></tr>')
+        out.append('</table></div></details>')
+    return "".join(out)
+
+
+def render_page(cards: list[dict], blocks: list[dict], args) -> str:
+    asof = cards[0]["asof"] if cards else pd.Timestamp.today().strftime("%Y-%m-%d")
+    head = (f'<header><h1>decide</h1><span class="meta">{asof} &middot; 30-delta spreads, 10% wide &middot; hurdle: market + {args.hurdle:g} points of risk</span>'
+            '<span class="legend"><span><i style="background:var(--ccs)"></i>CCS call credit spread</span><span><i style="background:var(--pcs)"></i>PCS put credit spread</span></span></header>')
+    body = "".join(card_html(c) for c in cards) + "".join(test_block_html(b, args.hurdle / 100.0) for b in blocks)
+    if not cards and not blocks:
+        body = '<p class="sub">nothing to show yet</p>'
+    if cards:
+        note = ('<p class="note">Bars are the expectancy of each side as a fraction of the money at risk, from the stock\'s own history rescaled to today\'s vol '
+                'and priced at the stated IV; the tick is the hurdle. A verdict is only as good as the walk-forward test (decide.py --test), and every number '
+                'moves with the IV you type in. Hover a bar for its sample size and error bar; open "numbers behind this card" for the full text.</p>')
+    else:
+        note = ('<p class="note">Rule = what following the verdicts earned per unit of risk, weeks it stood aside counted as zero. "Chosen minus other" is the '
+                'clean measure of side-picking skill: zero within its error bar on a fair random walk. n counts stock-weeks, and the same week on several names is '
+                'correlated, so the standard errors are optimistic; the year row is a handful of observations per name. No free source has IV history, so every '
+                'block assumes IV = m times realized.</p>')
+    return (f'<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
+            f'<title>decide</title><style>{PAGE_CSS}</style></head><body><div class="wrap">{head}{body}{note}</div></body></html>')
+
+
+def write_html(args, cards: list[dict], blocks: list[dict], announce: bool = False) -> None:
+    if args.no_html or not args.html or (not cards and not blocks):
+        return
+    out = Path(args.html)
+    if blocks and out.name == "decide.html":
+        out = out.with_name("decide_test.html")
+    out.write_text(render_page(cards, blocks, args), encoding="utf-8")
+    if announce or blocks:
+        print(f"wrote {out}")
+
+
 # ----------------------------------------------------------------------------------------------------- IO
 def parse_ticker_token(tok: str) -> tuple[str, float | None]:
     t, _, v = tok.replace(" ", "").partition("=")
@@ -333,8 +499,11 @@ def run_one(ticker: str, iv: float | None, args) -> list[dict] | None:
     S0, rv_now = float(daily["close"].iloc[-1]), float(rv_daily.iloc[-1])
     asof = daily.index[-1].date()
     rows = decide_at(wk, len(wk) - 1, cfg, args.m, iv, args.hurdle / 100.0, args.market_drift / 100.0, int(round(args.window * 52)), S0=S0, rv_now=rv_now)
-    print(card(ticker, rows, asof, iv, args.m, str(wk.index[0].year), int(wk["ret"].notna().sum()), args.why))
-    return rows
+    first_year, n_weeks = str(wk.index[0].year), int(wk["ret"].notna().sum())
+    text = card(ticker, rows, asof, iv, args.m, first_year, n_weeks, args.why)
+    print(text)
+    return {"ticker": ticker, "rows": rows, "asof": str(asof), "iv": iv, "m": args.m, "first_year": first_year, "n_weeks": n_weeks,
+            "text": card(ticker, rows, asof, iv, args.m, first_year, n_weeks, True)}
 
 
 def run_test(tickers: list[str], args) -> int:
@@ -362,9 +531,10 @@ def run_test(tickers: list[str], args) -> int:
         spy = {"frame": sw}
     except (SystemExit, Exception) as exc:  # noqa: BLE001
         print(f"  ({args.benchmark} not available for the market comparison: {exc})")
+    blocks = []
     for m in ms:
         pooled: dict[str, list[dict]] = {"week": [], "month": [], "year": []}
-        per_name = []
+        per_name, per_name_rows = [], []
         for t, (daily, wk) in frames.items():
             skew = args.skew if args.skew is not None else default_skew(vol_1y(daily))
             res = walk_forward(wk, make_cfg(args, skew), m, args.hurdle / 100.0, args.market_drift / 100.0, int(round(args.window * 52)))
@@ -373,6 +543,7 @@ def run_test(tickers: list[str], args) -> int:
             s = score(res["week"])
             if s["n"]:
                 per_name.append(f"  {t:<6} week: rule {_pct(s['rule'])} vs always CCS {_pct(s['ccs'])} / PCS {_pct(s['pcs'])}, traded {(s['frac_ccs']+s['frac_pcs'])*100:.0f}% of {s['n']} weeks")
+                per_name_rows.append({"ticker": t, **s})
         spy_means = None
         if spy:
             spy_means = {}
@@ -390,6 +561,9 @@ def run_test(tickers: list[str], args) -> int:
         if args.why and per_name:
             print("\n".join(per_name))
         print()
+        blocks.append({"m": m, "names": len(frames), "scores": {k: score(v) for k, v in pooled.items()}, "spy": spy_means, "per_name": per_name_rows,
+                       "tickers": list(frames)})
+    write_html(args, [], blocks)
     return 0
 
 
@@ -500,6 +674,8 @@ def main() -> int:
     p.add_argument("--test", action="store_true", help="walk-forward test of the rule on the given tickers")
     p.add_argument("--m-grid", action="store_true", help="with --test: run at IV = 1.0, 1.15 and 1.3 x realized")
     p.add_argument("--benchmark", default="SPY", help="market ticker for the --test comparison (default SPY)")
+    p.add_argument("--html", default="decide.html", help="write the verdicts (or the test) to this page as well (default decide.html)")
+    p.add_argument("--no-html", action="store_true", help="do not write the page")
     p.add_argument("--selftest", action="store_true")
     args = p.parse_args()
     if args.selftest:
@@ -509,11 +685,15 @@ def main() -> int:
         toks += read_universe(args.universe)
     if args.test:
         return run_test([parse_ticker_token(t)[0] for t in toks], args)
+    cards: list[dict] = []
     if toks:
         for tok in toks:
             t, iv = parse_ticker_token(tok)
-            run_one(t, iv, args)
+            c = run_one(t, iv, args)
+            if c:
+                cards.append(c)
             print()
+        write_html(args, cards, [], announce=True)
         return 0
     print("ticker, or ticker=IV% (e.g. ASTS=105); q to quit")
     while True:
@@ -526,8 +706,12 @@ def main() -> int:
             break
         for tok in line.replace(",", " ").split():
             t, iv = parse_ticker_token(tok)
-            run_one(t, iv, args)
+            c = run_one(t, iv, args)
+            if c:
+                cards.append(c)
+                write_html(args, cards, [])   # the page grows as you type; open it once and refresh
             print()
+    write_html(args, cards, [], announce=True)
     return 0
 
 
