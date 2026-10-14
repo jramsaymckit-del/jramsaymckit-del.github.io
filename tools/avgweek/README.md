@@ -17,10 +17,14 @@ It runs on the laptop in Python 3.13 with numpy and pandas. yfinance is used for
 ```bash
 cd tools/avgweek
 python3 -m pip install -U yfinance requests        # numpy and pandas are already there
-python3 avgweek.py --selftest                       # ~3 minutes; proves the math on synthetic data (41 checks)
-python3 avgweek.py ASTS RKLB HIMS SPY --iv-from-chain --out reports
-open reports/ASTS/report.html
+python3 avgweek.py --selftest                       # ~3 minutes; proves the math on synthetic data
+python3 avgweek.py --universe universe_highbeta.txt --min-vol 0.6 --brief --out reports                   # one card per high-beta name + the pooled basket line
+python3 avgweek.py --universe universe_highbeta.txt --min-vol 0.6 --brief --hold-weeks 2 --out reports2   # the same, two-week spreads entered every other week
+python3 avgweek.py ASTS RKLB HIMS --iv-from-chain --out reports        # full report per name; the chain only answers between 9:30 and 16:00 New York
+open reports/BRIEF.html reports/ASTS/report.html
 ```
+
+`universe_highbeta.txt` holds 37 long-history, optionable high-beta names (ASTS, RKLB, HIMS, MSTR, SMR, the 2021 meme and SPAC cohort, the semis and crypto miners). It is a survivor list: names that went to zero are not in it, which flatters the stock and hurts the call seller. Add `--iv ASTS=105 MSTR=70 ...` with your screener's implied vols to get the program at today's pricing instead of at IV = realized vol.
 
 Other ways to run it (a failing ticker is reported and skipped; the rest of a basket still runs):
 
@@ -30,9 +34,10 @@ python3 avgweek.py ASTS --csv asts_daily.csv          # offline, from a Yahoo or
 python3 avgweek.py ASTS RKLB HIMS --csv-dir data/     # offline basket (data/ASTS.csv, data/RKLB.csv, ...)
 python3 avgweek.py ASTS --deltas 0.5 0.3 0.1 --iv-mult 1.0 1.2 1.5 --mgmt hold --no-breakeven   # faster, narrower sweep
 python3 avgweek.py ASTS --earnings-file asts_earnings.txt   # hand-maintained earnings dates (one YYYY-MM-DD per line)
-python3 avgweek.py ASTS MSTR RKLB HIMS SMR SPY --brief --iv ASTS=105 MSTR=70 --out reports   # one six-line card per name; IV from your screener
+python3 avgweek.py ASTS MSTR RKLB HIMS SMR --brief --iv ASTS=105 MSTR=70 --out reports   # cards for a hand-picked list; IV from your screener
 python3 avgweek.py ASTS --regime-filter "trend == 'down' and rv20_pctile > 0.5"   # a pre-registered filter, shown next to unfiltered
-python3 avgweek.py --universe screener_tickers.txt SPY --out reports   # the whole screener basket + pooled view
+python3 avgweek.py --universe screener_tickers.txt --out reports   # the whole screener basket + pooled view (one ticker per line, # comments allowed)
+python3 avgweek.py ASTS SPY --brief                                # SPY, QQQ, IWM, DIA, VOO, VTI print a reference card only: never pooled, never counted as a candidate
 python3 iv_snapshot.py ASTS RKLB HIMS --out iv_log.csv      # run daily near the close; builds a real IV history
 ```
 
@@ -42,6 +47,8 @@ Where the answer to "if I sold a call credit spread every week for the past year
 - Files: `reports/ASTS/trades_call_d0.30_w10%_m1_hold.csv` is the week-by-week ledger; `sweep.csv` has every configuration; `report.html` has everything with charts.
 
 The number to compare across configurations is `expectancy_pct_risk` (average P&L per week as a fraction of the maximum loss), with its standard error. Never rank by win rate: a 10-delta program wins 93% of weeks and loses money.
+
+The arithmetic behind "short strike slightly above price, high win rate, every week or two": held to expiry, a credit spread breaks even at a win rate of `1 - credit / width`. Near-the-money weekly credits on these names run about 10 to 15% of width after costs, so the program has to win about 85 to 87% of its weeks; the realized rate at the 30-delta strike over these histories is 75 to 85%. The card's `Sell call spreads?` line is that comparison, expressed in dollars of risk per week (per two weeks with `--hold-weeks 2`), with the noise band one year of data carries (about +/-5 points).
 
 ---
 
@@ -124,7 +131,7 @@ What this says, and what the red-team Monte Carlo (20,000 simulated years per re
 | 7. Sweep | heatmap of expectancy by short delta x m with the break-even m column, full table for the last year | rank by expectancy with its standard error; count the variants |
 | Footer | what it can and cannot claim | please read it once |
 
-Pooled basket (several tickers): the same direction and shape tables on stacked stock-weeks, the pooled exceedance table, and the baseline program summed across tickers, by ticker, by trend state and by year. A five-point edge in exceedance needs about 260 ticker-weeks to resolve; the basket is the only level with statistical power. Pass SPY or QQQ as extra tickers to see whether "grinding down" is name-specific or market-wide.
+Pooled basket (several tickers): the same direction and shape tables on stacked stock-weeks, the pooled exceedance table, and the baseline program summed across tickers, by ticker, by trend state and by year. A five-point edge in exceedance needs about 260 ticker-weeks to resolve; the basket is the only level with statistical power. The basket line under the cards counts stock-weeks, the names with the grind-down-rip-up signature, and the names where call spreads were a YES, then pools every trade at fair IV (calls vs puts, all data and last year). Index ETFs (SPY, QQQ, IWM, DIA, VOO, VTI) print a reference card when passed, so you can see whether "grinding down" is name-specific or market-wide, but they are never pooled and never counted: an index week has positive drift and negative skew, the opposite of what a call seller wants, and a YES on SPY says nothing about ASTS.
 
 ---
 
@@ -142,6 +149,8 @@ Per week, at the last close of the week (entry) to the last close of the next we
 - Regime tags per trade: trend (close vs 50-day average and its 20-day slope), % below 52-week high, realized-vol percentile over the trailing year, above/below the 200-day average, earnings week, previous week's return. `--regime-filter` takes a pandas query over these columns and shows the filtered program next to the unfiltered one.
 - `m_be`: the multiplier at which the program's total P&L over the period is zero (bisection over 0.5 to 4, re-running the backtest), per delta and width. The summary also reports the expectancy standard error, the full-width-loss rate, expectancy as % of notional, and `years_to_2sigma = (2 sd / |mean|)^2 / 52`, the years of weekly data it would take to separate this configuration from zero.
 - Put mirror: the same configuration with put spreads, short strike snapped away from spot downward.
+- `--min-vol 0.6`: only enter when the trailing realized vol at the Friday close is at least 60%, across all years. This is the test of "high-beta, high-vol names" on the weeks that actually qualified, rather than on the calm early history of a name that became volatile later. Skipped entries are counted in the card header and the week counts shrink to match.
+- `--hold-weeks 2`: sell a two-week spread every other week (entry Friday, expiry two Fridays later, T = 14/365, strike from the same target delta at that horizon). A hole in the data longer than 17 days skips the entry, as 10 days does for weekly spreads. Every per-period number on the card is then per two weeks and labelled `/2wk`; the per-year table and the basket line annualise by the trades' own cadence.
 
 **Can claim**: how often and by how much weekly closes exceeded each strike distance (exact history); the hold-to-expiry P&L as a function of m, and the break-even m per period, ticker and configuration; whether calls beat puts under the same assumptions; the average-week statistics with honest intervals.
 
@@ -200,6 +209,7 @@ A browser version was deliberately not built yet. Yahoo and Stooq do not send CO
 |---|---|
 | `avgweek.py` | the tool: data, statistics, backtest, report, self-test, CLI |
 | `iv_snapshot.py` | daily chain logger |
+| `universe_highbeta.txt` | 37 long-history high-beta optionable names for `--universe`; survivorship caveat in its comments |
 | `README.md` | this document |
 | `.gitignore` | keeps reports, caches and logs out of the repo |
 

@@ -37,7 +37,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-__version__ = "0.6.0"
+__version__ = "0.6.1"
 
 # ======================================================================================================
 # 1. Normal distribution + chi-square helpers (self-contained; trivially portable to JS)
@@ -851,7 +851,7 @@ def backtest_spreads(daily: pd.DataFrame, wk: pd.DataFrame, cfg: SpreadConfig, e
             rg = regimes.loc[entry_date]
             rec.update({"trend": rg["trend"], "pct_from_high52": rg["pct_from_high52"], "rv20_pctile": rg["rv20_pctile"],
                         "above_dma200": bool(S0 > rg["dma200"]) if rg["dma200"] == rg["dma200"] else None})
-        if (exp_date - entry_date).days > MAX_WEEK_GAP_DAYS:
+        if (exp_date - entry_date).days > 7 * hw + (MAX_WEEK_GAP_DAYS - 7):   # 10 days weekly, 17 for two-week spreads
             rec["skipped"] = "data gap"
             rows.append(rec)
             continue
@@ -1019,6 +1019,14 @@ def summarize_trades(trades: pd.DataFrame, years_hint: float | None = None) -> d
     return out
 
 
+def cadence_weeks(trades: pd.DataFrame) -> int:
+    """Weeks per trade implied by the trades themselves (1 for weekly spreads, 2 for two-week spreads)."""
+    if trades.empty or "entry_date" not in trades.columns:
+        return 1
+    span = (trades["expiry_date"] - trades["entry_date"]).dt.days.median()
+    return max(int(round(float(span) / 7.0)), 1) if span == span else 1
+
+
 def group_summary(trades: pd.DataFrame, key: str) -> pd.DataFrame:
     t = trades[trades["skipped"].isna()].copy()
     if t.empty or key not in t.columns:
@@ -1027,7 +1035,7 @@ def group_summary(trades: pd.DataFrame, key: str) -> pd.DataFrame:
     for g, sub in t.groupby(key, dropna=False):
         if sub.empty:
             continue
-        s = summarize_trades(sub, years_hint=len(sub) / 52.0)
+        s = summarize_trades(sub, years_hint=len(sub) * cadence_weeks(sub) / 52.0)
         rows.append({key: g, "trades": s["trades"], "win_rate": s["win_rate"], "total_pnl": s["total_pnl"],
                      "expectancy_pct_risk": s["expectancy_pct_risk"], "full_loss_rate": s["full_loss_rate"],
                      "profit_factor": s["profit_factor"], "max_dd_$": s["max_drawdown_$"], "worst_wk_$": float(sub["pnl"].min()),
@@ -1606,14 +1614,16 @@ def brief_html(cards: list[dict], basket: str = "") -> str:
         si_txt = f" &middot; short interest {si['pct_float']*100:.0f}% of float, {si['days_to_cover']:.1f} days to cover" if si and si.get("pct_float") else (f" &middot; {si['days_to_cover']:.1f} days to cover" if si else "")
         years = "&nbsp;&nbsp;".join(f"{y} <b>{e*100:+.0f}%</b> <span class=q>({r*100:+.0f}%)</span>" for y, e, r in b["years"])
         deltas = ", ".join(f"{d:.2f}: {_sgn(e, 1)}" for d, e in b["deltas"])
+        u = b.get("unit", "wk")
+        trade_q, per = ("Sell weekly call spreads?", "per week") if u == "wk" else (f"Sell {u} call spreads?", f"per {u[:-2]} weeks")
         out.append(f'<div class="card"><div class="h">{b["ticker"]} <small>${b["close"]:,.2f} on {b["asof"]} &middot; 1y {_sgn(b["ret_1y"])} &middot; vol {b["vol"]*100:.0f}%{si_txt} &middot; {b["weeks_all"]} weeks since {b["first_week"][:4]} &middot; {b["skipped_note"]}</small></div>'
                    + row("Grinds down, rips up?", b["desc"], f"average week {_sgn(b['mean'], 1)} (mean), typical week {_sgn(b['median'], 1)} (median), up {b['win']*100:.0f}% of weeks; year {_sgn(b['ret_1y'])} but {_sgn(b['cum_ex_top5'])} without its best 5 weeks. A {b['vol']*100:.0f}%-vol random walk gives {b['win_null']*100:.0f}% up-weeks; yours is {b['noise']} its noise band {b['win_lo']*100:.0f} to {b['win_hi']*100:.0f}%.")
                    + row("Where the move happens", b["split_1y"], f"Last year: overnight {_sgn(b['on_1y'])}, intraday {_sgn(b['in_1y'])}. All data: overnight {_sgn(b['on_all'])}, intraday {_sgn(b['in_all'])}. Overnight gaps carry {b['gap_share']*100:.0f}% of daily variance, and a weekly spread owns every gap.")
-                   + row("Sell weekly call spreads?", b["trade"], f"At fair IV: last 1y {_sgn(b['exp1'], 1)} &plusmn;{_pts(b['se1'])} of risk per week, since {b['first'][:4]} {_sgn(b['expA'], 1)} per week. Breaks even at IV/RV {_num(b['mbe1'])} (1y) / {_num(b['mbeA'])} (all). {mt}.")
-                   + row("Direction or premium?", b["direction"], f"Call minus put spreads: 1y {_sgn(b['d1'], 1)}, all {_sgn(b['dA'], 1)} of risk per week. If puts do as well, the edge is the premium, not the drift.")
+                   + row(trade_q, b["trade"], f"At fair IV: last 1y {_sgn(b['exp1'], 1)} &plusmn;{_pts(b['se1'])} of risk {per}, since {b['first'][:4]} {_sgn(b['expA'], 1)} {per}. Breaks even at IV/RV {_num(b['mbe1'])} (1y) / {_num(b['mbeA'])} (all). {mt}.")
+                   + row("Direction or premium?", b["direction"], f"Call minus put spreads: 1y {_sgn(b['d1'], 1)}, all {_sgn(b['dA'], 1)} of risk {per}. If puts do as well, the edge is the premium, not the drift.")
                    + row("After a +15% week", b["after_rip"], f"Next week up {b['rip_win']*100:.0f}% of the time against {b['all_win']*100:.0f}% for all weeks, median {_sgn(b['rip_med'], 1)}, n={b['rip_n']}." if b["rip_win"] == b["rip_win"] else "Not enough rips in the window.")
                    + row("By year (30-delta, fair IV)" + (" , last 8" if b.get("years_cut") else ""), "", years + " <span class=q>(stock return in brackets)</span>")
-                   + (row("Best short delta, last 1y", f"{max(b['deltas'], key=lambda t: t[1])[0]:.2f} {_sgn(max(b['deltas'], key=lambda t: t[1])[1], 1)}/wk", f"{deltas}. Full-width losses {b['full_loss']*100:.0f}% of weeks; worst run ${b['max_dd']:,.0f} per contract. Differences inside &plusmn;{_pts(b['se1'], 0)} points are noise.") if b["deltas"] else "")
+                   + (row("Best short delta, last 1y", f"{max(b['deltas'], key=lambda t: t[1])[0]:.2f} {_sgn(max(b['deltas'], key=lambda t: t[1])[1], 1)}/{b.get('unit', 'wk')}", f"{deltas}. Full-width losses {b['full_loss']*100:.0f}% of trades; worst run ${b['max_dd']:,.0f} per contract. Differences inside &plusmn;{_pts(b['se1'], 0)} points are noise.") if b["deltas"] else "")
                    + "</div>")
     out.append('<p class="q" style="font-size:12.5px">Option P&amp;L is synthetic: Black-Scholes at IV = m x realized vol. "Fair IV" is m = 1. Full tables are in report.html next to this file.</p></body></html>')
     return "".join(out)
@@ -1938,9 +1948,10 @@ def analyse_ticker(ticker: str, daily: pd.DataFrame, source: str, args, daily_fu
         if lab in trade_sets:
             tr_mt = trade_sets[lab][1]
             m_today_summ = {"1y": summarize_trades(slice_period(tr_mt, 12, asof_tr)), "all": summarize_trades(tr_mt)}
+    unit_word = "weeks" if args.hold_weeks == 1 else "entries"
     skipped_note = ((f"{args.hold_weeks}-week spreads entered every {args.hold_weeks} weeks; " if args.hold_weeks != 1 else "")
                     + (f"high-vol weeks only (trailing vol >= {args.min_vol:.0%}); " if args.min_vol else "")
-                    + (f"backtest skipped {base_all.get('skipped', 0)} weeks: {base_all.get('skip_reasons', 'none')}" if base_all.get("skipped") else "no weeks skipped")
+                    + (f"backtest skipped {base_all.get('skipped', 0)} {unit_word}: {base_all.get('skip_reasons', 'none')}" if base_all.get("skipped") else f"no {unit_word} skipped")
                     + f"; call-wing skew assumed {skew_s:+.1f}")
     si_now = None
     if si_hist is not None and len(si_hist):
@@ -2204,6 +2215,15 @@ def selftest() -> int:
     check("max loss never exceeds (width - credit) x 100", (tr[tr["skipped"].isna()]["pnl"] >= -(tr[tr["skipped"].isna()]["max_risk"])).all())
     check("short strike snapped UP sits above the raw delta strike", last["K_short"] >= strike_for_call_delta(last["S0"], last["T_days"] / 365, 0.04, last["sigma"], 0.3) - 1e-9)
     check("slippage floor applies on tiny spreads", SpreadConfig().slip_floor_per_leg == 0.03 and max(0.02 * 0.5, 2 * 0.03) == 0.06)
+    tr2 = backtest_spreads(dd, wkd, replace(cfg, hold_weeks=2))
+    live2 = tr2[tr2["skipped"].isna()]
+    check("two-week spreads: one trade every other week, 14-day span, none skipped as a data gap",
+          len(tr2) == 6 and (tr2["skipped"] != "data gap").all() and len(live2) >= 1
+          and ((live2["expiry_date"] - live2["entry_date"]).dt.days == 14).all() and cadence_weeks(live2) == 2,
+          f"rows={len(tr2)} skipped={tr2['skipped'].dropna().unique().tolist()} spans={(tr2['expiry_date'] - tr2['entry_date']).dt.days.unique().tolist()}")
+    gap2 = backtest_spreads(gapd, wkg, replace(cfg, hold_weeks=2))
+    check("two-week spread across a hole in the data is skipped", (gap2["skipped"] == "data gap").any()
+          and gap2[gap2["skipped"] == "data gap"]["expiry_date"].sub(gap2[gap2["skipped"] == "data gap"]["entry_date"]).dt.days.min() > 17)
 
     print("Self-test 3: fair-value sanity on a random walk (mu = r, IV = true vol, flat skew) -> expectancy ~ 0 before costs")
     rng = np.random.default_rng(7)
@@ -2365,8 +2385,9 @@ def main(argv=None) -> int:
             n_trade = sum(1 for c in pcards if c["trade"].startswith("YES"))
             n_weeks = sum(c["weeks_all"] for c in pcards)
             first = min(c["first_week"][:4] for c in pcards)
+            unit = pcards[0].get("unit", "wk")
             basket = (f"Basket of {len(pcards)} names (benchmarks excluded), {n_weeks:,} stock-weeks since {first}: grind-down-rip-up signature in {n_desc}; call spreads a YES in {n_trade}. "
-                      f"Pooled at fair IV, all data ({sc.get('trades', 0):,} spreads): calls {_sgn(sc.get('expectancy_pct_risk'), 1)} +/-{_pts(sc.get('expectancy_se_pct_risk'))} vs puts {_sgn(sp.get('expectancy_pct_risk'), 1)} of risk/wk; "
+                      f"Pooled at fair IV, all data ({sc.get('trades', 0):,} spreads): calls {_sgn(sc.get('expectancy_pct_risk'), 1)} +/-{_pts(sc.get('expectancy_se_pct_risk'))} vs puts {_sgn(sp.get('expectancy_pct_risk'), 1)} of risk/{unit}; "
                       f"last 1y: calls {_sgn(sc1.get('expectancy_pct_risk'), 1)} vs puts {_sgn(sp1.get('expectancy_pct_risk'), 1)}.")
             print(basket)
         out = Path(args.out) / "BRIEF.html"
