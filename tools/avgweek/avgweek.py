@@ -37,7 +37,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-__version__ = "0.4.1"
+__version__ = "0.4.2"
 
 # ======================================================================================================
 # 1. Normal distribution + chi-square helpers (self-contained; trivially portable to JS)
@@ -1150,7 +1150,7 @@ def chain_calibration(ticker: str, spot: float, rv_now: float, rate: float = 0.0
             pass
         return {"expiry": exp, "dte": dte, "spot_used": spot, "iv_atm": iv_atm, "iv_25d_call": iv25, "iv_10d_call": iv10,
                 "short_pct_float": short_pct, "short_ratio_days": short_ratio,
-                "skew_s": float(min(max(skew, 0.0), 1.0)) if skew == skew else None,
+                "skew_s": float(min(max(skew, -0.5), 1.0)) if skew == skew else None,
                 "strike_step": step, "rv_now": rv_now, "m_today": iv_atm / rv_now if rv_now else float("nan"),
                 "yahoo_iv_atm": float(atm["impliedVolatility"].mean())}
     except Exception as exc:  # noqa: BLE001
@@ -1534,7 +1534,9 @@ def brief_fields(ticker, wk, stats, base_summary, base_all, m_be, mirror, cond, 
         after_rip = "MOMENTUM" if gap > 0.10 else ("MEAN REVERSION" if gap < -0.10 else "NO SIGNAL")
     else:
         after_rip, gap = "TOO FEW RIPS TO SAY", float("nan")
-    years = [(int(y), float(r["expectancy_pct_risk"]), float(r["stock_ret"])) for y, r in yr.iterrows()] if not yr.empty else []
+    years_all = [(int(y), float(r["expectancy_pct_risk"]), float(r["stock_ret"])) for y, r in yr.iterrows()] if not yr.empty else []
+    years = years_all[-8:]
+    years_cut = len(years_all) > 8
     sw = sweep[(sweep["period"] == "1y") & (sweep["mgmt"] == "hold") & (sweep["iv_mult"] == 1.0)] if not sweep.empty else pd.DataFrame()
     deltas = sorted(((float(r["delta"]), float(r["expectancy_pct_risk"])) for _, r in sw.iterrows()), reverse=True) if not sw.empty else []
     return dict(ticker=ticker, close=float(wk["close"].iloc[-1]), asof=str(wk["date"].iloc[-1].date()), ret_1y=s1["cum_return"], vol=s1["ann_vol"],
@@ -1547,7 +1549,7 @@ def brief_fields(ticker, wk, stats, base_summary, base_all, m_be, mirror, cond, 
                 m_today=m_today, exp_mt1=exp_mt1, exp_mtA=exp_mtA, trade=trade, chain_note=chain_note, d1=d1, dA=dA, direction=direction,
                 rip_n=int(rip_row["n"]) if rip_row is not None else 0, rip_win=rip_row["next_wk_win_rate"] if rip_row is not None else float("nan"),
                 rip_med=rip_row["next_wk_median"] if rip_row is not None else float("nan"), all_win=all_row["next_wk_win_rate"] if all_row is not None else float("nan"),
-                after_rip=after_rip, years=years, deltas=deltas, full_loss=base_all.get("full_loss_rate", float("nan")),
+                after_rip=after_rip, years=years, years_cut=years_cut, deltas=deltas, full_loss=base_all.get("full_loss_rate", float("nan")),
                 max_dd=base_all.get("max_drawdown_$", float("nan")), first=base_all.get("first_entry", ""), skipped_note=skipped_note)
 
 
@@ -1565,7 +1567,7 @@ def brief_text(b: dict) -> str:
     L.append(f"  Direction or premium?      {b['direction']:<28} call minus put spreads: 1y {_sgn(b['d1'], 1)}, all {_sgn(b['dA'], 1)} of risk/wk")
     L.append(f"  After a +15% week          {b['after_rip']:<28} next week up {_sgn(b['rip_win'], 0)[1:] if b['rip_win'] == b['rip_win'] else 'n/a'} of the time (all weeks {_sgn(b['all_win'], 0)[1:] if b['all_win'] == b['all_win'] else 'n/a'}), median {_sgn(b['rip_med'], 1)}, n={b['rip_n']}")
     if b["years"]:
-        L.append("  By year (30d, fair IV)     " + "  ".join(f"{y} {e*100:+.0f}%" for y, e, _ in b["years"]) + "   (stock: " + " ".join(f"{r*100:+.0f}%" for _, _, r in b["years"]) + ")")
+        L.append(f"  By year (30d, fair IV)     {'last 8y: ' if b.get('years_cut') else ''}" + "  ".join(f"{y} {e*100:+.0f}%" for y, e, _ in b["years"]) + "   (stock: " + " ".join(f"{r*100:+.0f}%" for _, _, r in b["years"]) + ")")
     if b["deltas"]:
         best = max(b["deltas"], key=lambda t: t[1])
         L.append(f"  Best short delta, last 1y  {best[0]:.2f} {_sgn(best[1], 1)}/wk" + " " * 14 + "(" + ", ".join(f"{d:.2f}: {_sgn(e, 1)}" for d, e in b["deltas"]) + f"; full-width losses {b['full_loss']*100:.0f}% of weeks, worst run ${b['max_dd']:,.0f} per contract)")
@@ -1599,7 +1601,7 @@ def brief_html(cards: list[dict], basket: str = "") -> str:
                    + row("Sell weekly call spreads?", b["trade"], f"At fair IV: last 1y {_sgn(b['exp1'], 1)} &plusmn;{_pts(b['se1'])} of risk per week, since {b['first'][:4]} {_sgn(b['expA'], 1)} per week. Breaks even at IV/RV {_num(b['mbe1'])} (1y) / {_num(b['mbeA'])} (all). {mt}.")
                    + row("Direction or premium?", b["direction"], f"Call minus put spreads: 1y {_sgn(b['d1'], 1)}, all {_sgn(b['dA'], 1)} of risk per week. If puts do as well, the edge is the premium, not the drift.")
                    + row("After a +15% week", b["after_rip"], f"Next week up {b['rip_win']*100:.0f}% of the time against {b['all_win']*100:.0f}% for all weeks, median {_sgn(b['rip_med'], 1)}, n={b['rip_n']}." if b["rip_win"] == b["rip_win"] else "Not enough rips in the window.")
-                   + row("By year (30-delta, fair IV)", "", years + " <span class=q>(stock return in brackets)</span>")
+                   + row("By year (30-delta, fair IV)" + (" , last 8" if b.get("years_cut") else ""), "", years + " <span class=q>(stock return in brackets)</span>")
                    + (row("Best short delta, last 1y", f"{max(b['deltas'], key=lambda t: t[1])[0]:.2f} {_sgn(max(b['deltas'], key=lambda t: t[1])[1], 1)}/wk", f"{deltas}. Full-width losses {b['full_loss']*100:.0f}% of weeks; worst run ${b['max_dd']:,.0f} per contract. Differences inside &plusmn;{_pts(b['se1'], 0)} points are noise.") if b["deltas"] else "")
                    + "</div>")
     out.append('<p class="q" style="font-size:12.5px">Option P&amp;L is synthetic: Black-Scholes at IV = m x realized vol. "Fair IV" is m = 1. Full tables are in report.html next to this file.</p></body></html>')
@@ -1741,7 +1743,8 @@ def analyse_ticker(ticker: str, daily: pd.DataFrame, source: str, args, daily_fu
     mgmts = list(args.mgmt) if "hold" in args.mgmt else ["hold"] + list(args.mgmt)
     if deltas != list(args.deltas) or mgmts != list(args.mgmt):
         print(f"  (added base delta {args.base_delta} and/or 'hold' to the sweep so the baseline exists)")
-    skew_s = args.skew if args.skew is not None else (chain["skew_s"] if chain and chain.get("skew_s") is not None else 0.3)
+    vol_1y = float(stats.loc["1y", "ann_vol"]) if "1y" in stats.index else float(stats["ann_vol"].iloc[-1])
+    skew_s = args.skew if args.skew is not None else (chain["skew_s"] if chain and chain.get("skew_s") is not None else (0.3 if vol_1y >= 0.35 else -0.2))
     strike_step = args.strike_step or (chain["strike_step"] if (chain and args.grid_from_chain and chain["strike_step"] == chain["strike_step"]) else None)
     earnings = set()
     if args.earnings != "include" or args.earnings_file:
@@ -1913,7 +1916,7 @@ def analyse_ticker(ticker: str, daily: pd.DataFrame, source: str, args, daily_fu
         if lab in trade_sets:
             tr_mt = trade_sets[lab][1]
             m_today_summ = {"1y": summarize_trades(slice_period(tr_mt, 12, asof_tr)), "all": summarize_trades(tr_mt)}
-    skipped_note = f"backtest skipped {base_all.get('skipped', 0)} weeks: {base_all.get('skip_reasons', 'none')}" if base_all.get("skipped") else "no weeks skipped"
+    skipped_note = (f"backtest skipped {base_all.get('skipped', 0)} weeks: {base_all.get('skip_reasons', 'none')}" if base_all.get("skipped") else "no weeks skipped") + f"; call-wing skew assumed {skew_s:+.1f}"
     si_now = None
     if si_hist is not None and len(si_hist):
         last = si_hist.iloc[-1]
