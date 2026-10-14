@@ -16,7 +16,7 @@ It runs on the laptop in Python 3.13 with numpy and pandas. yfinance is used for
 
 ```bash
 cd tools/avgweek
-python3 -m pip install -U yfinance requests        # numpy and pandas are already there
+python3 -m pip install -U yfinance requests
 python3 avgweek.py --selftest                       # ~3 minutes; proves the math on synthetic data
 python3 decide.py ASTS=105 RKLB=80                  # the one-screen answer: CCS, PCS or NEITHER for the week, the month, the year
 python3 decide.py --test --universe universe_highbeta.txt   # walk-forward proof of that rule; read it before trusting a verdict
@@ -25,6 +25,8 @@ python3 avgweek.py --universe universe_highbeta.txt --min-vol 0.6 --brief --hold
 python3 avgweek.py ASTS RKLB HIMS --iv-from-chain --out reports        # full report per name; the chain only answers between 9:30 and 16:00 New York
 open reports/BRIEF.html reports/ASTS/report.html
 ```
+
+Two things about the shell. Paste one command at a time: zsh runs a pasted block line by line and feeds anything typed while a command runs into the next prompt. And do not paste comments: zsh passes a trailing `# like this` to the program as arguments (both tools now drop everything from a `#` token on, but `pip` and `open` do not). Do not run `pip install -U pandas numpy` for these tools: they work on pandas 2.x and 3.x as they are, and pandas 3 breaks Streamlit (your screener) until Streamlit catches up. If that upgrade already happened, `python3 -m pip install "pandas<3" "numpy<2.5"` puts it back.
 
 `universe_highbeta.txt` holds 37 long-history, optionable high-beta names (ASTS, RKLB, HIMS, MSTR, SMR, the 2021 meme and SPAC cohort, the semis and crypto miners). It is a survivor list: names that went to zero are not in it, which flatters the stock and hurts the call seller. Add `--iv ASTS=105 MSTR=70 ...` with your screener's implied vols to get the program at today's pricing instead of at IV = realized vol.
 
@@ -219,7 +221,7 @@ Filter protocol, so you cannot fool yourself: pre-register at most four filters 
 ## 6. Data
 
 - **Prices**: yfinance first (`period="max"`, adjusted close, the live intraday bar is dropped before 16:15 New York), then Stooq (same live-bar rule) (`https://stooq.com/q/d/l/?s=asts.us&i=d`), then Alpha Vantage (`ALPHAVANTAGE_API_KEY`, 25 requests a day, unadjusted), then the stale cache, then an error with a `--csv` hint. Cache at `~/.cache/avgweek/TICKER.csv`, re-downloaded in full when older than the last final session (never appended: a split rewrites adjusted history). `--no-refresh` for offline, `--refresh` to force.
-- **yfinance in 2026**: it breaks for a few weeks whenever Yahoo changes the cookie/crumb flow (`pip install -U yfinance`), rate-limits shared IPs (`YFRateLimitError`: wait, or `--source stooq`), returns MultiIndex columns and tz-aware indexes (handled), and includes today's partial bar during the session (handled).
+- **yfinance in 2026**: it breaks for a few weeks whenever Yahoo changes the cookie/crumb flow (`pip install -U yfinance`), rate-limits shared IPs (`YFRateLimitError`: wait, or `--source stooq`), returns MultiIndex columns and tz-aware indexes (handled), and includes today's partial bar during the session (handled). Under pandas 3 it returns a second-resolution index while CSVs and the short-interest table come back in microseconds; every date is normalised to nanoseconds on the way in, so the merges never see mixed units.
 - **Implied vol from your screener**: `--iv ASTS=105 RKLB=0.8` (percent or decimal) sets `m_today = IV / realized vol` without touching Yahoo's chain; `--m ASTS=1.2` sets the multiplier directly. The brief card then reports the program at that multiplier.
 - **Earnings dates**: SEC EDGAR 8-K filings with item 2.02 (Results of Operations), the event date of each filing, merged with Yahoo's calendar and any `--earnings-file`. Set `AVGWEEK_CONTACT="name email"` in your environment to satisfy the SEC's fair-access policy.
 - **Short interest**: Nasdaq's per-symbol bi-monthly table (about one year), used with a 10-business-day publication lag; the baseline is split by days-to-cover above or below its median, and the latest reading sits in the card header. `--no-short-interest` skips it.

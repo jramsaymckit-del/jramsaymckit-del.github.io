@@ -37,7 +37,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-__version__ = "0.7.0"
+__version__ = "0.7.1"
 
 # ======================================================================================================
 # 1. Normal distribution + chi-square helpers (self-contained; trivially portable to JS)
@@ -185,6 +185,8 @@ def _normalise_daily(df: pd.DataFrame) -> pd.DataFrame:
     if df.index.tz is not None:
         df.index = df.index.tz_localize(None)
     df.index = df.index.normalize()
+    if hasattr(df.index, "as_unit"):
+        df.index = df.index.as_unit("ns")   # yfinance hands back datetime64[s], CSVs datetime64[us] under pandas 3: one unit for every merge
     df.index.name = "date"
     df = df[~df.index.duplicated(keep="last")].sort_index()
     df = df.dropna(subset=["close"])
@@ -804,9 +806,10 @@ def regime_frame(daily: pd.DataFrame, short_interest: pd.DataFrame | None = None
     c = daily["close"]
     f = pd.DataFrame(index=daily.index)
     if short_interest is not None and len(short_interest):
-        si = short_interest.sort_values("available_date")
-        m = pd.merge_asof(pd.DataFrame({"date": daily.index}), si[["available_date", "short_interest", "days_to_cover"]].rename(columns={"available_date": "date"}),
-                          on="date", direction="backward")
+        si = short_interest.sort_values("available_date")[["available_date", "short_interest", "days_to_cover"]].rename(columns={"available_date": "date"})
+        si["date"] = pd.to_datetime(si["date"]).astype("datetime64[ns]")
+        left = pd.DataFrame({"date": pd.to_datetime(pd.DatetimeIndex(daily.index)).astype("datetime64[ns]")})
+        m = pd.merge_asof(left, si, on="date", direction="backward")
         f["si_days_to_cover"] = m["days_to_cover"].values
         f["si_shares"] = m["short_interest"].values
         f["si_pct_float"] = (m["short_interest"].values / float_shares) if float_shares else np.nan
@@ -1258,6 +1261,8 @@ def parse_nasdaq_short_interest(payload: dict) -> pd.DataFrame:
         "days_to_cover": [num(r.get("daysToCover")) for r in rows],
     }).dropna(subset=["settlement_date"]).sort_values("settlement_date")
     out["available_date"] = out["settlement_date"] + pd.offsets.BDay(10)
+    for c in ("settlement_date", "available_date"):
+        out[c] = pd.to_datetime(out[c]).astype("datetime64[ns]")
     return out.reset_index(drop=True)
 
 
@@ -1536,9 +1541,18 @@ def _pts(v, d=1):
 
 def brief_fields(ticker, wk, stats, base_summary, base_all, m_be, mirror, cond, yr, sweep, chain, chain_note, m_today_summ, skipped_note,
                  decomp=None, si_now=None):
-    s1 = stats.loc["1y"] if "1y" in stats.index else stats.iloc[-1]
+    has_1y = "1y" in stats.index
+    s1 = stats.loc["1y"] if has_1y else stats.iloc[-1]      # the all-data row stands in, and the card says so
+    desc_window = "last 1y" if has_1y else f"all data; no qualifying weeks in the last year"
     dec1 = decomp.loc["1y"] if (decomp is not None and "1y" in decomp.index) else None
     decA = decomp.loc["all"] if (decomp is not None and "all" in decomp.index) else None
+    dec5 = decomp.loc["5y"] if (decomp is not None and "5y" in decomp.index) else decA
+    def per_year(r):
+        if r is None or not r["days"]:
+            return float("nan"), float("nan"), float("nan")
+        yrs = max(float(r["days"]) / 252.0, 1e-9)
+        ann = lambda tot: (float("nan") if tot != tot else (-1.0 if tot <= -1.0 else (1.0 + tot) ** (1.0 / yrs) - 1.0))
+        return ann(r["overnight_total"]), ann(r["intraday_total"]), yrs
     def split_label(r):
         if r is None:
             return "n/a"
@@ -1585,18 +1599,21 @@ def brief_fields(ticker, wk, stats, base_summary, base_all, m_be, mirror, cond, 
     years_cut = len(years_all) > 8
     sw = sweep[(sweep["period"] == "1y") & (sweep["mgmt"] == "hold") & (sweep["iv_mult"] == 1.0)] if not sweep.empty else pd.DataFrame()
     deltas = sorted(((float(r["delta"]), float(r["expectancy_pct_risk"])) for _, r in sw.iterrows()), reverse=True) if not sw.empty else []
-    return dict(ticker=ticker, close=float(wk["close"].iloc[-1]), asof=str(wk["date"].iloc[-1].date()), ret_1y=s1["cum_return"], vol=s1["ann_vol"],
-                weeks=int(s1["weeks"]), weeks_all=int(wk["ret"].notna().sum()), first_week=str(wk.index[0].date()), median=s1["median_wk"], mean=s1["mean_wk"], win=win, win_lo=lo, win_hi=hi, win_null=null, noise=noise,
+    on5, in5, yrs5 = per_year(dec5)
+    return dict(ticker=ticker, close=float(wk["close"].iloc[-1]), asof=str(wk["date"].iloc[-1].date()), ret_1y=s1["cum_return"] if has_1y else float("nan"), vol=s1["ann_vol"],
+                weeks=int(s1["weeks"]) if has_1y else 0, weeks_all=int(wk["ret"].notna().sum()), first_week=str(wk.index[0].date()), median=s1["median_wk"], mean=s1["mean_wk"], win=win, win_lo=lo, win_hi=hi, win_null=null, noise=noise,
+                has_1y=has_1y, desc_window=desc_window, ret_window=s1["cum_return"],
                 split_1y=split_label(dec1), split_all=split_label(decA),
                 on_1y=dec1["overnight_total"] if dec1 is not None else float("nan"), in_1y=dec1["intraday_total"] if dec1 is not None else float("nan"),
                 on_all=decA["overnight_total"] if decA is not None else float("nan"), in_all=decA["intraday_total"] if decA is not None else float("nan"),
+                on_5y_pa=on5, in_5y_pa=in5, years5=yrs5,
                 gap_share=dec1["overnight_var_share"] if dec1 is not None else float("nan"), si_now=si_now,
                 cum_ex_top5=s1["cum_ex_top5"], desc=desc, exp1=exp1, se1=se1, expA=expA, seA=seA, mbe1=mbe1, mbeA=mbeA,
                 m_today=m_today, exp_mt1=exp_mt1, exp_mtA=exp_mtA, trade=trade, chain_note=chain_note, d1=d1, dA=dA, direction=direction,
                 rip_n=int(rip_row["n"]) if rip_row is not None else 0, rip_win=rip_row["next_wk_win_rate"] if rip_row is not None else float("nan"),
                 rip_med=rip_row["next_wk_median"] if rip_row is not None else float("nan"), all_win=all_row["next_wk_win_rate"] if all_row is not None else float("nan"),
                 after_rip=after_rip, years=years, years_cut=years_cut, deltas=deltas, full_loss=base_all.get("full_loss_rate", float("nan")),
-                max_dd=base_all.get("max_drawdown_$", float("nan")), first=base_all.get("first_entry", ""), skipped_note=skipped_note)
+                max_dd=base_summary.get("max_drawdown_$", float("nan")), first=base_all.get("first_entry", ""), skipped_note=skipped_note)
 
 
 def brief_text(b: dict) -> str:
@@ -1604,9 +1621,10 @@ def brief_text(b: dict) -> str:
     si = b.get("si_now")
     si_txt = f"   short interest {si['pct_float']*100:.0f}% of float, {si['days_to_cover']:.1f} days to cover" if si and si.get("pct_float") else (f"   short interest {si['days_to_cover']:.1f} days to cover" if si else "")
     L.append(f"{b['ticker']}  ${b['close']:,.2f}   1y {_sgn(b['ret_1y'])}   vol {b['vol']*100:.0f}%{si_txt}   ({b['weeks']} weeks last year, {b['weeks_all']} since {b['first_week'][:4]}; {b['skipped_note']})")
-    L.append(f"  Grinds down, rips up?      {b['desc']:<28} average week {_sgn(b['mean'], 1)} (mean), typical week {_sgn(b['median'], 1)} (median), up {b['win']*100:.0f}% of weeks; year {_sgn(b['ret_1y'])} but {_sgn(b['cum_ex_top5'])} without its best 5 weeks")
+    L.append(f"  Grinds down, rips up?      {b['desc']:<28} average week {_sgn(b['mean'], 1)} (mean), typical week {_sgn(b['median'], 1)} (median), up {b['win']*100:.0f}% of weeks; "
+             + (f"year {_sgn(b['ret_1y'])} but {_sgn(b['cum_ex_top5'])} without its best 5 weeks" if b.get("has_1y", True) else f"[{b['desc_window']}] period {_sgn(b['ret_window'])} but {_sgn(b['cum_ex_top5'])} without its best 5 weeks"))
     L.append(f"                             {'':<28} (a {b['vol']*100:.0f}%-vol random walk gives {b['win_null']*100:.0f}% up-weeks; yours is {b['noise']} its noise band {b['win_lo']*100:.0f}-{b['win_hi']*100:.0f}%)")
-    L.append(f"  Where the move happens     {b['split_1y']:<28} 1y: overnight {_sgn(b['on_1y'])}, intraday {_sgn(b['in_1y'])}; all data: overnight {_sgn(b['on_all'])}, intraday {_sgn(b['in_all'])}; gaps carry {b['gap_share']*100:.0f}% of daily variance")
+    L.append(f"  Where the move happens     {b['split_1y']:<28} 1y: overnight {_sgn(b['on_1y'])}, intraday {_sgn(b['in_1y'])}; last {b.get('years5', float('nan')):.0f}y per year: overnight {_sgn(b.get('on_5y_pa'))}, intraday {_sgn(b.get('in_5y_pa'))}; gaps carry {b['gap_share']*100:.0f}% of daily variance")
     mt = f"IV/RV today {b['m_today']:.2f}: last 1y {_sgn(b['exp_mt1'], 1)}, all {_sgn(b['exp_mtA'], 1)}" if b["m_today"] else "IV/RV today unknown: pass --iv TICKER=<screener IV> or run --iv-from-chain between 9:30 and 16:00 New York"
     u = b.get("unit", "wk")
     L.append(f"  Sell {'weekly' if u == 'wk' else u} call spreads?{'' if u == 'wk' else ' '} {b['trade']:<28} at fair IV: last 1y {_sgn(b['exp1'], 1)} +/-{_pts(b['se1'])} of risk/{u}, since {b['first'][:4]} {_sgn(b['expA'], 1)}/{u}; breaks even at IV/RV {_num(b['mbe1'])} (1y) / {_num(b['mbeA'])} (all)")
@@ -1645,8 +1663,10 @@ def brief_html(cards: list[dict], basket: str = "") -> str:
         u = b.get("unit", "wk")
         trade_q, per = ("Sell weekly call spreads?", "per week") if u == "wk" else (f"Sell {u} call spreads?", f"per {u[:-2]} weeks")
         out.append(f'<div class="card"><div class="h">{b["ticker"]} <small>${b["close"]:,.2f} on {b["asof"]} &middot; 1y {_sgn(b["ret_1y"])} &middot; vol {b["vol"]*100:.0f}%{si_txt} &middot; {b["weeks_all"]} weeks since {b["first_week"][:4]} &middot; {b["skipped_note"]}</small></div>'
-                   + row("Grinds down, rips up?", b["desc"], f"average week {_sgn(b['mean'], 1)} (mean), typical week {_sgn(b['median'], 1)} (median), up {b['win']*100:.0f}% of weeks; year {_sgn(b['ret_1y'])} but {_sgn(b['cum_ex_top5'])} without its best 5 weeks. A {b['vol']*100:.0f}%-vol random walk gives {b['win_null']*100:.0f}% up-weeks; yours is {b['noise']} its noise band {b['win_lo']*100:.0f} to {b['win_hi']*100:.0f}%.")
-                   + row("Where the move happens", b["split_1y"], f"Last year: overnight {_sgn(b['on_1y'])}, intraday {_sgn(b['in_1y'])}. All data: overnight {_sgn(b['on_all'])}, intraday {_sgn(b['in_all'])}. Overnight gaps carry {b['gap_share']*100:.0f}% of daily variance, and a weekly spread owns every gap.")
+                   + row("Grinds down, rips up?", b["desc"], f"average week {_sgn(b['mean'], 1)} (mean), typical week {_sgn(b['median'], 1)} (median), up {b['win']*100:.0f}% of weeks; "
+                         + (f"year {_sgn(b['ret_1y'])} but {_sgn(b['cum_ex_top5'])} without its best 5 weeks." if b.get("has_1y", True) else f"[{b['desc_window']}] period {_sgn(b['ret_window'])} but {_sgn(b['cum_ex_top5'])} without its best 5 weeks.")
+                         + f" A {b['vol']*100:.0f}%-vol random walk gives {b['win_null']*100:.0f}% up-weeks; yours is {b['noise']} its noise band {b['win_lo']*100:.0f} to {b['win_hi']*100:.0f}%.")
+                   + row("Where the move happens", b["split_1y"], f"Last year: overnight {_sgn(b['on_1y'])}, intraday {_sgn(b['in_1y'])}. Last {b.get('years5', float('nan')):.0f} years, per year: overnight {_sgn(b.get('on_5y_pa'))}, intraday {_sgn(b.get('in_5y_pa'))}. Overnight gaps carry {b['gap_share']*100:.0f}% of daily variance, and a weekly spread owns every gap.")
                    + row(trade_q, b["trade"], f"At fair IV: last 1y {_sgn(b['exp1'], 1)} &plusmn;{_pts(b['se1'])} of risk {per}, since {b['first'][:4]} {_sgn(b['expA'], 1)} {per}. Breaks even at IV/RV {_num(b['mbe1'])} (1y) / {_num(b['mbeA'])} (all). {mt}.")
                    + row("Direction or premium?", b["direction"], f"Call minus put spreads: 1y {_sgn(b['d1'], 1)}, all {_sgn(b['dA'], 1)} of risk {per}. If puts do as well, the edge is the premium, not the drift.")
                    + row("After a +15% week", b["after_rip"], f"Next week up {b['rip_win']*100:.0f}% of the time against {b['all_win']*100:.0f}% for all weeks, median {_sgn(b['rip_med'], 1)}, n={b['rip_n']}." if b["rip_win"] == b["rip_win"] else "Not enough rips in the window.")
@@ -1716,9 +1736,9 @@ def analyse_ticker(ticker: str, daily: pd.DataFrame, source: str, args, daily_fu
         if "=" in body:
             k, v = body.split("=", 1)
             try:
-                overrides[k.upper()] = (kind, float(v))
+                overrides[k.strip(",;").upper()] = (kind, float(v.strip(",;%")))
             except ValueError:
-                pass
+                print(f"  (ignoring {tok!r}: expected TICKER=number)")
     if ticker.upper() in overrides:
         kind, val = overrides[ticker.upper()]
         if kind == "iv":
@@ -2145,6 +2165,16 @@ def _run_paths(paths: list, cfg: SpreadConfig) -> tuple[pd.DataFrame, pd.Series]
     return pd.concat(trades, ignore_index=True), pd.concat(rets, ignore_index=True)
 
 
+def drop_shell_comment(tokens) -> list:
+    """zsh passes a trailing '# comment' through as arguments; everything from the first '#' token on is dropped."""
+    out = []
+    for tok in list(tokens or []):
+        if str(tok).startswith("#"):
+            break
+        out.append(tok)
+    return out
+
+
 def selftest() -> int:
     fails = 0
     def check(name, ok, detail=""):
@@ -2370,12 +2400,14 @@ def main(argv=None) -> int:
         return selftest()
     if args.brief and args.mgmt == ["hold", "tp50_sl2x"]:
         args.mgmt = ["hold"]
+    args.tickers, args.iv, args.m = drop_shell_comment(args.tickers), drop_shell_comment(args.iv), drop_shell_comment(args.m)
     if args.universe:
         extra = []
         for line in Path(args.universe).read_text().splitlines():
             line = line.split("#", 1)[0]
             extra += [tok.strip(",;") for tok in line.split() if tok.strip(",;")]
         args.tickers = list(args.tickers) + extra
+    args.tickers = [t.strip(",;") for t in args.tickers if t.strip(",;")]
     if not args.tickers:
         build_parser().print_help()
         return 2

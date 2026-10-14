@@ -41,7 +41,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from avgweek import (BENCHMARKS, SpreadConfig, _gbm_path, load_prices, price_spread, realized_vol_series,  # noqa: E402
                      spread_pnl_at_expiry, weekly_series)
 
-__version__ = "0.1.0"
+__version__ = "0.2.1"
 MIN_WEEKS = 52            # analog returns needed before a verdict is given
 WINDOW_WEEKS = 156        # trailing window for the week and month rows
 SCALE_CLIP = (0.25, 4.0)  # bounds on the vol-rescaling ratio in the filtered historical simulation
@@ -441,11 +441,38 @@ def write_html(args, cards: list[dict], blocks: list[dict], announce: bool = Fal
 
 # ----------------------------------------------------------------------------------------------------- IO
 def parse_ticker_token(tok: str) -> tuple[str, float | None]:
-    t, _, v = tok.replace(" ", "").partition("=")
+    """'ASTS', 'ASTS=105', 'ASTS=105%,' or 'asts=1.05' -> ('ASTS', 1.05). Raises ValueError with a readable message otherwise."""
+    tok = tok.replace(" ", "").strip(",;:")
+    t, _, v = tok.partition("=")
+    if not t:
+        raise ValueError(f"{tok!r} is not a ticker")
     if not v:
         return t.upper(), None
-    x = float(v.rstrip("%"))
+    try:
+        x = float(v.strip(",;%"))
+    except ValueError:
+        raise ValueError(f"{tok!r}: expected TICKER=IV, e.g. ASTS=105") from None
     return t.upper(), (x / 100.0 if x > 3 else x)
+
+
+def drop_shell_comment(tokens) -> list[str]:
+    """zsh passes a trailing '# comment' through as arguments; everything from the first '#' token on is dropped."""
+    out = []
+    for tok in list(tokens or []):
+        if str(tok).startswith("#"):
+            break
+        out.append(tok)
+    return out
+
+
+def parse_tokens(tokens) -> list[tuple[str, float | None]]:
+    out = []
+    for tok in drop_shell_comment(tokens):
+        try:
+            out.append(parse_ticker_token(tok))
+        except ValueError as exc:
+            print(f"  skipping {exc}")
+    return out
 
 
 def read_universe(path: str) -> list[str]:
@@ -680,15 +707,15 @@ def main() -> int:
     args = p.parse_args()
     if args.selftest:
         return selftest()
-    toks = list(args.tickers)
+    toks = drop_shell_comment(args.tickers)
     if args.universe:
         toks += read_universe(args.universe)
+    parsed = parse_tokens(toks)
     if args.test:
-        return run_test([parse_ticker_token(t)[0] for t in toks], args)
+        return run_test([t for t, _ in parsed], args)
     cards: list[dict] = []
-    if toks:
-        for tok in toks:
-            t, iv = parse_ticker_token(tok)
+    if parsed:
+        for t, iv in parsed:
             c = run_one(t, iv, args)
             if c:
                 cards.append(c)
@@ -704,8 +731,7 @@ def main() -> int:
             break
         if not line or line.lower() in ("q", "quit", "exit"):
             break
-        for tok in line.replace(",", " ").split():
-            t, iv = parse_ticker_token(tok)
+        for t, iv in parse_tokens(line.replace(",", " ").split()):
             c = run_one(t, iv, args)
             if c:
                 cards.append(c)
