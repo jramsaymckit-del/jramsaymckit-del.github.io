@@ -23,6 +23,8 @@ Dependencies: numpy, pandas. (pip install yfinance requests for live data.) scip
 from __future__ import annotations
 
 import argparse
+import contextlib
+import io
 import json
 import math
 import os
@@ -35,7 +37,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-__version__ = "0.3.1"
+__version__ = "0.4.0"
 
 # ======================================================================================================
 # 1. Normal distribution + chi-square helpers (self-contained; trivially portable to JS)
@@ -1396,6 +1398,114 @@ CANNOT: the actual historical dollar result (entry credits depend on IV, skew an
 
 
 # ======================================================================================================
+# 7b. Brief mode: the six lines that decide the thesis, nothing else
+# ======================================================================================================
+
+def _sgn(v, d=0):
+    return "n/a" if v is None or v != v else f"{v*100:+.{d}f}%"
+
+
+def _pts(v, d=1):
+    return "n/a" if v is None or v != v else f"{v*100:.{d}f}"
+
+
+def brief_fields(ticker, wk, stats, base_summary, base_all, m_be, mirror, cond, yr, sweep, chain, chain_note, m_today_summ, skipped_note):
+    s1 = stats.loc["1y"] if "1y" in stats.index else stats.iloc[-1]
+    win, lo, hi, null = s1["win_rate"], s1["win_ci_lo"], s1["win_ci_hi"], s1["win_null"]
+    desc = "YES" if (s1["median_wk"] < 0 and win < 0.5) else ("PARTLY" if (s1["median_wk"] < 0 or win < 0.5) else "NO")
+    noise = "inside" if (lo <= null <= hi) else ("below" if null > hi else "above")
+    exp1, se1 = base_summary.get("expectancy_pct_risk", float("nan")), base_summary.get("expectancy_se_pct_risk", float("nan"))
+    expA, seA = base_all.get("expectancy_pct_risk", float("nan")), base_all.get("expectancy_se_pct_risk", float("nan"))
+    mbe1, mbeA = m_be.get("1y", float("nan")), m_be.get("all", float("nan"))
+    m_today = chain["m_today"] if chain and chain.get("m_today") == chain.get("m_today") else None
+    exp_mt1 = m_today_summ.get("1y", {}).get("expectancy_pct_risk", float("nan")) if m_today_summ else float("nan")
+    exp_mtA = m_today_summ.get("all", {}).get("expectancy_pct_risk", float("nan")) if m_today_summ else float("nan")
+    if expA == expA and seA == seA and expA > 2 * seA and exp1 == exp1 and exp1 > -se1:
+        trade = "YES at fair pricing"
+    elif m_today and exp_mt1 == exp_mt1 and exp_mtA == exp_mtA and exp_mt1 > 0 and exp_mtA > 0:
+        trade = f"YES on today's premium (IV/RV {m_today:.2f})"
+    elif m_today:
+        trade = f"NO (IV/RV today {m_today:.2f}, needs {_num(max(mbe1, mbeA))})"
+    else:
+        trade = "NO at fair pricing"
+    d1 = mirror.loc["1y", "call_minus_put_pct_risk"] if (not mirror.empty and "1y" in mirror.index) else float("nan")
+    dA = mirror.loc["all", "call_minus_put_pct_risk"] if (not mirror.empty and "all" in mirror.index) else float("nan")
+    if d1 == d1 and dA == dA and d1 > 0.02 and dA > 0.02:
+        direction = "DIRECTION (calls beat puts)"
+    elif d1 == d1 and dA == dA and d1 < -0.02 and dA < -0.02:
+        direction = "PUT SIDE BETTER"
+    else:
+        direction = "PREMIUM, not direction"
+    rip_row = cond.loc["after week > +15%"] if "after week > +15%" in cond.index else None
+    all_row = cond.loc["all weeks"] if "all weeks" in cond.index else None
+    if rip_row is not None and all_row is not None and rip_row["n"] >= 10:
+        gap = rip_row["next_wk_win_rate"] - all_row["next_wk_win_rate"]
+        after_rip = "MOMENTUM" if gap > 0.10 else ("MEAN REVERSION" if gap < -0.10 else "NO SIGNAL")
+    else:
+        after_rip, gap = "TOO FEW RIPS TO SAY", float("nan")
+    years = [(int(y), float(r["expectancy_pct_risk"]), float(r["stock_ret"])) for y, r in yr.iterrows()] if not yr.empty else []
+    sw = sweep[(sweep["period"] == "1y") & (sweep["mgmt"] == "hold") & (sweep["iv_mult"] == 1.0)] if not sweep.empty else pd.DataFrame()
+    deltas = sorted(((float(r["delta"]), float(r["expectancy_pct_risk"])) for _, r in sw.iterrows()), reverse=True) if not sw.empty else []
+    return dict(ticker=ticker, close=float(wk["close"].iloc[-1]), asof=str(wk["date"].iloc[-1].date()), ret_1y=s1["cum_return"], vol=s1["ann_vol"],
+                weeks=int(s1["weeks"]), median=s1["median_wk"], win=win, win_lo=lo, win_hi=hi, win_null=null, noise=noise,
+                cum_ex_top5=s1["cum_ex_top5"], desc=desc, exp1=exp1, se1=se1, expA=expA, seA=seA, mbe1=mbe1, mbeA=mbeA,
+                m_today=m_today, exp_mt1=exp_mt1, exp_mtA=exp_mtA, trade=trade, chain_note=chain_note, d1=d1, dA=dA, direction=direction,
+                rip_n=int(rip_row["n"]) if rip_row is not None else 0, rip_win=rip_row["next_wk_win_rate"] if rip_row is not None else float("nan"),
+                rip_med=rip_row["next_wk_median"] if rip_row is not None else float("nan"), all_win=all_row["next_wk_win_rate"] if all_row is not None else float("nan"),
+                after_rip=after_rip, years=years, deltas=deltas, full_loss=base_all.get("full_loss_rate", float("nan")),
+                max_dd=base_all.get("max_drawdown_$", float("nan")), first=base_all.get("first_entry", ""), skipped_note=skipped_note)
+
+
+def brief_text(b: dict) -> str:
+    L = []
+    L.append(f"{b['ticker']}  ${b['close']:,.2f}   1y {_sgn(b['ret_1y'])}   vol {b['vol']*100:.0f}%   ({b['weeks']} weeks; {b['skipped_note']})")
+    L.append(f"  Grinds down, rips up?      {b['desc']:<28} typical week {_sgn(b['median'], 1)}, up {b['win']*100:.0f}% of weeks; year {_sgn(b['ret_1y'])} but {_sgn(b['cum_ex_top5'])} without its best 5 weeks")
+    L.append(f"                             {'':<28} (a {b['vol']*100:.0f}%-vol random walk gives {b['win_null']*100:.0f}% up-weeks; yours is {b['noise']} its noise band {b['win_lo']*100:.0f}-{b['win_hi']*100:.0f}%)")
+    mt = f"IV/RV today {b['m_today']:.2f}: last 1y {_sgn(b['exp_mt1'], 1)}, all {_sgn(b['exp_mtA'], 1)}" if b["m_today"] else "IV/RV today unknown: run between 9:30 and 16:00 New York"
+    L.append(f"  Sell weekly call spreads?  {b['trade']:<28} at fair IV: last 1y {_sgn(b['exp1'], 1)} +/-{_pts(b['se1'])} of risk/wk, since {b['first'][:4]} {_sgn(b['expA'], 1)}/wk; breaks even at IV/RV {_num(b['mbe1'])} (1y) / {_num(b['mbeA'])} (all)")
+    L.append(f"                             {'':<28} ({mt})")
+    L.append(f"  Direction or premium?      {b['direction']:<28} call minus put spreads: 1y {_sgn(b['d1'], 1)}, all {_sgn(b['dA'], 1)} of risk/wk")
+    L.append(f"  After a +15% week          {b['after_rip']:<28} next week up {_sgn(b['rip_win'], 0)[1:] if b['rip_win'] == b['rip_win'] else 'n/a'} of the time (all weeks {_sgn(b['all_win'], 0)[1:] if b['all_win'] == b['all_win'] else 'n/a'}), median {_sgn(b['rip_med'], 1)}, n={b['rip_n']}")
+    if b["years"]:
+        L.append("  By year (30d, fair IV)     " + "  ".join(f"{y} {e*100:+.0f}%" for y, e, _ in b["years"]) + "   (stock: " + " ".join(f"{r*100:+.0f}%" for _, _, r in b["years"]) + ")")
+    if b["deltas"]:
+        best = max(b["deltas"], key=lambda t: t[1])
+        L.append(f"  Best short delta, last 1y  {best[0]:.2f} {_sgn(best[1], 1)}/wk" + " " * 14 + "(" + ", ".join(f"{d:.2f}: {_sgn(e, 1)}" for d, e in b["deltas"]) + f"; full-width losses {b['full_loss']*100:.0f}% of weeks, worst run ${b['max_dd']:,.0f} per contract)")
+    return "\n".join(L)
+
+
+def brief_html(cards: list[dict], basket: str = "") -> str:
+    css = ("body{background:#0b0c10;color:#e6e6e6;font:15px/1.5 -apple-system,Segoe UI,Roboto,sans-serif;margin:28px;max-width:1100px}"
+           ".card{background:#13161d;border:1px solid #252a38;border-radius:10px;padding:18px 22px;margin:0 0 18px}"
+           ".h{font-size:22px;font-weight:600;margin:0 0 10px} .h small{color:#8c94a8;font-weight:400;font-size:14px;margin-left:12px}"
+           ".row{display:grid;grid-template-columns:230px 250px 1fr;gap:10px;padding:7px 0;border-top:1px solid #1f2430} .row:first-of-type{border-top:0}"
+           ".q{color:#8c94a8} .v{font-weight:600} .yes{color:#4caf82} .no{color:#e05c5c} .mid{color:#c9a84c} .d{color:#c8cdd8;font-size:13.5px}"
+           ".basket{color:#c9a84c;font-size:14px;margin:0 0 14px}")
+    def cls(v):
+        v = v.upper()
+        return "yes" if v.startswith("YES") or v.startswith("DIRECTION") else ("no" if v.startswith("NO") or v.startswith("PUT") else "mid")
+    def row(q, v, d):
+        return f'<div class="row"><div class="q">{q}</div><div class="v {cls(v)}">{v}</div><div class="d">{d}</div></div>'
+    out = [f'<!doctype html><html><head><meta charset="utf-8"><title>avgweek brief</title><style>{css}</style></head><body>']
+    if basket:
+        out.append(f'<p class="basket">{basket}</p>')
+    for b in cards:
+        mt = f"IV/RV today {b['m_today']:.2f}: last 1y {_sgn(b['exp_mt1'], 1)}, all {_sgn(b['exp_mtA'], 1)}" if b["m_today"] else "IV/RV today unknown: run between 9:30 and 16:00 New York"
+        years = "&nbsp;&nbsp;".join(f"{y} <b>{e*100:+.0f}%</b> <span class=q>({r*100:+.0f}%)</span>" for y, e, r in b["years"])
+        deltas = ", ".join(f"{d:.2f}: {_sgn(e, 1)}" for d, e in b["deltas"])
+        out.append(f'<div class="card"><div class="h">{b["ticker"]} <small>${b["close"]:,.2f} on {b["asof"]} &middot; 1y {_sgn(b["ret_1y"])} &middot; vol {b["vol"]*100:.0f}% &middot; {b["skipped_note"]}</small></div>'
+                   + row("Grinds down, rips up?", b["desc"], f"typical week {_sgn(b['median'], 1)}, up {b['win']*100:.0f}% of weeks; year {_sgn(b['ret_1y'])} but {_sgn(b['cum_ex_top5'])} without its best 5 weeks. A {b['vol']*100:.0f}%-vol random walk gives {b['win_null']*100:.0f}% up-weeks; yours is {b['noise']} its noise band {b['win_lo']*100:.0f} to {b['win_hi']*100:.0f}%.")
+                   + row("Sell weekly call spreads?", b["trade"], f"At fair IV: last 1y {_sgn(b['exp1'], 1)} &plusmn;{_pts(b['se1'])} of risk per week, since {b['first'][:4]} {_sgn(b['expA'], 1)} per week. Breaks even at IV/RV {_num(b['mbe1'])} (1y) / {_num(b['mbeA'])} (all). {mt}.")
+                   + row("Direction or premium?", b["direction"], f"Call minus put spreads: 1y {_sgn(b['d1'], 1)}, all {_sgn(b['dA'], 1)} of risk per week. If puts do as well, the edge is the premium, not the drift.")
+                   + row("After a +15% week", b["after_rip"], f"Next week up {b['rip_win']*100:.0f}% of the time against {b['all_win']*100:.0f}% for all weeks, median {_sgn(b['rip_med'], 1)}, n={b['rip_n']}." if b["rip_win"] == b["rip_win"] else "Not enough rips in the window.")
+                   + row("By year (30-delta, fair IV)", "", years + " <span class=q>(stock return in brackets)</span>")
+                   + (row("Best short delta, last 1y", f"{max(b['deltas'], key=lambda t: t[1])[0]:.2f} {_sgn(max(b['deltas'], key=lambda t: t[1])[1], 1)}/wk", f"{deltas}. Full-width losses {b['full_loss']*100:.0f}% of weeks; worst run ${b['max_dd']:,.0f} per contract. Differences inside &plusmn;{_pts(b['se1'], 0)} points are noise.") if b["deltas"] else "")
+                   + "</div>")
+    out.append('<p class="q" style="font-size:12.5px">Option P&amp;L is synthetic: Black-Scholes at IV = m x realized vol. "Fair IV" is m = 1. Full tables are in report.html next to this file.</p></body></html>')
+    return "".join(out)
+
+
+# ======================================================================================================
 # 8. Orchestration
 # ======================================================================================================
 
@@ -1648,9 +1758,20 @@ def analyse_ticker(ticker: str, daily: pd.DataFrame, source: str, args, daily_fu
     if not sweep.empty:
         print(fmt_table(sweep[sweep["period"] == "1y"].drop(columns=["period", "side"]).set_index("config")))
 
+    # ---- brief card
+    m_today_summ = {}
+    if chain and chain.get("m_today") == chain.get("m_today"):
+        lab = mk(iv_mult=round(chain["m_today"], 2)).label()
+        if lab in trade_sets:
+            tr_mt = trade_sets[lab][1]
+            m_today_summ = {"1y": summarize_trades(slice_period(tr_mt, 12, asof_tr)), "all": summarize_trades(tr_mt)}
+    skipped_note = f"backtest skipped {base_all.get('skipped', 0)} weeks: {base_all.get('skip_reasons', 'none')}" if base_all.get("skipped") else "no weeks skipped"
+    brief = brief_fields(ticker, wk, stats, base_summary, base_all, m_be, mirror, cond, yr, sweep, chain, chain_note, m_today_summ, skipped_note)
+
     # ---- outputs
     out_dir = Path(args.out) / ticker.upper()
     out_dir.mkdir(parents=True, exist_ok=True)
+    (out_dir / "brief.html").write_text(brief_html([brief]), encoding="utf-8")
     stats.drop(columns=["pooled"], errors="ignore").to_csv(out_dir / "weekly_stats.csv")
     yearly.drop(columns=["pooled"], errors="ignore").to_csv(out_dir / "yearly_stats.csv")
     horizon_df.to_csv(out_dir / "horizon.csv")
@@ -1679,7 +1800,7 @@ def analyse_ticker(ticker: str, daily: pd.DataFrame, source: str, args, daily_fu
     (out_dir / "summary.json").write_text(json.dumps(_json_safe(summary), indent=1, default=str, allow_nan=False))
     print(f"\nWrote {out_dir}/report.html (+ csv, summary.json)")
     return {"ticker": ticker, "wk": wk, "daily": daily, "stats": stats, "base_trades": base_trades, "put_trades": put_trades, "base_cfg": base_cfg,
-            "summary": summary, "exceed": exceed, "sweep": sweep}
+            "summary": summary, "exceed": exceed, "sweep": sweep, "brief": brief}
 
 
 def pooled_report(results: list[dict], args) -> None:
@@ -1760,6 +1881,11 @@ def run_ticker(ticker: str, args) -> dict:
         daily = daily[daily.index >= pd.Timestamp(args.start)]   # analysis window; daily_full keeps the warm-up for vol/regimes
     if len(daily) < 30:
         raise SystemExit(f"{ticker}: only {len(daily)} daily bars in the window; need at least 30")
+    if args.brief:
+        with contextlib.redirect_stdout(io.StringIO()):
+            res = analyse_ticker(ticker, daily, source, args, daily_full=daily_full)
+        print(brief_text(res["brief"]) + "\n")
+        return res
     return analyse_ticker(ticker, daily, source, args, daily_full=daily_full)
 
 
@@ -1992,6 +2118,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--no-breakeven", action="store_true", help="skip the break-even multiplier search (faster)")
     p.add_argument("--no-pool", action="store_true", help="skip the pooled-basket section when several tickers are given")
     p.add_argument("--out", default="avgweek_out")
+    p.add_argument("--brief", action="store_true", help="print one short card per ticker (six lines that decide the thesis) and write BRIEF.html; nothing else")
     p.add_argument("--selftest", action="store_true")
     return p
 
@@ -2000,6 +2127,8 @@ def main(argv=None) -> int:
     args = build_parser().parse_args(argv)
     if args.selftest:
         return selftest()
+    if args.brief and args.mgmt == ["hold", "tp50_sl2x"]:
+        args.mgmt = ["hold"]
     if args.universe:
         extra = []
         for line in Path(args.universe).read_text().splitlines():
@@ -2026,6 +2155,24 @@ def main(argv=None) -> int:
         print(f"\nFailed tickers: {', '.join(f'{t} ({msg[:80]})' for t, msg in failed)}")
     if not results:
         return 1
+    if args.brief:
+        cards = [r["brief"] for r in results]
+        basket = ""
+        if len(results) > 1:
+            calls = pd.concat([r["base_trades"] for r in results], ignore_index=True)
+            puts = pd.concat([r["put_trades"] for r in results], ignore_index=True)
+            sc, sp = summarize_trades(calls), summarize_trades(puts)
+            sc1, sp1 = summarize_trades(slice_period(calls, 12)), summarize_trades(slice_period(puts, 12))
+            n_desc = sum(1 for c in cards if c["desc"] == "YES")
+            n_trade = sum(1 for c in cards if c["trade"].startswith("YES"))
+            basket = (f"Basket of {len(cards)}: grind-down-rip-up signature in {n_desc}; call spreads a YES in {n_trade}. Pooled at fair IV, all data: calls {_sgn(sc.get('expectancy_pct_risk'), 1)} vs puts {_sgn(sp.get('expectancy_pct_risk'), 1)} of risk/wk; "
+                      f"last 1y: calls {_sgn(sc1.get('expectancy_pct_risk'), 1)} vs puts {_sgn(sp1.get('expectancy_pct_risk'), 1)}.")
+            print(basket)
+        out = Path(args.out) / "BRIEF.html"
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(brief_html(cards, basket), encoding="utf-8")
+        print(f"\nWrote {out}  (full tables per ticker are in {args.out}/<TICKER>/report.html)")
+        return 0
     if len(results) > 1:
         print(f"\n{'='*110}\nCROSS-TICKER (baseline call spreads, last 1y)\n{'='*110}")
         for r in results:
