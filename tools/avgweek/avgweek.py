@@ -37,7 +37,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-__version__ = "0.5.1"
+__version__ = "0.6.0"
 
 # ======================================================================================================
 # 1. Normal distribution + chi-square helpers (self-contained; trivially portable to JS)
@@ -776,10 +776,11 @@ class SpreadConfig:
     earnings_move: float = 0.12    # implied move used by 'bump'
     risk_budget: float = 2000.0    # for the constant-risk sizing variant
     min_rv: float = 0.0            # only trade weeks whose trailing realized vol at entry is at least this (0 = all)
+    hold_weeks: int = 1            # 1 = weekly expiries every week; 2 = two-week spreads entered every other week
 
     def label(self) -> str:
         w = f"${self.width_abs:g}" if self.width_abs else f"{self.width_pct:.0%}"
-        return f"{self.side}_d{self.delta:.2f}_w{w}_m{self.iv_mult:g}_{self.mgmt}"
+        return f"{self.side}_d{self.delta:.2f}_w{w}_m{self.iv_mult:g}_{self.mgmt}" + (f"_h{self.hold_weeks}" if self.hold_weeks != 1 else "")
 
 
 def realized_vol_series(close: pd.Series, mode: str = "blend") -> pd.Series:
@@ -838,8 +839,9 @@ def backtest_spreads(daily: pd.DataFrame, wk: pd.DataFrame, cfg: SpreadConfig, e
     is_call = cfg.side == "call"
     rows = []
     idx = list(wk.index)
-    for i in range(len(idx) - 1):
-        e_lbl, x_lbl = idx[i], idx[i + 1]
+    hw = max(int(cfg.hold_weeks), 1)
+    for i in range(0, len(idx) - hw, hw):
+        e_lbl, x_lbl = idx[i], idx[i + hw]
         entry_date, exp_date = wk.at[e_lbl, "date"], wk.at[x_lbl, "date"]
         S0, ST = float(wk.at[e_lbl, "close"]), float(wk.at[x_lbl, "close"])
         prev_ret = wk.at[e_lbl, "ret"]
@@ -971,6 +973,7 @@ def summarize_trades(trades: pd.DataFrame, years_hint: float | None = None) -> d
     cum = pd.concat([pd.Series([0.0]), t["pnl"].cumsum()], ignore_index=True)  # equity starts at zero
     span_days = (t["expiry_date"].max() - t["entry_date"].min()).days
     years = years_hint or max(span_days / 365.25, 1e-9)
+    ppy = max(n / years, 1.0) if n > 2 else 52.0   # trades per year (52 weekly, 26 two-weekly)
     avg_risk = float(t["max_risk"].mean())
     streak, worst_streak = 0, 0
     for w in (t["pnl"] > 0).values:
@@ -988,14 +991,15 @@ def summarize_trades(trades: pd.DataFrame, years_hint: float | None = None) -> d
         "expectancy_se_pct_risk": float((t["pnl"] / t["max_risk"]).std(ddof=1) / math.sqrt(n)) if n > 2 else float("nan"),
         "expectancy_pct_notional": float((t["pnl"] / (t["S0"] * 100.0)).mean()),
         "full_loss_rate": float((t["pnl"] <= -0.9 * t["max_risk"]).mean()),
-        "years_to_2sigma": float((2 * (t["pnl"] / t["max_risk"]).std(ddof=1) / abs((t["pnl"] / t["max_risk"]).mean())) ** 2 / 52) if n > 2 and (t["pnl"] / t["max_risk"]).mean() != 0 else float("nan"),
+        "years_to_2sigma": float((2 * (t["pnl"] / t["max_risk"]).std(ddof=1) / abs((t["pnl"] / t["max_risk"]).mean())) ** 2 / ppy) if n > 2 and (t["pnl"] / t["max_risk"]).mean() != 0 else float("nan"),
         "return_on_max_risk": float(t["pnl"].sum() / t["max_risk"].sum()),
         "return_on_avg_risk_annual": float(t["pnl"].sum() / avg_risk / years) if avg_risk > 0 else float("nan"),
         "breakeven_win_rate": float(abs(losses.mean()) / (wins.mean() + abs(losses.mean()))) if len(wins) and len(losses) else float("nan"),
         "max_drawdown_$": float((cum - cum.cummax()).min()),
         "longest_losing_streak": int(worst_streak),
         "worst5_share_of_losses": float(worst5 / losses.sum()) if len(losses) and losses.sum() else float("nan"),
-        "sharpe_weekly": float(t["pnl"].mean() / t["pnl"].std(ddof=1) * math.sqrt(52)) if n > 2 and t["pnl"].std(ddof=1) > 0 else float("nan"),
+        "sharpe_weekly": float(t["pnl"].mean() / t["pnl"].std(ddof=1) * math.sqrt(ppy)) if n > 2 and t["pnl"].std(ddof=1) > 0 else float("nan"),
+        "trades_per_year": float(ppy),
         "pnl_const_risk": float(t["pnl_const_risk"].sum()),
         "avg_contracts_const_risk": float(t["contracts_const_risk"].mean()),
         "const_risk_zero_weeks": int((t["contracts_const_risk"] == 0).sum()),
@@ -1568,15 +1572,16 @@ def brief_text(b: dict) -> str:
     L.append(f"                             {'':<28} (a {b['vol']*100:.0f}%-vol random walk gives {b['win_null']*100:.0f}% up-weeks; yours is {b['noise']} its noise band {b['win_lo']*100:.0f}-{b['win_hi']*100:.0f}%)")
     L.append(f"  Where the move happens     {b['split_1y']:<28} 1y: overnight {_sgn(b['on_1y'])}, intraday {_sgn(b['in_1y'])}; all data: overnight {_sgn(b['on_all'])}, intraday {_sgn(b['in_all'])}; gaps carry {b['gap_share']*100:.0f}% of daily variance")
     mt = f"IV/RV today {b['m_today']:.2f}: last 1y {_sgn(b['exp_mt1'], 1)}, all {_sgn(b['exp_mtA'], 1)}" if b["m_today"] else "IV/RV today unknown: pass --iv TICKER=<screener IV> or run --iv-from-chain between 9:30 and 16:00 New York"
-    L.append(f"  Sell weekly call spreads?  {b['trade']:<28} at fair IV: last 1y {_sgn(b['exp1'], 1)} +/-{_pts(b['se1'])} of risk/wk, since {b['first'][:4]} {_sgn(b['expA'], 1)}/wk; breaks even at IV/RV {_num(b['mbe1'])} (1y) / {_num(b['mbeA'])} (all)")
+    u = b.get("unit", "wk")
+    L.append(f"  Sell {'weekly' if u == 'wk' else u} call spreads?{'' if u == 'wk' else ' '} {b['trade']:<28} at fair IV: last 1y {_sgn(b['exp1'], 1)} +/-{_pts(b['se1'])} of risk/{u}, since {b['first'][:4]} {_sgn(b['expA'], 1)}/{u}; breaks even at IV/RV {_num(b['mbe1'])} (1y) / {_num(b['mbeA'])} (all)")
     L.append(f"                             {'':<28} ({mt})")
-    L.append(f"  Direction or premium?      {b['direction']:<28} call minus put spreads: 1y {_sgn(b['d1'], 1)}, all {_sgn(b['dA'], 1)} of risk/wk")
+    L.append(f"  Direction or premium?      {b['direction']:<28} call minus put spreads: 1y {_sgn(b['d1'], 1)}, all {_sgn(b['dA'], 1)} of risk/{u}")
     L.append(f"  After a +15% week          {b['after_rip']:<28} next week up {_sgn(b['rip_win'], 0)[1:] if b['rip_win'] == b['rip_win'] else 'n/a'} of the time (all weeks {_sgn(b['all_win'], 0)[1:] if b['all_win'] == b['all_win'] else 'n/a'}), median {_sgn(b['rip_med'], 1)}, n={b['rip_n']}")
     if b["years"]:
         L.append(f"  By year (30d, fair IV)     {'last 8y: ' if b.get('years_cut') else ''}" + "  ".join(f"{y} {e*100:+.0f}%" for y, e, _ in b["years"]) + "   (stock: " + " ".join(f"{r*100:+.0f}%" for _, _, r in b["years"]) + ")")
     if b["deltas"]:
         best = max(b["deltas"], key=lambda t: t[1])
-        L.append(f"  Best short delta, last 1y  {best[0]:.2f} {_sgn(best[1], 1)}/wk" + " " * 14 + "(" + ", ".join(f"{d:.2f}: {_sgn(e, 1)}" for d, e in b["deltas"]) + f"; full-width losses {b['full_loss']*100:.0f}% of weeks, worst run ${b['max_dd']:,.0f} per contract)")
+        L.append(f"  Best short delta, last 1y  {best[0]:.2f} {_sgn(best[1], 1)}/{u}" + " " * 14 + "(" + ", ".join(f"{d:.2f}: {_sgn(e, 1)}" for d, e in b["deltas"]) + f"; full-width losses {b['full_loss']*100:.0f}% of trades, worst run ${b['max_dd']:,.0f} per contract)")
     return "\n".join(L)
 
 
@@ -1800,7 +1805,7 @@ def analyse_ticker(ticker: str, daily: pd.DataFrame, source: str, args, daily_fu
                     r=args.rate, strike_step=strike_step, snap_mode=args.snap, slip_frac=args.slip, slip_floor_per_leg=args.slip_floor,
                     mark_iv_mult=args.mark_iv_mult, commission=args.commission,
                     mgmt="hold", earnings=args.earnings if earnings else "include", earnings_move=args.earnings_move,
-                    risk_budget=args.risk_budget, min_rv=args.min_vol or 0.0)
+                    risk_budget=args.risk_budget, min_rv=args.min_vol or 0.0, hold_weeks=args.hold_weeks)
         base.update(kw)
         return SpreadConfig(**base)
 
@@ -1933,7 +1938,8 @@ def analyse_ticker(ticker: str, daily: pd.DataFrame, source: str, args, daily_fu
         if lab in trade_sets:
             tr_mt = trade_sets[lab][1]
             m_today_summ = {"1y": summarize_trades(slice_period(tr_mt, 12, asof_tr)), "all": summarize_trades(tr_mt)}
-    skipped_note = ((f"high-vol weeks only (trailing vol >= {args.min_vol:.0%}); " if args.min_vol else "")
+    skipped_note = ((f"{args.hold_weeks}-week spreads entered every {args.hold_weeks} weeks; " if args.hold_weeks != 1 else "")
+                    + (f"high-vol weeks only (trailing vol >= {args.min_vol:.0%}); " if args.min_vol else "")
                     + (f"backtest skipped {base_all.get('skipped', 0)} weeks: {base_all.get('skip_reasons', 'none')}" if base_all.get("skipped") else "no weeks skipped")
                     + f"; call-wing skew assumed {skew_s:+.1f}")
     si_now = None
@@ -1941,6 +1947,7 @@ def analyse_ticker(ticker: str, daily: pd.DataFrame, source: str, args, daily_fu
         last = si_hist.iloc[-1]
         si_now = {"days_to_cover": float(last["days_to_cover"]), "pct_float": (float(last["short_interest"]) / float_shares) if float_shares else None, "date": str(last["settlement_date"].date())}
     brief = brief_fields(ticker, wk, stats, base_summary, base_all, m_be, mirror, cond, yr, sweep, chain, chain_note, m_today_summ, skipped_note, decomp, si_now)
+    brief["unit"] = "wk" if args.hold_weeks == 1 else f"{args.hold_weeks}wk"
 
     # ---- outputs
     out_dir = Path(args.out) / ticker.upper()
@@ -2282,6 +2289,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--m", nargs="*", default=[], help="IV/RV multiplier per ticker directly, e.g. ASTS=1.2")
     p.add_argument("--no-short-interest", action="store_true", help="skip the Nasdaq short-interest fetch")
     p.add_argument("--min-vol", type=float, default=None, help="keep only weeks whose trailing realized vol at entry is at least this (e.g. 0.6): 'high-beta weeks across all years'")
+    p.add_argument("--hold-weeks", type=int, default=1, help="1 = weekly spreads every week (default); 2 = two-week spreads entered every other week")
     p.add_argument("--grid-from-chain", action="store_true", help="use the chain's modal strike spacing as the grid for the whole backtest")
     p.add_argument("--rv-mode", default="blend", choices=["blend", "rv20", "longrun"], help="realized-vol estimator behind the IV proxy")
     p.add_argument("--skew", type=float, default=None, help="call skew s (default: from chain if available, else 0.3; 0 = flat)")
