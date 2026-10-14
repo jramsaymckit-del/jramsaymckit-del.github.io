@@ -37,7 +37,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-__version__ = "0.4.0"
+__version__ = "0.4.1"
 
 # ======================================================================================================
 # 1. Normal distribution + chi-square helpers (self-contained; trivially portable to JS)
@@ -797,9 +797,16 @@ def realized_vol_series(close: pd.Series, mode: str = "blend") -> pd.Series:
     return out
 
 
-def regime_frame(daily: pd.DataFrame) -> pd.DataFrame:
+def regime_frame(daily: pd.DataFrame, short_interest: pd.DataFrame | None = None, float_shares: float | None = None) -> pd.DataFrame:
     c = daily["close"]
     f = pd.DataFrame(index=daily.index)
+    if short_interest is not None and len(short_interest):
+        si = short_interest.sort_values("available_date")
+        m = pd.merge_asof(pd.DataFrame({"date": daily.index}), si[["available_date", "short_interest", "days_to_cover"]].rename(columns={"available_date": "date"}),
+                          on="date", direction="backward")
+        f["si_days_to_cover"] = m["days_to_cover"].values
+        f["si_shares"] = m["short_interest"].values
+        f["si_pct_float"] = (m["short_interest"].values / float_shares) if float_shares else np.nan
     f["dma50"] = c.rolling(50).mean()
     f["dma50_slope"] = f["dma50"].diff(20)
     f["dma200"] = c.rolling(200).mean()
@@ -1151,6 +1158,71 @@ def chain_calibration(ticker: str, spot: float, rv_now: float, rate: float = 0.0
         return None
 
 
+SEC_UA = os.environ.get("AVGWEEK_CONTACT", "avgweek research tool (set AVGWEEK_CONTACT=name email for SEC fair-access policy)")
+
+
+def harvest_edgar_8k(block: dict) -> set:
+    """Earnings-release dates from an EDGAR submissions block: 8-K filings whose items include 2.02
+    (Results of Operations). reportDate is the event date; filingDate is the fallback."""
+    out = set()
+    forms, items = block.get("form", []), block.get("items", [])
+    rdates, fdates = block.get("reportDate", []), block.get("filingDate", [])
+    for i, f in enumerate(forms):
+        if f in ("8-K", "8-K/A") and "2.02" in str(items[i] if i < len(items) else ""):
+            d = (rdates[i] if i < len(rdates) else "") or (fdates[i] if i < len(fdates) else "")
+            if d:
+                out.add(pd.Timestamp(d).normalize())
+    return out
+
+
+def earnings_from_edgar(ticker: str, years: int = 8) -> set:
+    """Free and authoritative: SEC EDGAR 8-K item 2.02 filings. Needs network; returns an empty set on failure."""
+    import requests
+    h = {"User-Agent": SEC_UA, "Accept-Encoding": "gzip, deflate"}
+    tick = requests.get("https://www.sec.gov/files/company_tickers.json", headers=h, timeout=30).json()
+    cik = next((v["cik_str"] for v in tick.values() if str(v.get("ticker", "")).upper() == ticker.upper()), None)
+    if cik is None:
+        return set()
+    sub = requests.get(f"https://data.sec.gov/submissions/CIK{int(cik):010d}.json", headers=h, timeout=30).json()
+    dates = harvest_edgar_8k(sub.get("filings", {}).get("recent", {}))
+    cutoff = pd.Timestamp.today() - pd.DateOffset(years=years)
+    for extra in sub.get("filings", {}).get("files", []):
+        if pd.Timestamp(extra.get("filingTo", "1900-01-01")) < cutoff:
+            continue
+        try:
+            dates |= harvest_edgar_8k(requests.get(f"https://data.sec.gov/submissions/{extra['name']}", headers=h, timeout=30).json())
+        except Exception:  # noqa: BLE001
+            pass
+    return dates
+
+
+def parse_nasdaq_short_interest(payload: dict) -> pd.DataFrame:
+    """Nasdaq's per-symbol short-interest table (bi-monthly settlement dates, about one year). Publication lags the
+    settlement date by roughly nine business days, so `available_date` is what the backtest may know at entry."""
+    rows = (((payload or {}).get("data") or {}).get("shortInterestTable") or {}).get("rows") or []
+    def num(x):
+        try:
+            return float(str(x).replace(",", ""))
+        except (TypeError, ValueError):
+            return float("nan")
+    out = pd.DataFrame({
+        "settlement_date": [pd.Timestamp(r.get("settlementDate")) for r in rows],
+        "short_interest": [num(r.get("interest")) for r in rows],
+        "avg_daily_volume": [num(r.get("avgDailyShareVolume")) for r in rows],
+        "days_to_cover": [num(r.get("daysToCover")) for r in rows],
+    }).dropna(subset=["settlement_date"]).sort_values("settlement_date")
+    out["available_date"] = out["settlement_date"] + pd.offsets.BDay(10)
+    return out.reset_index(drop=True)
+
+
+def short_interest_history(ticker: str) -> pd.DataFrame:
+    import requests
+    url = f"https://api.nasdaq.com/api/quote/{ticker.upper()}/short-interest?assetClass=stocks"
+    h = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0 Safari/537.36",
+         "Accept": "application/json, text/plain, */*", "Accept-Language": "en-US,en;q=0.9", "Origin": "https://www.nasdaq.com", "Referer": "https://www.nasdaq.com/"}
+    return parse_nasdaq_short_interest(requests.get(url, headers=h, timeout=20).json())
+
+
 def load_earnings(ticker: str, earnings_file: str | None, fetch: bool) -> set:
     dates: set = set()
     if earnings_file:
@@ -1159,6 +1231,13 @@ def load_earnings(ticker: str, earnings_file: str | None, fetch: bool) -> set:
             if raw:
                 dates.add(pd.Timestamp(raw).normalize())
     if fetch:
+        try:
+            edgar = earnings_from_edgar(ticker)
+            if edgar:
+                print(f"  earnings dates from SEC EDGAR 8-K item 2.02: {len(edgar)}")
+            dates |= edgar
+        except Exception as exc:  # noqa: BLE001
+            print(f"  (could not fetch EDGAR filings: {exc})")
         try:
             import yfinance as yf
             ed = yf.Ticker(ticker).get_earnings_dates(limit=60)
@@ -1409,8 +1488,20 @@ def _pts(v, d=1):
     return "n/a" if v is None or v != v else f"{v*100:.{d}f}"
 
 
-def brief_fields(ticker, wk, stats, base_summary, base_all, m_be, mirror, cond, yr, sweep, chain, chain_note, m_today_summ, skipped_note):
+def brief_fields(ticker, wk, stats, base_summary, base_all, m_be, mirror, cond, yr, sweep, chain, chain_note, m_today_summ, skipped_note,
+                 decomp=None, si_now=None):
     s1 = stats.loc["1y"] if "1y" in stats.index else stats.iloc[-1]
+    dec1 = decomp.loc["1y"] if (decomp is not None and "1y" in decomp.index) else None
+    decA = decomp.loc["all"] if (decomp is not None and "all" in decomp.index) else None
+    def split_label(r):
+        if r is None:
+            return "n/a"
+        on, ind = r["overnight_total"], r["intraday_total"]
+        if on > 0 and ind < 0:
+            return "GAPS UP, BLEEDS INTRADAY"
+        if on < 0 and ind > 0:
+            return "GAINS INTRADAY, GAPS DOWN"
+        return "BOTH UP" if on > 0 else "BOTH DOWN"
     win, lo, hi, null = s1["win_rate"], s1["win_ci_lo"], s1["win_ci_hi"], s1["win_null"]
     desc = "YES" if (s1["median_wk"] < 0 and win < 0.5) else ("PARTLY" if (s1["median_wk"] < 0 or win < 0.5) else "NO")
     noise = "inside" if (lo <= null <= hi) else ("below" if null > hi else "above")
@@ -1447,7 +1538,11 @@ def brief_fields(ticker, wk, stats, base_summary, base_all, m_be, mirror, cond, 
     sw = sweep[(sweep["period"] == "1y") & (sweep["mgmt"] == "hold") & (sweep["iv_mult"] == 1.0)] if not sweep.empty else pd.DataFrame()
     deltas = sorted(((float(r["delta"]), float(r["expectancy_pct_risk"])) for _, r in sw.iterrows()), reverse=True) if not sw.empty else []
     return dict(ticker=ticker, close=float(wk["close"].iloc[-1]), asof=str(wk["date"].iloc[-1].date()), ret_1y=s1["cum_return"], vol=s1["ann_vol"],
-                weeks=int(s1["weeks"]), median=s1["median_wk"], win=win, win_lo=lo, win_hi=hi, win_null=null, noise=noise,
+                weeks=int(s1["weeks"]), median=s1["median_wk"], mean=s1["mean_wk"], win=win, win_lo=lo, win_hi=hi, win_null=null, noise=noise,
+                split_1y=split_label(dec1), split_all=split_label(decA),
+                on_1y=dec1["overnight_total"] if dec1 is not None else float("nan"), in_1y=dec1["intraday_total"] if dec1 is not None else float("nan"),
+                on_all=decA["overnight_total"] if decA is not None else float("nan"), in_all=decA["intraday_total"] if decA is not None else float("nan"),
+                gap_share=dec1["overnight_var_share"] if dec1 is not None else float("nan"), si_now=si_now,
                 cum_ex_top5=s1["cum_ex_top5"], desc=desc, exp1=exp1, se1=se1, expA=expA, seA=seA, mbe1=mbe1, mbeA=mbeA,
                 m_today=m_today, exp_mt1=exp_mt1, exp_mtA=exp_mtA, trade=trade, chain_note=chain_note, d1=d1, dA=dA, direction=direction,
                 rip_n=int(rip_row["n"]) if rip_row is not None else 0, rip_win=rip_row["next_wk_win_rate"] if rip_row is not None else float("nan"),
@@ -1458,10 +1553,13 @@ def brief_fields(ticker, wk, stats, base_summary, base_all, m_be, mirror, cond, 
 
 def brief_text(b: dict) -> str:
     L = []
-    L.append(f"{b['ticker']}  ${b['close']:,.2f}   1y {_sgn(b['ret_1y'])}   vol {b['vol']*100:.0f}%   ({b['weeks']} weeks; {b['skipped_note']})")
-    L.append(f"  Grinds down, rips up?      {b['desc']:<28} typical week {_sgn(b['median'], 1)}, up {b['win']*100:.0f}% of weeks; year {_sgn(b['ret_1y'])} but {_sgn(b['cum_ex_top5'])} without its best 5 weeks")
+    si = b.get("si_now")
+    si_txt = f"   short interest {si['pct_float']*100:.0f}% of float, {si['days_to_cover']:.1f} days to cover" if si and si.get("pct_float") else (f"   short interest {si['days_to_cover']:.1f} days to cover" if si else "")
+    L.append(f"{b['ticker']}  ${b['close']:,.2f}   1y {_sgn(b['ret_1y'])}   vol {b['vol']*100:.0f}%{si_txt}   ({b['weeks']} weeks; {b['skipped_note']})")
+    L.append(f"  Grinds down, rips up?      {b['desc']:<28} average week {_sgn(b['mean'], 1)} (mean), typical week {_sgn(b['median'], 1)} (median), up {b['win']*100:.0f}% of weeks; year {_sgn(b['ret_1y'])} but {_sgn(b['cum_ex_top5'])} without its best 5 weeks")
     L.append(f"                             {'':<28} (a {b['vol']*100:.0f}%-vol random walk gives {b['win_null']*100:.0f}% up-weeks; yours is {b['noise']} its noise band {b['win_lo']*100:.0f}-{b['win_hi']*100:.0f}%)")
-    mt = f"IV/RV today {b['m_today']:.2f}: last 1y {_sgn(b['exp_mt1'], 1)}, all {_sgn(b['exp_mtA'], 1)}" if b["m_today"] else "IV/RV today unknown: run between 9:30 and 16:00 New York"
+    L.append(f"  Where the move happens     {b['split_1y']:<28} 1y: overnight {_sgn(b['on_1y'])}, intraday {_sgn(b['in_1y'])}; all data: overnight {_sgn(b['on_all'])}, intraday {_sgn(b['in_all'])}; gaps carry {b['gap_share']*100:.0f}% of daily variance")
+    mt = f"IV/RV today {b['m_today']:.2f}: last 1y {_sgn(b['exp_mt1'], 1)}, all {_sgn(b['exp_mtA'], 1)}" if b["m_today"] else "IV/RV today unknown: pass --iv TICKER=<screener IV> or run --iv-from-chain between 9:30 and 16:00 New York"
     L.append(f"  Sell weekly call spreads?  {b['trade']:<28} at fair IV: last 1y {_sgn(b['exp1'], 1)} +/-{_pts(b['se1'])} of risk/wk, since {b['first'][:4]} {_sgn(b['expA'], 1)}/wk; breaks even at IV/RV {_num(b['mbe1'])} (1y) / {_num(b['mbeA'])} (all)")
     L.append(f"                             {'':<28} ({mt})")
     L.append(f"  Direction or premium?      {b['direction']:<28} call minus put spreads: 1y {_sgn(b['d1'], 1)}, all {_sgn(b['dA'], 1)} of risk/wk")
@@ -1490,11 +1588,14 @@ def brief_html(cards: list[dict], basket: str = "") -> str:
     if basket:
         out.append(f'<p class="basket">{basket}</p>')
     for b in cards:
-        mt = f"IV/RV today {b['m_today']:.2f}: last 1y {_sgn(b['exp_mt1'], 1)}, all {_sgn(b['exp_mtA'], 1)}" if b["m_today"] else "IV/RV today unknown: run between 9:30 and 16:00 New York"
+        mt = f"IV/RV today {b['m_today']:.2f}: last 1y {_sgn(b['exp_mt1'], 1)}, all {_sgn(b['exp_mtA'], 1)}" if b["m_today"] else "IV/RV today unknown: pass --iv TICKER=&lt;screener IV&gt; or run --iv-from-chain during US market hours"
+        si = b.get("si_now")
+        si_txt = f" &middot; short interest {si['pct_float']*100:.0f}% of float, {si['days_to_cover']:.1f} days to cover" if si and si.get("pct_float") else (f" &middot; {si['days_to_cover']:.1f} days to cover" if si else "")
         years = "&nbsp;&nbsp;".join(f"{y} <b>{e*100:+.0f}%</b> <span class=q>({r*100:+.0f}%)</span>" for y, e, r in b["years"])
         deltas = ", ".join(f"{d:.2f}: {_sgn(e, 1)}" for d, e in b["deltas"])
-        out.append(f'<div class="card"><div class="h">{b["ticker"]} <small>${b["close"]:,.2f} on {b["asof"]} &middot; 1y {_sgn(b["ret_1y"])} &middot; vol {b["vol"]*100:.0f}% &middot; {b["skipped_note"]}</small></div>'
-                   + row("Grinds down, rips up?", b["desc"], f"typical week {_sgn(b['median'], 1)}, up {b['win']*100:.0f}% of weeks; year {_sgn(b['ret_1y'])} but {_sgn(b['cum_ex_top5'])} without its best 5 weeks. A {b['vol']*100:.0f}%-vol random walk gives {b['win_null']*100:.0f}% up-weeks; yours is {b['noise']} its noise band {b['win_lo']*100:.0f} to {b['win_hi']*100:.0f}%.")
+        out.append(f'<div class="card"><div class="h">{b["ticker"]} <small>${b["close"]:,.2f} on {b["asof"]} &middot; 1y {_sgn(b["ret_1y"])} &middot; vol {b["vol"]*100:.0f}%{si_txt} &middot; {b["skipped_note"]}</small></div>'
+                   + row("Grinds down, rips up?", b["desc"], f"average week {_sgn(b['mean'], 1)} (mean), typical week {_sgn(b['median'], 1)} (median), up {b['win']*100:.0f}% of weeks; year {_sgn(b['ret_1y'])} but {_sgn(b['cum_ex_top5'])} without its best 5 weeks. A {b['vol']*100:.0f}%-vol random walk gives {b['win_null']*100:.0f}% up-weeks; yours is {b['noise']} its noise band {b['win_lo']*100:.0f} to {b['win_hi']*100:.0f}%.")
+                   + row("Where the move happens", b["split_1y"], f"Last year: overnight {_sgn(b['on_1y'])}, intraday {_sgn(b['in_1y'])}. All data: overnight {_sgn(b['on_all'])}, intraday {_sgn(b['in_all'])}. Overnight gaps carry {b['gap_share']*100:.0f}% of daily variance, and a weekly spread owns every gap.")
                    + row("Sell weekly call spreads?", b["trade"], f"At fair IV: last 1y {_sgn(b['exp1'], 1)} &plusmn;{_pts(b['se1'])} of risk per week, since {b['first'][:4]} {_sgn(b['expA'], 1)} per week. Breaks even at IV/RV {_num(b['mbe1'])} (1y) / {_num(b['mbeA'])} (all). {mt}.")
                    + row("Direction or premium?", b["direction"], f"Call minus put spreads: 1y {_sgn(b['d1'], 1)}, all {_sgn(b['dA'], 1)} of risk per week. If puts do as well, the edge is the premium, not the drift.")
                    + row("After a +15% week", b["after_rip"], f"Next week up {b['rip_win']*100:.0f}% of the time against {b['all_win']*100:.0f}% for all weeks, median {_sgn(b['rip_med'], 1)}, n={b['rip_n']}." if b["rip_win"] == b["rip_win"] else "Not enough rips in the window.")
@@ -1548,7 +1649,29 @@ def analyse_ticker(ticker: str, daily: pd.DataFrame, source: str, args, daily_fu
     offline = source.startswith("csv")
     chain = None
     chain_note = "No chain calibration (run with --iv-from-chain during US market hours to get m_today and the skew)."
-    if args.iv_from_chain:
+    overrides = {}
+    for tok in list(args.iv or []) + [f"m:{t}" for t in (args.m or [])]:
+        kind = "m" if tok.startswith("m:") else "iv"
+        body = tok[2:] if kind == "m" else tok
+        if "=" in body:
+            k, v = body.split("=", 1)
+            try:
+                overrides[k.upper()] = (kind, float(v))
+            except ValueError:
+                pass
+    if ticker.upper() in overrides:
+        kind, val = overrides[ticker.upper()]
+        if kind == "iv":
+            iv_val = val / 100.0 if val > 3 else val
+            m_val = iv_val / rv_now if rv_now else float("nan")
+        else:
+            m_val, iv_val = val, val * rv_now
+        chain = {"source": "screener", "expiry": "screener", "dte": 7, "spot_used": float(dfull["close"].iloc[-1]), "iv_atm": iv_val, "iv_25d_call": float("nan"),
+                 "iv_10d_call": float("nan"), "short_pct_float": None, "short_ratio_days": None, "skew_s": None, "strike_step": float("nan"),
+                 "rv_now": rv_now, "m_today": m_val, "yahoo_iv_atm": float("nan")}
+        chain_note = f"IV from your screener: {iv_val:.0%} against realized {rv_now:.0%} -> m_today = {m_val:.2f}."
+        print(f"  {chain_note}")
+    if chain is None and args.iv_from_chain:
         if offline:
             chain_note = "Chain calibration skipped: offline CSV source."
         elif args.end:
@@ -1609,7 +1732,7 @@ def analyse_ticker(ticker: str, daily: pd.DataFrame, source: str, args, daily_fu
     print(f"\n-- Rolling 26-week median/win rate: {rolling}  {regime_flag}")
 
     # ---- chain calibration + earnings
-    if chain:
+    if chain and chain.get("source") != "screener":
         print(f"\n-- Today's chain {chain['expiry']} ({chain['dte']}d): ATM IV {chain['iv_atm']:.0%} (Yahoo column said {chain['yahoo_iv_atm']:.0%}), 25d call {chain['iv_25d_call']:.0%}, "
               f"skew s {chain['skew_s']}, step {chain['strike_step']}, RV now {rv_now:.0%}  =>  m_today = {chain['m_today']:.2f}"
               + (f"  | short interest {chain['short_pct_float']*100:.0f}% of float, {chain['short_ratio_days']} days to cover" if chain.get("short_pct_float") else ""))
@@ -1632,7 +1755,24 @@ def analyse_ticker(ticker: str, daily: pd.DataFrame, source: str, args, daily_fu
         print(f"  earnings dates known: {len(earnings)} ({' + '.join(src) or 'file'}) -> mode '{args.earnings}'")
     elif not offline and args.earnings != "include":
         print("  earnings dates: none found (yfinance calendar is unreliable for small caps; pass --earnings-file to skip them)")
-    regimes = regime_frame(daily)
+    si_hist, float_shares = None, None
+    if not offline and not args.no_short_interest:
+        try:
+            si_hist = short_interest_history(ticker)
+            if si_hist.empty:
+                si_hist = None
+        except Exception as exc:  # noqa: BLE001
+            print(f"  (short interest unavailable: {exc})")
+        if si_hist is not None:
+            try:
+                import yfinance as yf
+                float_shares = float((yf.Ticker(ticker).info or {}).get("floatShares") or 0) or None
+            except Exception:  # noqa: BLE001
+                float_shares = None
+            last = si_hist.iloc[-1]
+            pct = f", {last['short_interest']/float_shares*100:.0f}% of float" if float_shares else ""
+            print(f"  short interest (Nasdaq, settlement {last['settlement_date'].date()}): {last['short_interest']/1e6:.1f}M shares{pct}, {last['days_to_cover']:.1f} days to cover; {len(si_hist)} settlement dates")
+    regimes = regime_frame(dfull, si_hist, float_shares)
 
     # ---- backtests
     def mk(**kw):
@@ -1710,6 +1850,11 @@ def analyse_ticker(ticker: str, daily: pd.DataFrame, source: str, args, daily_fu
         ok["rv_bucket"] = pd.cut(ok["rv20_pctile"], [-0.01, 0.33, 0.66, 1.01], labels=["low third", "mid third", "high third"]).astype(str)
         ok.loc[ok["rv20_pctile"].isna(), "rv_bucket"] = "warm-up (no trailing-year percentile)"
     base_trend = group_summary(ok, "trend")
+    base_si = pd.DataFrame()
+    if "si_days_to_cover" in ok.columns and ok["si_days_to_cover"].notna().sum() >= 10:
+        med = ok["si_days_to_cover"].median()
+        ok["si_bucket"] = np.where(ok["si_days_to_cover"].isna(), "unknown", np.where(ok["si_days_to_cover"] > med, f"days-to-cover above {med:.1f}", f"days-to-cover at or below {med:.1f}"))
+        base_si = group_summary(ok, "si_bucket")
     base_rv = group_summary(ok, "rv_bucket") if "rv_bucket" in ok.columns else pd.DataFrame()
     ok["last_week"] = np.where(ok["prev_week_ret"] > 0.15, "after > +15%", np.where(ok["prev_week_ret"] > 0, "after up week", "after down week"))
     base_cond = group_summary(ok, "last_week")
@@ -1750,6 +1895,9 @@ def analyse_ticker(ticker: str, daily: pd.DataFrame, source: str, args, daily_fu
     if not base_earn.empty:
         print("\n-- Baseline: earnings weeks vs the rest (earnings weeks are a different trade) --")
         print(fmt_table(base_earn))
+    if not base_si.empty:
+        print("\n-- Baseline by short interest at entry (Nasdaq bi-monthly, known with a 10-business-day lag) --")
+        print(fmt_table(base_si))
     if not regime_filtered.empty:
         print("\n-- Baseline: regime filter vs unfiltered (a filter fixed before looking at P&L is the only kind that counts) --")
         print(fmt_table(regime_filtered))
@@ -1766,7 +1914,11 @@ def analyse_ticker(ticker: str, daily: pd.DataFrame, source: str, args, daily_fu
             tr_mt = trade_sets[lab][1]
             m_today_summ = {"1y": summarize_trades(slice_period(tr_mt, 12, asof_tr)), "all": summarize_trades(tr_mt)}
     skipped_note = f"backtest skipped {base_all.get('skipped', 0)} weeks: {base_all.get('skip_reasons', 'none')}" if base_all.get("skipped") else "no weeks skipped"
-    brief = brief_fields(ticker, wk, stats, base_summary, base_all, m_be, mirror, cond, yr, sweep, chain, chain_note, m_today_summ, skipped_note)
+    si_now = None
+    if si_hist is not None and len(si_hist):
+        last = si_hist.iloc[-1]
+        si_now = {"days_to_cover": float(last["days_to_cover"]), "pct_float": (float(last["short_interest"]) / float_shares) if float_shares else None, "date": str(last["settlement_date"].date())}
+    brief = brief_fields(ticker, wk, stats, base_summary, base_all, m_be, mirror, cond, yr, sweep, chain, chain_note, m_today_summ, skipped_note, decomp, si_now)
 
     # ---- outputs
     out_dir = Path(args.out) / ticker.upper()
@@ -2003,6 +2155,13 @@ def selftest() -> int:
     ya = pd.DataFrame({"Open": [10.0], "High": [11.0], "Low": [9.0], "Close": [10.0], "Adj Close": [5.0], "Volume": [1]}, index=pd.to_datetime(["2026-10-09"]))
     check("Adj Close rescales OHLC", abs(_normalise_daily(ya)["open"].iloc[0] - 5.0) < 1e-12)
 
+    blk = {"form": ["8-K", "10-Q", "8-K", "8-K/A"], "items": ["2.02,9.01", "", "1.01", "2.02"], "reportDate": ["2026-08-11", "2026-08-12", "2026-09-01", ""], "filingDate": ["2026-08-12", "2026-08-12", "2026-09-02", "2026-05-13"]}
+    ed = harvest_edgar_8k(blk)
+    check("EDGAR 8-K item 2.02 harvest picks event dates (and filing date when reportDate is blank)", ed == {pd.Timestamp("2026-08-11"), pd.Timestamp("2026-05-13")}, str(sorted(ed)))
+    si = parse_nasdaq_short_interest({"data": {"shortInterestTable": {"rows": [{"settlementDate": "09/30/2026", "interest": "12,345,678", "avgDailyShareVolume": "4,000,000", "daysToCover": "3.09"},
+                                                                                 {"settlementDate": "09/15/2026", "interest": "11,000,000", "avgDailyShareVolume": "5,500,000", "daysToCover": "2.00"}]}}})
+    check("Nasdaq short-interest table parses and lags availability by 10 business days", len(si) == 2 and si["short_interest"].iloc[-1] == 12345678 and si["available_date"].iloc[-1] == pd.Timestamp("2026-10-14"), str(si["available_date"].tolist()))
+
     print("Self-test 2: one hand-checked trade")
     d = pd.DataFrame({"close": [100.0 * math.exp(0.05 * math.sin(i)) for i in range(30)] + [100.0, 105.0, 110.0, 118.0, 120.0]},
                      index=pd.bdate_range("2026-01-05", periods=35))
@@ -2095,8 +2254,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--deltas", type=float, nargs="+", default=[0.5, 0.3, 0.16, 0.1], help="short-strike |deltas| to sweep")
     p.add_argument("--base-delta", type=float, default=0.3, help="delta for the detailed baseline tables")
     p.add_argument("--widths", type=float, nargs="+", default=[0.10], help="spread widths as a fraction of spot")
-    p.add_argument("--iv-mult", type=float, nargs="+", default=[0.9, 1.0, 1.2, 1.5], help="IV/RV multipliers m to sweep (m_today is added when --iv-from-chain)")
+    p.add_argument("--iv-mult", type=float, nargs="+", default=[0.9, 1.0, 1.15, 1.3], help="IV/RV multipliers m to sweep; 1.1-1.25 is the normal range for single names, above 1.6 is rare (m_today from --iv or the chain is added)")
     p.add_argument("--iv-from-chain", action="store_true", help="read today's weekly chain from yfinance: m_today, skew, strike step")
+    p.add_argument("--iv", nargs="*", default=[], help="implied vol from your screener per ticker, e.g. ASTS=105 RKLB=0.8 (percent or decimal); sets m_today = IV / realized vol")
+    p.add_argument("--m", nargs="*", default=[], help="IV/RV multiplier per ticker directly, e.g. ASTS=1.2")
+    p.add_argument("--no-short-interest", action="store_true", help="skip the Nasdaq short-interest fetch")
     p.add_argument("--grid-from-chain", action="store_true", help="use the chain's modal strike spacing as the grid for the whole backtest")
     p.add_argument("--rv-mode", default="blend", choices=["blend", "rv20", "longrun"], help="realized-vol estimator behind the IV proxy")
     p.add_argument("--skew", type=float, default=None, help="call skew s (default: from chain if available, else 0.3; 0 = flat)")
