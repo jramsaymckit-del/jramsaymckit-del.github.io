@@ -18,6 +18,8 @@ It runs on the laptop in Python 3.13 with numpy and pandas. yfinance is used for
 cd tools/avgweek
 python3 -m pip install -U yfinance requests        # numpy and pandas are already there
 python3 avgweek.py --selftest                       # ~3 minutes; proves the math on synthetic data
+python3 decide.py ASTS=105 RKLB=80                  # the one-screen answer: CCS, PCS or NEITHER for the week, the month, the year
+python3 decide.py --test --universe universe_highbeta.txt   # walk-forward proof of that rule; read it before trusting a verdict
 python3 avgweek.py --universe universe_highbeta.txt --min-vol 0.6 --brief --out reports                   # one card per high-beta name + the pooled basket line
 python3 avgweek.py --universe universe_highbeta.txt --min-vol 0.6 --brief --hold-weeks 2 --out reports2   # the same, two-week spreads entered every other week
 python3 avgweek.py ASTS RKLB HIMS --iv-from-chain --out reports        # full report per name; the chain only answers between 9:30 and 16:00 New York
@@ -49,6 +51,42 @@ Where the answer to "if I sold a call credit spread every week for the past year
 The number to compare across configurations is `expectancy_pct_risk` (average P&L per week as a fraction of the maximum loss), with its standard error. Never rank by win rate: a 10-delta program wins 93% of weeks and loses money.
 
 The arithmetic behind "short strike slightly above price, high win rate, every week or two": held to expiry, a credit spread breaks even at a win rate of `1 - credit / width`. Near-the-money weekly credits on these names run about 10 to 15% of width after costs, so the program has to win about 85 to 87% of its weeks; the realized rate at the 30-delta strike over these histories is 75 to 85%. The card's `Sell call spreads?` line is that comparison, expressed in dollars of risk per week (per two weeks with `--hold-weeks 2`), with the noise band one year of data carries (about +/-5 points).
+
+---
+
+## 0. decide.py: CCS, PCS or neither
+
+`avgweek.py` is the research tool. `decide.py` is the one you use on a Friday: type a ticker, get three lines.
+
+```
+ASTS  $52.10 on 2026-10-09   IV 105% (screener), 1.14x realized   283 weeks since 2021
+  week   PCS      sell 48p / buy 43p                     CCS  -1.2%  PCS  +3.4%  of risk per trade (hurdle +2.7%)
+  month  NEITHER                                         CCS  -2.0%  PCS  +1.0%  of risk per trade (hurdle +3.3%)
+  year   PCS      every week; this week sell 48p / buy 43p   CCS  -3.1%  PCS  +2.9%  of risk per week (hurdle +2.7%)
+```
+
+Run it with no arguments for a prompt (`ASTS=105`, `RKLB 80`, `q`). `--why` adds one line per row with the sample size, standard errors, win rates and credits. `--asof 2025-10-10` shows what it would have said a year ago. Index ETFs are refused as candidates.
+
+The determinant, the same for all three rows:
+
+1. The stock's own weekly closes. For horizon h (1 week, 4 weeks) every past h-week return in the trailing window (3 years; all data for the year row) is rescaled from the realized vol at its own start to today's realized vol (filtered historical simulation), so the shape of the past (rips, grinds, gaps) is measured in today's units.
+2. Today's 30-delta call spread and put spread, 10% of spot wide on the listed strike grid, with the wing skew, slippage and commissions of the backtest (`price_spread()` is shared), priced at today's IV: your screener's number, or `--m` times realized (default 1.15).
+3. Expectancy of each side = average over the rescaled history of (net credit - capped payoff) / max risk.
+4. Hurdle = the market's average return over the horizon plus 2.5 points, per unit of risk. That is your success criterion, "done weekly, beat the market by 2.5%", read per trade on the capital at risk: it is the only reading that is testable (per year it is undetectable; per week on the whole account it is impossible by construction). `--hurdle` and `--market-drift` change it. A side is a candidate when its expectancy clears the hurdle; the verdict is the better candidate, else NEITHER.
+
+The year row answers "which side, every week, for the coming year": the weekly determinant on all available history.
+
+`--test` is the proof. It runs the identical rule at every past Friday using only data up to that Friday, then scores what the chosen side actually did over the next period, pooled across the names you give it:
+
+```
+Walk-forward, 37 name(s), IV assumed 1.15x realized, hurdle = market + 2.5 points per unit of risk
+  week   rule +0.4% of risk per trade (SE 0.3%, n 9,812 trades, ...)   traded 38% (CCS 7%, PCS 31%), chosen side minus the other +1.1% (SE 0.9%)   always CCS -3.0%   always PCS -1.6%   best in hindsight +9.8%
+         SPY over the same span +0.2% per trade; rule minus SPY +0.2 points (target +2.5)
+```
+
+How to read it: `rule` is what following the verdicts would have earned per unit of risk, with weeks it stood aside counted as zero; compare it with `always CCS`, `always PCS` and with `best in hindsight` (the ceiling: the better side, or cash, chosen with perfect foresight). `chosen side minus the other` is the only clean measure of whether the side-picking adds anything; on a fair random walk it is zero within its standard error (self-test 5). `rule minus SPY` against the target is the pass/fail line for your criterion. `--m-grid` repeats the test at IV = 1.0, 1.15 and 1.3 times realized, because no free source has IV history and every P&L number is conditional on that assumption.
+
+Limits: the same week on several names is correlated, so the pooled standard error is optimistic; the year row has a handful of observations per name; on stocks under about $25 the $0.50 strike grid and the slippage floor dominate the credit, and the tool will mostly say NEITHER for the right reason; the IV you type applies to all three rows (term structure is ignored).
 
 ---
 
@@ -208,6 +246,7 @@ A browser version was deliberately not built yet. Yahoo and Stooq do not send CO
 | file | purpose |
 |---|---|
 | `avgweek.py` | the tool: data, statistics, backtest, report, self-test, CLI |
+| `decide.py` | the one-screen verdict (CCS, PCS or NEITHER by week, month, year) with its walk-forward test and self-test |
 | `iv_snapshot.py` | daily chain logger |
 | `universe_highbeta.txt` | 37 long-history high-beta optionable names for `--universe`; survivorship caveat in its comments |
 | `README.md` | this document |

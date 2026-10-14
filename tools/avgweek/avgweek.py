@@ -37,7 +37,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-__version__ = "0.6.1"
+__version__ = "0.7.0"
 
 # ======================================================================================================
 # 1. Normal distribution + chi-square helpers (self-contained; trivially portable to JS)
@@ -829,6 +829,55 @@ def regime_frame(daily: pd.DataFrame, short_interest: pd.DataFrame | None = None
     return f
 
 
+def price_spread(S0: float, T: float, sigma: float, cfg: SpreadConfig) -> dict:
+    """One spread at entry: strikes on the listed grid, per-leg vols with the wing skew, mid credit, net credit after slippage,
+    and the maximum risk per contract. `skipped` names the reason when it could not be sold. Shared by the backtest and decide.py."""
+    step = cfg.strike_step or default_strike_step(S0)
+    width = cfg.width_abs if cfg.width_abs else cfg.width_pct * S0
+    width = max(step, snap(width, step))
+    q = {"step": step, "width": width, "skipped": None}
+    if cfg.side == "call":
+        K_raw = strike_for_call_delta(S0, T, cfg.r, sigma, cfg.delta)
+        K_short = max(snap(K_raw, step, "up" if cfg.snap_mode == "up" else "nearest"), step)
+        K_long = round(K_short + width, 4)
+        d_s = bs_call_delta(S0, K_short, T, cfg.r, sigma)
+        d_l = bs_call_delta(S0, K_long, T, cfg.r, sigma)
+        iv_s, iv_l = sigma * (1 + cfg.skew * (0.5 - d_s)), sigma * (1 + cfg.skew * (0.5 - d_l))
+        credit_mid = bs_call(S0, K_short, T, cfg.r, iv_s) - bs_call(S0, K_long, T, cfg.r, iv_l)
+        otm = K_short / S0 - 1.0
+    else:
+        K_raw = strike_for_put_delta(S0, T, cfg.r, sigma, cfg.delta)
+        K_short = max(snap(K_raw, step, "down" if cfg.snap_mode == "up" else "nearest"), step)
+        K_long = round(K_short - width, 4)
+        if K_long <= 0:
+            q.update({"K_short": K_short, "K_long": K_long, "skipped": "long put strike <= 0"})
+            return q
+        d_s = 1.0 - bs_call_delta(S0, K_short, T, cfg.r, sigma)
+        d_l = 1.0 - bs_call_delta(S0, K_long, T, cfg.r, sigma)
+        iv_s, iv_l = sigma * (1 + cfg.skew * (0.5 - d_s)), sigma * (1 + cfg.skew * (0.5 - d_l))
+        credit_mid = bs_put(S0, K_short, T, cfg.r, iv_s) - bs_put(S0, K_long, T, cfg.r, iv_l)
+        otm = 1.0 - K_short / S0
+    slip = max(cfg.slip_frac * width, 2 * cfg.slip_floor_per_leg)
+    credit = credit_mid - slip
+    q.update({"K_short": K_short, "K_long": K_long, "model_delta": d_s, "iv_s": iv_s, "iv_l": iv_l, "credit_mid": credit_mid, "slip": slip,
+              "credit": credit, "short_otm_pct": otm, "max_risk": (width - credit) * 100.0 + 4 * cfg.commission + slip * 100.0})
+    if credit_mid < cfg.min_credit_frac * width or credit <= 0:
+        q["skipped"] = "credit too small"
+    return q
+
+
+def spread_payoff(side: str, ST, K_short: float, width: float):
+    """What the short spread owes at expiry, per share, capped at the width. Works on scalars and numpy arrays."""
+    intrinsic = (ST - K_short) if side == "call" else (K_short - ST)
+    return np.clip(intrinsic, 0.0, width)
+
+
+def spread_pnl_at_expiry(q: dict, side: str, ST, commission: float):
+    """P&L per contract held to expiry: (net credit - payoff) x 100, minus the opening commissions and a closing round when it finishes in the money."""
+    payoff = spread_payoff(side, ST, q["K_short"], q["width"])
+    return (q["credit"] - payoff) * 100.0 - (2 * commission + np.where(payoff > 0, 2 * commission, 0.0))
+
+
 def backtest_spreads(daily: pd.DataFrame, wk: pd.DataFrame, cfg: SpreadConfig, earnings: set | None = None,
                      regimes: pd.DataFrame | None = None) -> pd.DataFrame:
     """Sell one credit spread at each weekly close, expiring at the next weekly close. One row per week."""
@@ -877,39 +926,18 @@ def backtest_spreads(daily: pd.DataFrame, wk: pd.DataFrame, cfg: SpreadConfig, e
             continue
         if ew and cfg.earnings == "bump":
             sigma = math.sqrt(sigma * sigma + (cfg.earnings_move / 0.8) ** 2 / T)
-        step = cfg.strike_step or default_strike_step(S0)
-        width = cfg.width_abs if cfg.width_abs else cfg.width_pct * S0
-        width = max(step, snap(width, step))
-        if is_call:
-            K_raw = strike_for_call_delta(S0, T, cfg.r, sigma, cfg.delta)
-            K_short = max(snap(K_raw, step, "up" if cfg.snap_mode == "up" else "nearest"), step)
-            K_long = round(K_short + width, 4)
-            d_s = bs_call_delta(S0, K_short, T, cfg.r, sigma)
-            d_l = bs_call_delta(S0, K_long, T, cfg.r, sigma)
-            iv_s, iv_l = sigma * (1 + cfg.skew * (0.5 - d_s)), sigma * (1 + cfg.skew * (0.5 - d_l))
-            credit_mid = bs_call(S0, K_short, T, cfg.r, iv_s) - bs_call(S0, K_long, T, cfg.r, iv_l)
-            payoff = max(0.0, min(ST - K_short, width))
-            otm = K_short / S0 - 1.0
-        else:
-            K_raw = strike_for_put_delta(S0, T, cfg.r, sigma, cfg.delta)
-            K_short = max(snap(K_raw, step, "down" if cfg.snap_mode == "up" else "nearest"), step)
-            K_long = round(K_short - width, 4)
-            if K_long <= 0:
-                rec["skipped"] = "long put strike <= 0"
-                rows.append(rec)
-                continue
-            d_s = 1.0 - bs_call_delta(S0, K_short, T, cfg.r, sigma)
-            d_l = 1.0 - bs_call_delta(S0, K_long, T, cfg.r, sigma)
-            iv_s, iv_l = sigma * (1 + cfg.skew * (0.5 - d_s)), sigma * (1 + cfg.skew * (0.5 - d_l))
-            credit_mid = bs_put(S0, K_short, T, cfg.r, iv_s) - bs_put(S0, K_long, T, cfg.r, iv_l)
-            payoff = max(0.0, min(K_short - ST, width))
-            otm = 1.0 - K_short / S0
-        slip = max(cfg.slip_frac * width, 2 * cfg.slip_floor_per_leg)
-        credit = credit_mid - slip
+        q = price_spread(S0, T, sigma, cfg)
+        if q["skipped"] == "long put strike <= 0":
+            rec["skipped"] = q["skipped"]
+            rows.append(rec)
+            continue
+        K_short, K_long, width = q["K_short"], q["K_long"], q["width"]
+        d_s, iv_s, iv_l, credit_mid, slip, credit, otm = q["model_delta"], q["iv_s"], q["iv_l"], q["credit_mid"], q["slip"], q["credit"], q["short_otm_pct"]
+        payoff = float(spread_payoff(cfg.side, ST, K_short, width))
         rec.update({"rv": rv0, "sigma": sigma, "sessions": n_sessions, "T_days": (exp_date - entry_date).days, "K_short": K_short, "K_long": K_long, "width": width,
                     "short_otm_pct": otm, "model_delta": d_s, "credit_mid": credit_mid, "credit": credit})
-        if credit_mid < cfg.min_credit_frac * width or credit <= 0:
-            rec["skipped"] = "credit too small"
+        if q["skipped"]:
+            rec["skipped"] = q["skipped"]
             rows.append(rec)
             continue
         exit_date, exit_reason, exit_value = exp_date, "expiry", None
