@@ -1114,6 +1114,7 @@ def chain_calibration(ticker: str, spot: float, rv_now: float, rate: float = 0.0
         calls_all["mid"] = (calls_all["bid"] + calls_all["ask"]) / 2.0
         calls = calls_all[(calls_all["mid"] > 0) & (calls_all["ask"] > 0)].copy()
         if calls.empty:
+            print(f"  (option chain for {exp} has no live bid/ask yet)")
             return None
         calls["iv_own"] = [implied_vol(m, spot, k, T, rate, True) for m, k in zip(calls["mid"], calls["strike"])]
         calls = calls.dropna(subset=["iv_own"])
@@ -1336,7 +1337,7 @@ def html_report(ctx: dict) -> str:
     chain = ctx.get("chain")
     chain_txt = (f"Today's chain ({chain['expiry']}, {chain['dte']}d): ATM IV {chain['iv_atm']:.0%}, 25d call IV {chain['iv_25d_call']:.0%}, "
                  f"skew s = {chain['skew_s']}, strike step {chain['strike_step']}, RV now {chain['rv_now']:.0%}, <b>m_today = {chain['m_today']:.2f}</b>.") if chain else \
-        ("No chain calibration: offline CSV source." if ctx['source'].startswith('csv') else "No chain calibration (run with --iv-from-chain on the laptop to get m_today and the skew).")
+        ctx.get("chain_note", "No chain calibration.")
     dep = ctx["dep"]
     cfg = ctx["base_cfg"]
     g = lambda k: dep.get(k, float("nan"))  # noqa: E731
@@ -1436,13 +1437,19 @@ def analyse_ticker(ticker: str, daily: pd.DataFrame, source: str, args, daily_fu
     rv_now = float(realized_vol_series(dfull["close"], args.rv_mode).iloc[-1])
     offline = source.startswith("csv")
     chain = None
+    chain_note = "No chain calibration (run with --iv-from-chain during US market hours to get m_today and the skew)."
     if args.iv_from_chain:
         if offline:
-            print("  (chain calibration skipped: offline CSV source)")
+            chain_note = "Chain calibration skipped: offline CSV source."
         elif args.end:
-            print("  (chain calibration skipped: --end makes today's chain meaningless against a historical spot)")
+            chain_note = "Chain calibration skipped: --end makes today's chain meaningless against a historical spot."
         else:
             chain = chain_calibration(ticker, float(dfull["close"].iloc[-1]), rv_now, args.rate)
+            if chain is None:
+                chain_note = ("Chain calibration was requested but found no usable quotes (pre-market, after hours, or no listed options). "
+                              "Re-run between 9:30 and 16:00 New York time to get m_today and the skew.")
+        if chain is None:
+            print(f"  ({chain_note})")
     if wk.attrs.get("data_gaps"):
         print(f"  data gaps: {wk.attrs['data_gaps']} week(s) follow a hole of more than {MAX_WEEK_GAP_DAYS} days and are excluded")
     stats = weekly_stats(wk, daily)
@@ -1660,7 +1667,7 @@ def analyse_ticker(ticker: str, daily: pd.DataFrame, source: str, args, daily_fu
                exceed=exceed, cond=cond, dep=dep, decomp=decomp, top_days=top_days, rolling=rolling, regime_flag=regime_flag, verdict=verdict,
                chain=chain, base_trades=base_trades, put_trades=put_trades, base_cfg=base_cfg, base_summary=base_summary, base_all=base_all,
                m_be=m_be, mirror=mirror, base_year=yr, base_trend=base_trend, base_rv=base_rv, base_cond=base_cond, bench=bench, sweep=sweep,
-               pricing_modes=pricing_modes, n_variants=n_variants, base_earn=base_earn, regime_filtered=regime_filtered)
+               pricing_modes=pricing_modes, n_variants=n_variants, base_earn=base_earn, regime_filtered=regime_filtered, chain_note=chain_note)
     (out_dir / "report.html").write_text(html_report(ctx), encoding="utf-8")
     summary = {"ticker": ticker, "version": __version__, "source": source, "asof": str(wk["date"].iloc[-1].date()), "last_close": float(wk["close"].iloc[-1]),
                "rv_now": rv_now, "chain": chain, "verdict": verdict, "weekly_stats": json.loads(stats.to_json(orient="index")),
