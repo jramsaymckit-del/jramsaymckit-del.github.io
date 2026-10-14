@@ -44,5 +44,4 @@ QS
 IONQ
 RGTI
 SMCI
-# benchmark
-SPY
+# (SPY/QQQ can be added as reference cards; they are never pooled or counted)

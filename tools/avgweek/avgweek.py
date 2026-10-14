@@ -37,7 +37,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-__version__ = "0.5.0"
+__version__ = "0.5.1"
 
 # ======================================================================================================
 # 1. Normal distribution + chi-square helpers (self-contained; trivially portable to JS)
@@ -331,6 +331,7 @@ MIN_WEEKS_FOR_DIRECTION = 26
 
 
 MAX_WEEK_GAP_DAYS = 10
+BENCHMARKS = {"SPY", "QQQ", "IWM", "DIA", "VOO", "VTI", "SPX", "NDX"}   # shown as reference only, never pooled or counted
 
 
 def weekly_series(daily: pd.DataFrame, drop_partial: bool = True, now: datetime | None = None) -> pd.DataFrame:
@@ -2341,17 +2342,22 @@ def main(argv=None) -> int:
         return 1
     if args.brief:
         cards = [r["brief"] for r in results]
+        for c in cards:
+            if c["ticker"].upper() in BENCHMARKS:
+                c["skipped_note"] = "BENCHMARK, reference only, not pooled; " + c["skipped_note"]
+        pool = [r for r in results if r["ticker"].upper() not in BENCHMARKS]
+        pcards = [r["brief"] for r in pool]
         basket = ""
-        if len(results) > 1:
-            calls = pd.concat([r["base_trades"] for r in results], ignore_index=True)
-            puts = pd.concat([r["put_trades"] for r in results], ignore_index=True)
+        if len(pool) > 1:
+            calls = pd.concat([r["base_trades"] for r in pool], ignore_index=True)
+            puts = pd.concat([r["put_trades"] for r in pool], ignore_index=True)
             sc, sp = summarize_trades(calls), summarize_trades(puts)
             sc1, sp1 = summarize_trades(slice_period(calls, 12)), summarize_trades(slice_period(puts, 12))
-            n_desc = sum(1 for c in cards if c["desc"] == "YES")
-            n_trade = sum(1 for c in cards if c["trade"].startswith("YES"))
-            n_weeks = sum(c["weeks_all"] for c in cards)
-            first = min(c["first_week"][:4] for c in cards)
-            basket = (f"Basket of {len(cards)} names, {n_weeks:,} stock-weeks since {first}: grind-down-rip-up signature in {n_desc}; call spreads a YES in {n_trade}. "
+            n_desc = sum(1 for c in pcards if c["desc"] == "YES")
+            n_trade = sum(1 for c in pcards if c["trade"].startswith("YES"))
+            n_weeks = sum(c["weeks_all"] for c in pcards)
+            first = min(c["first_week"][:4] for c in pcards)
+            basket = (f"Basket of {len(pcards)} names (benchmarks excluded), {n_weeks:,} stock-weeks since {first}: grind-down-rip-up signature in {n_desc}; call spreads a YES in {n_trade}. "
                       f"Pooled at fair IV, all data ({sc.get('trades', 0):,} spreads): calls {_sgn(sc.get('expectancy_pct_risk'), 1)} +/-{_pts(sc.get('expectancy_se_pct_risk'))} vs puts {_sgn(sp.get('expectancy_pct_risk'), 1)} of risk/wk; "
                       f"last 1y: calls {_sgn(sc1.get('expectancy_pct_risk'), 1)} vs puts {_sgn(sp1.get('expectancy_pct_risk'), 1)}.")
             print(basket)
@@ -2369,7 +2375,9 @@ def main(argv=None) -> int:
             print(f"  {r['ticker']:<6} {med:<58} spreads: n={b.get('trades',0):<3} win {b.get('win_rate',float('nan'))*100:5.1f}%  exp {b.get('expectancy_pct_risk',float('nan'))*100:+5.1f}% of risk  "
                   f"P&L ${b.get('total_pnl',0):>7,.0f}  m_be {_num(r['summary']['baseline']['m_be'].get('1y', float('nan')))}  stock {_pct(b.get('stock_buy_hold'), 0)}")
         if not args.no_pool:
-            pooled_report(results, args)
+            pool = [r for r in results if r["ticker"].upper() not in BENCHMARKS]
+            if len(pool) > 1:
+                pooled_report(pool, args)
     return 0
 
 
