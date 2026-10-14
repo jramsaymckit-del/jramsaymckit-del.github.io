@@ -29,7 +29,7 @@ import numpy as np
 import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from avgweek import bs_call, bs_call_delta, implied_vol  # noqa: E402
+from avgweek import NY, bs_call, bs_call_delta, implied_vol  # noqa: E402
 
 TARGET_DELTAS = (0.50, 0.30, 0.20, 0.10)
 
@@ -47,11 +47,19 @@ def snapshot(ticker: str, rate: float = 0.04, width_pct: float = 0.10) -> dict |
     if not exps:
         print(f"  {ticker}: no listed options")
         return None
-    today = date.today()
-    cands = [(e, (datetime.strptime(e, "%Y-%m-%d").date() - today).days) for e in exps]
-    weekly = [c for c in cands if 3 <= c[1] <= 12] or [c for c in cands if c[1] > 0]
-    exp, dte = sorted(weekly, key=lambda c: abs(c[1] - 7))[0]
-    calls = tk.option_chain(exp).calls.copy()
+    today = datetime.now(NY).date()
+    cands = [(e, (datetime.strptime(e, "%Y-%m-%d").date() - today).days, datetime.strptime(e, "%Y-%m-%d").weekday()) for e in exps]
+    window = [c for c in cands if 3 <= c[1] <= 12] or [c for c in cands if c[1] > 0]
+    fridays = [c for c in window if c[2] == 4]
+    exp, dte, _ = sorted(fridays or window, key=lambda c: abs(c[1] - 7))[0]
+    ch = tk.option_chain(exp)
+    calls = ch.calls.copy()
+    try:
+        live = float(ch.underlying.get("regularMarketPrice") or 0)
+        if live > 0:
+            spot = live
+    except Exception:  # noqa: BLE001
+        pass
     T = max(dte, 1) / 365.0
     calls["mid"] = (calls["bid"] + calls["ask"]) / 2.0
     calls = calls[(calls["mid"] > 0) & (calls["ask"] > 0)].copy()
@@ -113,10 +121,14 @@ def main() -> int:
     if not rows:
         return 1
     out = Path(args.out)
-    new = not out.exists()
+    fields = list(rows[0].keys())
+    existing = out.read_text().splitlines()[0].split(",") if out.exists() and out.stat().st_size > 0 else None
+    if existing and existing != fields:
+        # keep the file's own header so old and new rows stay aligned; new fields are dropped, missing ones left blank
+        fields = existing
     with out.open("a", newline="") as fh:
-        w = csv.DictWriter(fh, fieldnames=list(rows[0].keys()))
-        if new:
+        w = csv.DictWriter(fh, fieldnames=fields, extrasaction="ignore")
+        if existing is None:
             w.writeheader()
         for r in rows:
             w.writerow(r)

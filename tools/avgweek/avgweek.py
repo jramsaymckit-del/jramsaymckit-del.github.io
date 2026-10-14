@@ -35,7 +35,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-__version__ = "0.3.0"
+__version__ = "0.3.1"
 
 # ======================================================================================================
 # 1. Normal distribution + chi-square helpers (self-contained; trivially portable to JS)
@@ -190,7 +190,11 @@ def _normalise_daily(df: pd.DataFrame) -> pd.DataFrame:
     for c in ("open", "high", "low"):
         if c not in df.columns:
             df[c] = df["close"]
+        bad = ~(pd.to_numeric(df[c], errors="coerce") > 0)
+        df.loc[bad, c] = df.loc[bad, "close"]
     df[["open", "high", "low", "close"]] = df[["open", "high", "low", "close"]].astype(float)
+    df["high"] = df[["high", "open", "close"]].max(axis=1)
+    df["low"] = df[["low", "open", "close"]].min(axis=1)
     return df
 
 
@@ -233,7 +237,7 @@ def fetch_stooq(ticker: str) -> pd.DataFrame:
     resp.raise_for_status()
     if "Date,Open" not in resp.text[:200]:
         raise RuntimeError(f"Stooq returned no data for {ticker}: {resp.text[:80]!r}")
-    return _normalise_daily(pd.read_csv(StringIO(resp.text), parse_dates=["Date"], index_col="Date"))
+    return drop_live_bar(_normalise_daily(pd.read_csv(StringIO(resp.text), parse_dates=["Date"], index_col="Date")))
 
 
 def fetch_alphavantage(ticker: str) -> pd.DataFrame:
@@ -260,8 +264,20 @@ def read_csv_prices(path: str) -> pd.DataFrame:
     if not Path(path).exists():
         raise SystemExit(f"CSV not found: {path}  (for --csv-dir the file must be named TICKER.csv)")
     df = pd.read_csv(path)
+    if len(df) and str(df.columns[0]).strip().lower() == "price" and str(df.iloc[0, 0]).strip().lower() == "ticker":
+        # yf.download(...).to_csv(): three header rows (Price / Ticker / Date)
+        df = pd.read_csv(path, header=0, skiprows=[1, 2])
+        df = df.rename(columns={df.columns[0]: "Date"})
     date_col = next((c for c in df.columns if str(c).lower() in ("date", "datetime", "timestamp")), df.columns[0])
-    df = df.set_index(pd.to_datetime(df[date_col])).drop(columns=[date_col])
+    raw = df[date_col].astype(str)
+    try:
+        idx = pd.to_datetime(raw)
+        if idx.dt.tz is not None:
+            idx = idx.dt.tz_convert(NY).dt.tz_localize(None)
+    except (ValueError, TypeError):
+        idx = pd.to_datetime(raw, utc=True, errors="coerce").dt.tz_convert(NY).dt.tz_localize(None)
+    df = df.set_index(pd.DatetimeIndex(idx)).drop(columns=[date_col])
+    df = df[df.index.notna()]
     return _normalise_daily(df)
 
 
@@ -275,10 +291,16 @@ def load_prices(ticker: str, cache_dir: Path, csv: str | None = None, refresh: b
     cache_file = cache_dir / f"{ticker.upper()}.csv"
     cached = None
     if cache_file.exists():
-        cached = _normalise_daily(pd.read_csv(cache_file, parse_dates=["date"], index_col="date"))
-        last = cached.index[-1].date()
-        if not force and (not refresh or last >= expected_last_session()):
-            return cached, f"cache:{cache_file} (through {last})"
+        try:
+            cached = _normalise_daily(pd.read_csv(cache_file, parse_dates=["date"], index_col="date"))
+            if cached.empty:
+                raise ValueError("empty cache")
+        except Exception:  # noqa: BLE001 - a truncated or empty cache file is treated as missing
+            cached = None
+        if cached is not None:
+            last = cached.index[-1].date()
+            if not force and (not refresh or last >= expected_last_session()):
+                return cached, f"cache:{cache_file} (through {last})"
     errors = []
     order = ["yfinance", "stooq", "alphavantage"] if source == "auto" else [source]
     fetchers = [(n, FETCHERS[n]) for n in order]
@@ -306,7 +328,10 @@ EXCEEDANCE_K = (0.0, 0.025, 0.05, 0.075, 0.10, 0.15, 0.20, 0.30)
 MIN_WEEKS_FOR_DIRECTION = 26
 
 
-def weekly_series(daily: pd.DataFrame, drop_partial: bool = True) -> pd.DataFrame:
+MAX_WEEK_GAP_DAYS = 10
+
+
+def weekly_series(daily: pd.DataFrame, drop_partial: bool = True, now: datetime | None = None) -> pd.DataFrame:
     """Weekly bars labelled by the week's Friday. `date` = actual last trading day; `first_date` = first."""
     d = daily.copy()
     d["date"] = d.index
@@ -316,16 +341,30 @@ def weekly_series(daily: pd.DataFrame, drop_partial: bool = True) -> pd.DataFram
         "date": g["date"].last(), "first_date": g["date"].first(), "ndays": g["close"].count(),
     })
     wk = wk[wk["ndays"] > 0].copy()
+    wk.index.name = "week_ending"
     if drop_partial and len(wk):
         label, last = wk.index[-1], wk["date"].iloc[-1]
-        if last.weekday() < 4 and label > last and label >= pd.Timestamp.today().normalize():
+        now = now or datetime.now(NY)
+        today = pd.Timestamp(now.date())
+        # the trailing bin is incomplete if its Friday has not closed yet; a past week ending Mon-Wed is a data cut
+        incomplete_now = label > today or (label == today and now.time() < dtime(16, 15))
+        if label > last and (last.weekday() < 3 or incomplete_now):
             wk = wk.iloc[:-1].copy()
     wk["prev_close"] = wk["close"].shift(1)
+    wk["gap_days"] = (wk["date"] - wk["date"].shift(1)).dt.days
     wk["ret"] = wk["close"] / wk["prev_close"] - 1.0
     wk["logret"] = np.log(wk["close"] / wk["prev_close"])
     wk["gap_ret"] = wk["open"] / wk["prev_close"] - 1.0      # weekend gap: first open vs previous week's close
     wk["hold_ret"] = wk["close"] / wk["open"] - 1.0           # Monday open -> Friday close
+    gap = wk["gap_days"] > MAX_WEEK_GAP_DAYS                   # a hole in the data is not a week
+    wk.loc[gap, ["ret", "logret", "gap_ret", "hold_ret"]] = np.nan
+    wk.attrs["data_gaps"] = int(gap.sum())
     return wk
+
+
+def week_window(wk: pd.DataFrame, cutoff) -> pd.DataFrame:
+    """Weeks whose whole span lies after `cutoff` (a week labelled L spans (L-7d, L])."""
+    return wk if cutoff is None else wk[wk.index >= cutoff + pd.Timedelta(days=7)]
 
 
 def wilson_ci(k: float, n: float, z: float = 1.96) -> tuple[float, float]:
@@ -344,9 +383,9 @@ def median_ci(x: pd.Series, z: float = 1.96) -> tuple[float, float]:
     n = len(s)
     if n < 6:
         return (float("nan"), float("nan"))
-    lo = int(math.floor(n / 2 - z * math.sqrt(n) / 2))
-    hi = int(math.ceil(n / 2 + z * math.sqrt(n) / 2))
-    return (float(s[max(lo, 0)]), float(s[min(hi, n - 1)]))
+    L = max(int(math.floor((n - z * math.sqrt(n)) / 2)), 1)   # 1-based ranks, symmetric about the middle
+    U = n - L + 1
+    return (float(s[L - 1]), float(s[U - 1]))
 
 
 def max_drawdown(prices: pd.Series) -> float:
@@ -426,7 +465,7 @@ def weekly_stats(wk: pd.DataFrame, daily: pd.DataFrame | None, lookbacks=LOOKBAC
     rows = []
     for label, months in lookbacks:
         cutoff = lookback_cutoff(asof, months)
-        sub = wk if cutoff is None else wk[wk.index > cutoff]
+        sub = week_window(wk, cutoff)
         dsub = None if daily is None else (daily if cutoff is None else daily[daily.index > cutoff])
         m = window_metrics(sub, dsub)
         if m:
@@ -511,7 +550,7 @@ def exceedance_table(r: pd.Series, ann_vol: float, widths=(0.05, 0.10), ks=EXCEE
             row[f"payout_w{int(w*100)}"] = payout
             row[f"full_width_share_w{int(w*100)}"] = float((over >= w).mean()) if len(over) else float("nan")
             row[f"bs_credit_w{int(w*100)}"] = credit
-            row[f"credit_over_payout_w{int(w*100)}"] = credit / payout if payout > 0 else float("inf")
+            row[f"credit_over_payout_w{int(w*100)}"] = credit / payout if payout > 0 else float("nan")  # no breaches: undefined, see the CI
         rows.append(row)
     return pd.DataFrame(rows).set_index("k_otm")
 
@@ -523,8 +562,10 @@ def dependence_block(lr: pd.Series) -> dict:
     if n < 12:
         return out
     acf = {}
+    xm = x - x.mean()
+    den = float((xm * xm).sum())
     for k in (1, 2, 3, 4):
-        acf[k] = float(np.corrcoef(x[k:], x[:-k])[0, 1])
+        acf[k] = float((xm[k:] * xm[:-k]).sum() / den) if den > 0 else float("nan")
         out[f"acf{k}"] = acf[k]
     q = n * (n + 2) * sum(acf[k] ** 2 / (n - k) for k in (1, 2, 3, 4))
     out["ljung_box_q4"] = float(q)
@@ -542,7 +583,7 @@ def dependence_block(lr: pd.Series) -> dict:
 def conditional_stats(wk: pd.DataFrame, daily: pd.DataFrame | None, years: float = 2.0, big: float = 0.15) -> pd.DataFrame:
     """Next-week distribution conditional on what just happened. Compare rows to 'all weeks', not to zero."""
     asof = wk.index[-1]
-    sub = wk[wk.index > asof - pd.DateOffset(months=int(round(years * 12)))].copy()
+    sub = week_window(wk, asof - pd.DateOffset(months=int(round(years * 12)))).copy()
     r = sub["ret"]
     prev = r.shift(1)
     r3_prev = sub["logret"].rolling(3).sum().shift(1)
@@ -638,32 +679,70 @@ def rolling_regime(wk: pd.DataFrame, window: int = 26) -> dict:
     return out
 
 
+def _pct(v, d: int = 1, sign: bool = True) -> str:
+    if v is None or v != v:
+        return "n/a"
+    return f"{v*100:+.{d}f}%" if sign else f"{v*100:.{d}f}%"
+
+
+def _num(v, d: int = 2) -> str:
+    if v is None or v != v:
+        return "n/a"
+    if v == float("inf"):
+        return ">4"
+    return f"{v:.{d}f}"
+
+
+def poisson_tail(k: int, lam: float) -> float:
+    """P(X >= k) for X ~ Poisson(lam)."""
+    if lam <= 0:
+        return 1.0 if k <= 0 else 0.0
+    cdf, term = 0.0, math.exp(-lam)
+    for i in range(k):
+        cdf += term
+        term *= lam / (i + 1)
+    return max(0.0, 1.0 - cdf)
+
+
 def verdict_lines(stats: pd.DataFrame, horizon: dict, window: str = "1y") -> list[str]:
     if stats.empty or window not in stats.index:
         return ["(not enough data for a verdict)"]
     s = stats.loc[window]
-    direction = "not distinguishable from zero" if (abs(s["t_stat"]) < 2 and s["win_ci_lo"] < 0.5 < s["win_ci_hi"]) \
-        else ("DOWN" if s["median_wk"] < 0 else "UP")
-    l1 = (f"DIRECTION ({window}, n={int(s['weeks'])}): median {s['median_wk']*100:+.1f}%/wk "
-          f"[{s['median_ci_lo']*100:+.1f}, {s['median_ci_hi']*100:+.1f}], win {s['win_rate']*100:.0f}% "
-          f"[{s['win_ci_lo']*100:.0f}, {s['win_ci_hi']*100:.0f}], mean log {s['mean_log_wk']*100:+.2f}%/wk (t={s['t_stat']:.2f}) "
-          f"-> {direction}.")
+    t = s["t_stat"]
+    n = int(s["weeks"])
+    if t != t:
+        direction = "not computable (no variance)"
+    else:
+        sig_t = abs(t) >= 2
+        win_sig = not (s["win_ci_lo"] < 0.5 < s["win_ci_hi"])
+        if sig_t and win_sig and ((t > 0) != (s["win_rate"] > 0.5)):
+            direction = "MIXED: the mean says " + ("up" if t > 0 else "down") + ", the typical week says the opposite"
+        elif sig_t:
+            direction = ("UP" if t > 0 else "DOWN") + " on the mean (t beyond 2)"
+        elif win_sig:
+            direction = ("UP" if s["win_rate"] > 0.5 else "DOWN") + " on the typical week (win-rate CI excludes 50%)"
+        else:
+            direction = "not distinguishable from zero"
+    l1 = (f"DIRECTION ({window}, n={n}): median {_pct(s['median_wk'])}/wk [{_pct(s['median_ci_lo'])}, {_pct(s['median_ci_hi'])}], "
+          f"win {_pct(s['win_rate'], 0, False)} [{_pct(s['win_ci_lo'], 0, False)}, {_pct(s['win_ci_hi'], 0, False)}], "
+          f"mean log {_pct(s['mean_log_wk'], 2)}/wk (t={_num(t)}) -> {direction}.")
     shape = []
-    if s["skew"] == s["skew"] and s["skew"] > s["skew_lognormal_null"] + 0.5:
-        shape.append("right-tailed beyond lognormal")
-    if s["n_wk_gt_15"] >= 1.5 * s["exp_n_wk_gt_15_lognormal"] and s["n_wk_gt_15"] >= 2:
-        shape.append("excess +15% weeks")
-    if s["cum_ex_top5"] == s["cum_ex_top5"] and (s["cum_return"] - s["cum_ex_top5"]) > 0.5:
-        shape.append("returns concentrated in a few weeks")
-    l2 = (f"SHAPE ({window}): skew {s['skew']:.2f} (lognormal null {s['skew_lognormal_null']:.2f}), "
-          f"{int(s['n_wk_gt_15'])} weeks > +15% (lognormal expects {s['exp_n_wk_gt_15_lognormal']:.1f}), "
-          f"tail ratio {s['tail_ratio_5']:.2f}, year {s['cum_return']*100:+.0f}% vs {s['cum_ex_top5']*100:+.0f}% without its top 5 weeks "
-          f"-> {', '.join(shape) if shape else 'consistent with a plain high-vol random walk'}.")
+    se_skew = math.sqrt(6.0 / n) if n else float("nan")
+    if s["skew"] == s["skew"] and s["skew_lognormal_null"] == s["skew_lognormal_null"] and s["skew"] > s["skew_lognormal_null"] + 2 * se_skew:
+        shape.append("right-tailed beyond lognormal (skew more than 2 SE above the null)")
+    k15 = int(s["n_wk_gt_15"])
+    p_pois = poisson_tail(k15, float(s["exp_n_wk_gt_15_lognormal"])) if s["exp_n_wk_gt_15_lognormal"] == s["exp_n_wk_gt_15_lognormal"] else 1.0
+    if k15 >= 3 and p_pois < 0.05:
+        shape.append(f"excess +15% weeks (Poisson tail p={p_pois:.2f})")
+    l2 = (f"SHAPE ({window}): skew {_num(s['skew'])} (lognormal null {_num(s['skew_lognormal_null'])}, SE {_num(se_skew)}), "
+          f"{k15} weeks > +15% (lognormal expects {_num(s['exp_n_wk_gt_15_lognormal'], 1)}), tail ratio {_num(s['tail_ratio_5'])}, "
+          f"window {_pct(s['cum_return'], 0)} vs {_pct(s['cum_ex_top5'], 0)} without its top 5 weeks "
+          f"-> {', '.join(shape) if shape else 'not separable from a plain high-vol random walk at this sample size'}.")
     l3 = ""
     if horizon and "p_up_block_ci_lo" in horizon:
-        l3 = (f"3-WEEK: P(up) {horizon['p_up_overlap']*100:.0f}% overlapping (n_eff {horizon['n_eff']:.0f}), "
-              f"{horizon['p_up_iid_boot']*100:.0f}% bootstrap, block-bootstrap 95% CI [{horizon['p_up_block_ci_lo']*100:.0f}%, {horizon['p_up_block_ci_hi']*100:.0f}%]; "
-              f"median 3-wk move {horizon['q50']*100:+.1f}%, P(> +20%) {horizon['p_gt_20']*100:.0f}%, P(< -20%) {horizon['p_lt_m20']*100:.0f}%.")
+        l3 = (f"3-WEEK: P(up) {_pct(horizon['p_up_overlap'], 0, False)} overlapping (n_eff {horizon['n_eff']:.0f}), "
+              f"{_pct(horizon['p_up_iid_boot'], 0, False)} bootstrap, block-bootstrap 95% CI [{_pct(horizon['p_up_block_ci_lo'], 0, False)}, {_pct(horizon['p_up_block_ci_hi'], 0, False)}]; "
+              f"median 3-wk move {_pct(horizon['q50'])}, P(> +20%) {_pct(horizon['p_gt_20'], 0, False)}, P(< -20%) {_pct(horizon['p_lt_m20'], 0, False)}.")
     return [l1, l2] + ([l3] if l3 else [])
 
 
@@ -726,11 +805,15 @@ def regime_frame(daily: pd.DataFrame) -> pd.DataFrame:
     f["pct_from_high52"] = c / f["high52"] - 1.0
     rv20 = np.log(c).diff().rolling(20).std(ddof=1) * math.sqrt(252)
     f["rv20"] = rv20
-    f["rv20_pctile"] = rv20.rolling(252, min_periods=60).apply(lambda x: float((x[-1] > x[:-1]).mean()), raw=True)
+    def _pctile(x):
+        past = x[:-1]
+        past = past[~np.isnan(past)]
+        return float((x[-1] > past).mean()) if len(past) >= 40 and x[-1] == x[-1] else float("nan")
+    f["rv20_pctile"] = rv20.rolling(252, min_periods=60).apply(_pctile, raw=True)
     above = c > f["dma50"]
     rising = f["dma50_slope"] > 0
     f["trend"] = np.where(above & rising, "up", np.where(~above & ~rising, "down", "mixed"))
-    f.loc[f["dma50"].isna(), "trend"] = "n/a"
+    f.loc[f["dma50"].isna() | f["dma50_slope"].isna(), "trend"] = "n/a"
     return f
 
 
@@ -755,6 +838,10 @@ def backtest_spreads(daily: pd.DataFrame, wk: pd.DataFrame, cfg: SpreadConfig, e
             rg = regimes.loc[entry_date]
             rec.update({"trend": rg["trend"], "pct_from_high52": rg["pct_from_high52"], "rv20_pctile": rg["rv20_pctile"],
                         "above_dma200": bool(S0 > rg["dma200"]) if rg["dma200"] == rg["dma200"] else None})
+        if (exp_date - entry_date).days > MAX_WEEK_GAP_DAYS:
+            rec["skipped"] = "data gap"
+            rows.append(rec)
+            continue
         rv0 = rv.get(entry_date, float("nan"))
         if not (rv0 == rv0) or rv0 <= 0:
             rec["skipped"] = "no realized vol yet"
@@ -764,7 +851,8 @@ def backtest_spreads(daily: pd.DataFrame, wk: pd.DataFrame, cfg: SpreadConfig, e
         n_sessions = p1 - p0
         T = max((exp_date - entry_date).days, 1) / 365.0   # calendar clock, same as the chain calibration (dte/365)
         sigma = max(cfg.iv_mult * rv0, cfg.iv_floor)
-        ew = bool(earnings) and any(entry_date < e <= exp_date for e in earnings)
+        # a report dated on the entry Friday could be after the close (lands in this week): treat it as in-week too
+        ew = bool(earnings) and any(entry_date <= e <= exp_date for e in earnings)
         rec["earnings_week"] = ew
         if ew and cfg.earnings == "skip":
             rec["skipped"] = "earnings week"
@@ -813,7 +901,7 @@ def backtest_spreads(daily: pd.DataFrame, wk: pd.DataFrame, cfg: SpreadConfig, e
             for p in range(p0 + 1, p1):
                 S_ = close_vals[p]
                 d_ = closes.index[p]
-                T_rem = max((exp_date - d_).days, 0) / 365.0
+                T_rem = T * (p1 - p) / max(n_sessions, 1)   # decay spread evenly over the remaining sessions
                 beyond = (S_ > K_short) if is_call else (S_ < K_short)
                 mk = cfg.mark_iv_mult if beyond else 1.0
                 if is_call:
@@ -840,7 +928,7 @@ def backtest_spreads(daily: pd.DataFrame, wk: pd.DataFrame, cfg: SpreadConfig, e
             pnl_share = credit - (exit_value + slip)
             comm = 4 * cfg.commission
         pnl = pnl_share * 100.0 - comm
-        max_risk = (width - credit) * 100.0 + 2 * cfg.commission
+        max_risk = (width - credit) * 100.0 + 4 * cfg.commission + slip * 100.0   # includes a worst-case closing round
         contracts = int(cfg.risk_budget // max_risk) if max_risk > 0 else 0
         path_hi = highs.iloc[p0 + 1:p1 + 1]
         path_lo = lows.iloc[p0 + 1:p1 + 1]
@@ -865,7 +953,7 @@ def summarize_trades(trades: pd.DataFrame, years_hint: float | None = None) -> d
     if n == 0:
         return out
     wins, losses = t[t["pnl"] > 0]["pnl"], t[t["pnl"] <= 0]["pnl"]
-    cum = t["pnl"].cumsum()
+    cum = pd.concat([pd.Series([0.0]), t["pnl"].cumsum()], ignore_index=True)  # equity starts at zero
     span_days = (t["expiry_date"].max() - t["entry_date"].min()).days
     years = years_hint or max(span_days / 365.25, 1e-9)
     avg_risk = float(t["max_risk"].mean())
@@ -873,7 +961,7 @@ def summarize_trades(trades: pd.DataFrame, years_hint: float | None = None) -> d
     for w in (t["pnl"] > 0).values:
         streak = 0 if w else streak + 1
         worst_streak = max(worst_streak, streak)
-    worst5 = t["pnl"].nsmallest(5).sum()
+    worst5 = losses.nsmallest(5).sum() if len(losses) else 0.0
     out.update({
         "win_rate": float((t["pnl"] > 0).mean()),
         "total_pnl": float(t["pnl"].sum()),
@@ -895,6 +983,7 @@ def summarize_trades(trades: pd.DataFrame, years_hint: float | None = None) -> d
         "sharpe_weekly": float(t["pnl"].mean() / t["pnl"].std(ddof=1) * math.sqrt(52)) if n > 2 and t["pnl"].std(ddof=1) > 0 else float("nan"),
         "pnl_const_risk": float(t["pnl_const_risk"].sum()),
         "avg_contracts_const_risk": float(t["contracts_const_risk"].mean()),
+        "const_risk_zero_weeks": int((t["contracts_const_risk"] == 0).sum()),
         "avg_credit": float(t["credit"].mean()),
         "avg_width": float(t["width"].mean()),
         "avg_credit_pct_width": float((t["credit"] / t["width"]).mean()),
@@ -935,11 +1024,29 @@ def per_year(trades: pd.DataFrame) -> pd.DataFrame:
     return group_summary(t, "year")
 
 
-def slice_period(trades: pd.DataFrame, months: int | None) -> pd.DataFrame:
-    if months is None or trades.empty:
+def slice_period(trades: pd.DataFrame, months: int | None, asof=None) -> pd.DataFrame:
+    """Trades entered within the last `months` before `asof` (default: the frame's last expiry). Pass the
+    unfiltered frame's as-of when slicing a filtered subset so both cover the same calendar window."""
+    if months is None or trades.empty or "expiry_date" not in trades.columns:
         return trades
-    asof = trades["expiry_date"].max()
+    asof = asof if asof is not None else trades["expiry_date"].max()
     return trades[trades["entry_date"] > asof - pd.DateOffset(months=months)]
+
+
+TRADE_COLS = ["entry_date", "expiry_date", "S0", "ST", "stock_ret", "prev_week_ret", "skipped", "rv", "sigma", "K_short", "K_long",
+              "width", "short_otm_pct", "model_delta", "credit_mid", "credit", "exit_date", "exit_reason", "pnl", "max_risk",
+              "ret_on_risk", "win", "contracts_const_risk", "pnl_const_risk", "finished_beyond_short", "touched_short"]
+
+
+def completed(trades: pd.DataFrame) -> pd.DataFrame:
+    """Rows that actually traded, with every expected column present even when nothing traded."""
+    if trades is None or trades.empty:
+        return pd.DataFrame(columns=TRADE_COLS)
+    t = trades[trades["skipped"].isna()].copy() if "skipped" in trades.columns else trades.copy()
+    for c in TRADE_COLS:
+        if c not in t.columns:
+            t[c] = np.nan
+    return t
 
 
 def breakeven_mult(daily, wk, cfg: SpreadConfig, earnings, regimes, months: int | None, lo=0.5, hi=4.0, iters=14) -> float:
@@ -965,14 +1072,14 @@ def breakeven_mult(daily, wk, cfg: SpreadConfig, earnings, regimes, months: int 
 
 
 def leaky_short_benchmark(daily: pd.DataFrame, trades: pd.DataFrame) -> float:
-    """Short 100 shares each week at the entry close, cover at the first close >= S0 + width or at Friday.
-    'Leaky cap' because gaps can jump through it."""
-    t = trades[trades["skipped"].isna()]
+    """Short 100 shares each week at the entry close, cover at the first close at or above the spread's long
+    strike or at Friday. 'Leaky cap' because gaps can jump through it."""
+    t = completed(trades)
     closes = daily["close"]
     total = 0.0
     for _, row in t.iterrows():
         path = closes[(closes.index > row["entry_date"]) & (closes.index <= row["expiry_date"])]
-        cap = row["S0"] + row["width"]
+        cap = row["K_long"]
         hit = path[path >= cap]
         exit_px = float(hit.iloc[0]) if len(hit) else float(row["ST"])
         total += -(exit_px - row["S0"]) * 100.0
@@ -990,22 +1097,35 @@ def chain_calibration(ticker: str, spot: float, rv_now: float, rate: float = 0.0
         exps = tk.options
         if not exps:
             return None
-        today = date.today()
-        cands = [(e, (datetime.strptime(e, "%Y-%m-%d").date() - today).days) for e in exps]
-        weekly = [c for c in cands if 3 <= c[1] <= 12] or [c for c in cands if c[1] > 0]
-        exp, dte = sorted(weekly, key=lambda c: abs(c[1] - 7))[0]
+        today = datetime.now(NY).date()
+        cands = [(e, (datetime.strptime(e, "%Y-%m-%d").date() - today).days, datetime.strptime(e, "%Y-%m-%d").weekday()) for e in exps]
+        window = [c for c in cands if 3 <= c[1] <= 12] or [c for c in cands if c[1] > 0]
+        fridays = [c for c in window if c[2] == 4]   # the backtest trades Friday expiries; SPY/QQQ also list Mon/Wed
+        exp, dte, _ = sorted(fridays or window, key=lambda c: abs(c[1] - 7))[0]
         ch = tk.option_chain(exp)
-        calls = ch.calls.copy()
+        calls_all = ch.calls.copy()
+        try:  # price the chain against the chain's own underlying quote, not a cached or historical close
+            live = float(ch.underlying.get("regularMarketPrice") or 0)
+            if live > 0:
+                spot = live
+        except Exception:  # noqa: BLE001
+            pass
         T = max(dte, 1) / 365.0
-        calls["mid"] = (calls["bid"] + calls["ask"]) / 2.0
-        calls = calls[(calls["mid"] > 0) & (calls["ask"] > 0)]
+        calls_all["mid"] = (calls_all["bid"] + calls_all["ask"]) / 2.0
+        calls = calls_all[(calls_all["mid"] > 0) & (calls_all["ask"] > 0)].copy()
+        if calls.empty:
+            return None
         calls["iv_own"] = [implied_vol(m, spot, k, T, rate, True) for m, k in zip(calls["mid"], calls["strike"])]
         calls = calls.dropna(subset=["iv_own"])
-        near = calls[(calls["strike"] > spot * 0.8) & (calls["strike"] < spot * 1.2)].sort_values("strike")
-        steps = np.diff(near["strike"].values)
+        if calls.empty:
+            return None
+        listed = calls_all[(calls_all["strike"] > spot * 0.8) & (calls_all["strike"] < spot * 1.2)].sort_values("strike")
+        steps = np.diff(listed["strike"].values)
         step = float(pd.Series(steps).mode().iloc[0]) if len(steps) else float("nan")
         atm = calls.iloc[(calls["strike"] - spot).abs().argsort()[:2]]
         iv_atm = float(atm["iv_own"].mean())
+        if not iv_atm == iv_atm:
+            return None
         calls["delta"] = [bs_call_delta(spot, k, T, rate, v) for k, v in zip(calls["strike"], calls["iv_own"])]
         c25 = calls.iloc[(calls["delta"] - 0.25).abs().argsort()[:1]]
         c10 = calls.iloc[(calls["delta"] - 0.10).abs().argsort()[:1]]
@@ -1018,7 +1138,7 @@ def chain_calibration(ticker: str, spot: float, rv_now: float, rate: float = 0.0
             short_pct, short_ratio = info.get("shortPercentOfFloat"), info.get("shortRatio")
         except Exception:  # noqa: BLE001
             pass
-        return {"expiry": exp, "dte": dte, "iv_atm": iv_atm, "iv_25d_call": iv25, "iv_10d_call": iv10,
+        return {"expiry": exp, "dte": dte, "spot_used": spot, "iv_atm": iv_atm, "iv_25d_call": iv25, "iv_10d_call": iv10,
                 "short_pct_float": short_pct, "short_ratio_days": short_ratio,
                 "skew_s": float(min(max(skew, 0.0), 1.0)) if skew == skew else None,
                 "strike_step": step, "rv_now": rv_now, "m_today": iv_atm / rv_now if rv_now else float("nan"),
@@ -1059,7 +1179,7 @@ PCT_COLS = {"cum_return", "mean_wk", "mean_log_wk", "vol_drag_wk", "median_wk", 
             "overnight_win_rate", "intraday_mean", "intraday_win_rate", "overnight_total", "intraday_total",
             "overnight_var_share", "expectancy_pct_risk", "beyond_short", "stock_ret", "model_delta", "realized_p",
             "ci_lo", "ci_hi", "lognormal_p", "avg_overshoot", "payout_w5", "payout_w10", "bs_credit_w5", "bs_credit_w10",
-            "full_width_share_w5", "full_width_share_w10", "win_null", "win_null_lo", "win_null_hi", "expectancy_se_pct_risk",
+            "full_width_share_w5", "full_width_share_w10", "win_null", "win_null_lo", "win_null_hi", "expectancy_se_pct_risk", "avg_sigma_used",
             "cc", "overnight", "intraday", "pct_from_high52", "return_on_max_risk", "full_loss_rate", "implied_p_today",
             "p_up_overlap", "p_up_nonoverlap", "p_up_iid_boot", "p_up_block_ci_lo", "p_up_block_ci_hi", "p_up_normal",
             "q05", "q25", "q50", "q75", "q95", "mean_h", "p_gt_10", "p_gt_20", "p_gt_30", "p_lt_m20",
@@ -1195,27 +1315,28 @@ def html_report(ctx: dict) -> str:
         if df is None or df.empty:
             return "<p class='note'>(no data)</p>"
         return '<div class="scroll">' + _fmt_df(df).to_html(border=0, escape=False) + "</div>"
-    t = ctx["base_trades"][ctx["base_trades"]["skipped"].isna()]
-    series = [("Call spreads: cumulative P&L ($, 1 contract)", t["pnl"].cumsum().tolist())]
-    put_t = ctx["put_trades"][ctx["put_trades"]["skipped"].isna()] if ctx.get("put_trades") is not None else None
-    if put_t is not None and len(put_t):
+    t = completed(ctx["base_trades"])
+    series = [("Call spreads: cumulative P&L ($, 1 contract)", t["pnl"].cumsum().tolist())] if len(t) else []
+    put_t = completed(ctx.get("put_trades"))
+    if len(put_t):
         series.append(("Put spreads (mirror)", put_t["pnl"].cumsum().tolist()))
     bs = ctx["base_summary"]
     mbe1 = ctx["m_be"].get("1y", float("nan"))
     kpis = [("Weeks (1y)", str(bs.get("trades", 0))), ("Win rate", f"{bs.get('win_rate', float('nan'))*100:.0f}%"),
-            ("P&L, 1 contract", f"${bs.get('total_pnl', 0):,.0f}"), (f"P&L, const. risk ${ctx['base_cfg'].risk_budget:,.0f}", f"${bs.get('pnl_const_risk', 0):,.0f}"),
+            ("P&L, 1 contract", f"${bs.get('total_pnl', 0):,.0f}"),
+            (f"P&L, const. risk ${ctx['base_cfg'].risk_budget:,.0f}", f"${bs.get('pnl_const_risk', 0):,.0f}" + (f" ({bs['const_risk_zero_weeks']} wks over budget)" if bs.get('const_risk_zero_weeks') else "")),
             ("Expectancy / max risk", f"{bs.get('expectancy_pct_risk', float('nan'))*100:.1f}% ± {bs.get('expectancy_se_pct_risk', float('nan'))*100:.1f}%"),
             ("Full-width losses", f"{bs.get('full_loss_rate', float('nan'))*100:.0f}% of weeks"),
-            ("Break-even m (1y)", ">4" if mbe1 == float("inf") else f"{mbe1:.2f}"),
+            ("Break-even m (1y)", _num(mbe1)),
             ("Max drawdown", f"${bs.get('max_drawdown_$', 0):,.0f}"), ("Stock buy & hold", f"{bs.get('stock_buy_hold', float('nan'))*100:+.0f}%")]
     kpi_html = "".join(f'<div class="kpi"><span class="note">{k}</span><b>{v}</b></div>' for k, v in kpis)
     wk = ctx["wk"]
-    marks = [(float(t["short_otm_pct"].mean()), "avg short strike")] if len(t) else []
+    marks = [(float(t["short_otm_pct"].mean()), "avg short strike")] if len(t) and t["short_otm_pct"].notna().any() else []
     weekly_hist = svg_hist(wk["ret"].dropna().tolist(), title="Distribution of weekly returns (all data); dashed = average short-strike distance", marks=marks)
     chain = ctx.get("chain")
     chain_txt = (f"Today's chain ({chain['expiry']}, {chain['dte']}d): ATM IV {chain['iv_atm']:.0%}, 25d call IV {chain['iv_25d_call']:.0%}, "
                  f"skew s = {chain['skew_s']}, strike step {chain['strike_step']}, RV now {chain['rv_now']:.0%}, <b>m_today = {chain['m_today']:.2f}</b>.") if chain else \
-        "No chain calibration (run with --iv-from-chain on the laptop to get m_today and the skew)."
+        ("No chain calibration: offline CSV source." if ctx['source'].startswith('csv') else "No chain calibration (run with --iv-from-chain on the laptop to get m_today and the skew).")
     dep = ctx["dep"]
     cfg = ctx["base_cfg"]
     g = lambda k: dep.get(k, float("nan"))  # noqa: E731
@@ -1231,7 +1352,7 @@ Weeks run last-trading-day to last-trading-day. Option prices: Black-Scholes, IV
 {tbl(ctx['stats'][ctx['dir_cols']])}
 <h3>Shape and tails</h3>{tbl(ctx['stats'][ctx['shape_cols']])}
 <h3>Calendar years (non-nested)</h3>{tbl(ctx['yearly'][[c for c in ctx['dir_cols'] + ['ann_vol', 'cum_ex_top5', 'n_wk_gt_15', 'max_dd'] if c in ctx['yearly'].columns]])}
-<p class="note">Rolling 26-week median: now {ctx['rolling'].get('median_now', float('nan'))*100:+.1f}%/wk, range [{ctx['rolling'].get('median_min', float('nan'))*100:+.1f}%, {ctx['rolling'].get('median_max', float('nan'))*100:+.1f}%], sign changes {ctx['rolling'].get('n_sign_changes', 0)}, last on {ctx['rolling'].get('last_sign_change', 'n/a')}. {ctx['regime_flag']}</p>
+<p class="note">Rolling 26-week median: now {_pct(ctx['rolling'].get('median_now'))}/wk, range [{_pct(ctx['rolling'].get('median_min'))}, {_pct(ctx['rolling'].get('median_max'))}], sign changes {ctx['rolling'].get('n_sign_changes', 0)}, last on {ctx['rolling'].get('last_sign_change', 'n/a')}. {ctx['regime_flag']}</p>
 {weekly_hist}
 
 <h2>2. The {ctx['h']}-week horizon</h2>{tbl(ctx['horizon_df'])}
@@ -1243,7 +1364,7 @@ Weeks run last-trading-day to last-trading-day. Option prices: Black-Scholes, IV
 <h3>All data</h3>{tbl(ctx['exceed'].get('all'))}
 
 <h2>4. What happens the week after... (last {ctx['cond'].attrs.get('window_years', 2):g} years)</h2>{tbl(ctx['cond'])}
-<p class="note">Compare each row to 'all weeks', not to zero: conditioning on a +15% week selects lucky weeks, and the next week regresses regardless of any true signal. Dependence (last 2y): ACF(1..4) = {g('acf1'):+.2f}, {g('acf2'):+.2f}, {g('acf3'):+.2f}, {g('acf4'):+.2f} (SE {g('acf_se'):.2f}; need |rho| &gt; {2*g('acf_se'):.2f} to matter); Ljung-Box Q(4) p = {g('ljung_box_p'):.2f}; variance ratios VR2 {g('vr2'):.2f}, VR3 {g('vr3'):.2f}, VR4 {g('vr4'):.2f} (&lt;1 mean reversion, &gt;1 momentum; iid SE for VR3 {g('vr3_se'):.2f}).</p>
+<p class="note">Compare each row to 'all weeks', not to zero: conditioning on a +15% week selects lucky weeks, and the next week regresses regardless of any true signal. Dependence (last 2y): ACF(1..4) = {_num(g('acf1'))}, {_num(g('acf2'))}, {_num(g('acf3'))}, {_num(g('acf4'))} (SE {_num(g('acf_se'))}; need |rho| &gt; {_num(2*g('acf_se'))} to matter); Ljung-Box Q(4) p = {_num(g('ljung_box_p'))}; variance ratios VR2 {_num(g('vr2'))}, VR3 {_num(g('vr3'))}, VR4 {_num(g('vr4'))} (&lt;1 mean reversion, &gt;1 momentum; iid SE for VR3 {_num(g('vr3_se'))}).</p>
 
 <h2>5. Daily decomposition: overnight gap vs intraday drift, and gap events</h2>{tbl(ctx['decomp'])}
 <h3>Ten largest sessions</h3>{tbl(ctx['top_days'])}
@@ -1261,7 +1382,7 @@ Weeks run last-trading-day to last-trading-day. Option prices: Black-Scholes, IV
 <h3>Conditional on last week</h3>{tbl(ctx['base_cond'])}
 {('<h3>Earnings weeks vs the rest</h3>' + tbl(ctx['base_earn'])) if not ctx['base_earn'].empty else ''}
 {('<h3>Regime filter vs unfiltered</h3>' + tbl(ctx['regime_filtered'])) if not ctx['regime_filtered'].empty else ''}
-<p class="note">Benchmarks over the same weeks, all data: buy &amp; hold 100 shares {ctx['bench']['buy_hold_100']:+,.0f} $; short 100 shares each week with a close-based cap at the long strike ("leaky cap") {ctx['bench']['leaky_short']:+,.0f} $; call spreads {ctx['base_all'].get('total_pnl', 0):+,.0f} $ per contract. Management variants (tp50, sl2x, close1dte) are approximate: daily-close triggers, flat intra-week IV.</p>
+<p class="note">Benchmarks over the same weeks, all data: buy &amp; hold 100 shares {ctx['bench']['buy_hold_100']:+,.0f} $; short 100 shares each week, covered at the first close at or above the spread's long strike ("leaky cap": gaps jump through it) {ctx['bench']['leaky_short']:+,.0f} $; call spreads {ctx['base_all'].get('total_pnl', 0):+,.0f} $ per contract. Management variants (tp50, sl2x, close1dte) are approximate: daily-close triggers, flat intra-week IV.</p>
 
 <h2>7. Sweep: short delta x IV multiplier</h2>{heatmap_html(ctx['sweep'], period='1y')}{heatmap_html(ctx['sweep'], period='all')}
 <p class="note">{ctx['n_variants']} configurations were evaluated for this ticker. At zero true edge the best of 16 variants on one year reads about +6% of risk per week, and a 16-delta program shows a &gt;90% win rate 62% of the time; the expectancy standard error is in summary.json (expectancy_se_pct_risk). Rank by expectancy, never by win rate.</p>
@@ -1286,22 +1407,51 @@ HORIZON_COLS = ["weeks", "n_windows", "n_eff", "p_up_overlap", "p_up_nonoverlap"
                 "p_up_normal", "q05", "q25", "q50", "q75", "q95", "p_gt_10", "p_gt_20", "p_gt_30", "p_lt_m20"]
 
 
-def analyse_ticker(ticker: str, daily: pd.DataFrame, source: str, args) -> dict:
+def _json_safe(obj):
+    """Recursively replace NaN/inf (not valid JSON) with None and numpy scalars with Python ones."""
+    if isinstance(obj, dict):
+        return {str(k): _json_safe(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_json_safe(v) for v in obj]
+    if isinstance(obj, (np.integer,)):
+        return int(obj)
+    if isinstance(obj, (float, np.floating)):
+        return None if (obj != obj or obj in (float("inf"), float("-inf"))) else float(obj)
+    if isinstance(obj, (np.bool_,)):
+        return bool(obj)
+    if isinstance(obj, (pd.Timestamp, datetime, date)):
+        return str(obj)
+    return obj
+
+
+def analyse_ticker(ticker: str, daily: pd.DataFrame, source: str, args, daily_full: pd.DataFrame | None = None) -> dict:
+    """`daily` is the analysis window; `daily_full` (default: the same) carries the warm-up history for
+    realized vol and regime tags so --start does not silently drop the first weeks of the backtest."""
+    dfull = daily_full if daily_full is not None else daily
     wk = weekly_series(daily, drop_partial=not args.include_partial)
     h = args.horizon
     print(f"\n{'='*110}\n{ticker}  |  {source}\n{'='*110}")
     print(f"Daily bars: {len(daily)} ({daily.index[0].date()} .. {daily.index[-1].date()})  |  weekly bars: {len(wk)}  |  last weekly close {wk['close'].iloc[-1]:,.2f} on {wk['date'].iloc[-1].date()}")
 
-    rv_now = float(realized_vol_series(daily["close"], args.rv_mode).iloc[-1])
+    rv_now = float(realized_vol_series(dfull["close"], args.rv_mode).iloc[-1])
     offline = source.startswith("csv")
-    chain = chain_calibration(ticker, float(daily["close"].iloc[-1]), rv_now, args.rate) if (args.iv_from_chain and not offline) else None
+    chain = None
+    if args.iv_from_chain:
+        if offline:
+            print("  (chain calibration skipped: offline CSV source)")
+        elif args.end:
+            print("  (chain calibration skipped: --end makes today's chain meaningless against a historical spot)")
+        else:
+            chain = chain_calibration(ticker, float(dfull["close"].iloc[-1]), rv_now, args.rate)
+    if wk.attrs.get("data_gaps"):
+        print(f"  data gaps: {wk.attrs['data_gaps']} week(s) follow a hole of more than {MAX_WEEK_GAP_DAYS} days and are excluded")
     stats = weekly_stats(wk, daily)
     yearly = yearly_stats(wk, daily)
     asof = wk.index[-1]
     horizon, exceed = {}, {}
     for label, months in (("1y", 12), ("2y", 24), ("all", None)):
         cutoff = lookback_cutoff(asof, months)
-        sub = wk if cutoff is None else wk[wk.index > cutoff]
+        sub = week_window(wk, cutoff)
         if label in stats.index:
             horizon[label] = horizon_block(sub["logret"], h=h, b_iid=args.boot, b_block=args.block_boot, seed=1)
             exceed[label] = exceedance_table(sub["ret"], float(stats.loc[label, "ann_vol"]), rate=args.rate,
@@ -1309,8 +1459,8 @@ def analyse_ticker(ticker: str, daily: pd.DataFrame, source: str, args) -> dict:
     horizon_df = pd.DataFrame(horizon).T.astype(float) if horizon else pd.DataFrame()
     for c in ("weeks", "n_windows"):
         if c in horizon_df.columns:
-            horizon_df[c] = horizon_df[c].astype(int)
-    dep = dependence_block((wk[wk.index > lookback_cutoff(asof, 24)] if len(wk) > 30 else wk)["logret"])
+            horizon_df[c] = horizon_df[c].round().astype("Int64")
+    dep = dependence_block((week_window(wk, lookback_cutoff(asof, 24)) if len(wk) > 30 else wk)["logret"])
     cond = conditional_stats(wk, daily, years=args.cond_years)
     decomp, top_days = daily_decomposition(daily)
     rolling = rolling_regime(wk)
@@ -1346,35 +1496,44 @@ def analyse_ticker(ticker: str, daily: pd.DataFrame, source: str, args) -> dict:
         print(f"\n-- Today's chain {chain['expiry']} ({chain['dte']}d): ATM IV {chain['iv_atm']:.0%} (Yahoo column said {chain['yahoo_iv_atm']:.0%}), 25d call {chain['iv_25d_call']:.0%}, "
               f"skew s {chain['skew_s']}, step {chain['strike_step']}, RV now {rv_now:.0%}  =>  m_today = {chain['m_today']:.2f}"
               + (f"  | short interest {chain['short_pct_float']*100:.0f}% of float, {chain['short_ratio_days']} days to cover" if chain.get("short_pct_float") else ""))
-    iv_mults = sorted(set(list(args.iv_mult) + ([round(chain["m_today"], 2)] if chain and chain["m_today"] == chain["m_today"] else [])))
+    iv_mults = sorted(set(list(args.iv_mult) + [1.0] + ([round(chain["m_today"], 2)] if chain and chain["m_today"] == chain["m_today"] else [])))
+    deltas = list(args.deltas) if args.base_delta in args.deltas else list(args.deltas) + [args.base_delta]
+    mgmts = list(args.mgmt) if "hold" in args.mgmt else ["hold"] + list(args.mgmt)
+    if deltas != list(args.deltas) or mgmts != list(args.mgmt):
+        print(f"  (added base delta {args.base_delta} and/or 'hold' to the sweep so the baseline exists)")
     skew_s = args.skew if args.skew is not None else (chain["skew_s"] if chain and chain.get("skew_s") is not None else 0.3)
     strike_step = args.strike_step or (chain["strike_step"] if (chain and args.grid_from_chain and chain["strike_step"] == chain["strike_step"]) else None)
     earnings = set()
     if args.earnings != "include" or args.earnings_file:
         earnings = load_earnings(ticker, args.earnings_file, fetch=(args.earnings != "include") and not offline)
     if earnings:
-        print(f"  earnings dates known: {len(earnings)} ({'file' if args.earnings_file else 'yfinance'}{' + yfinance' if args.earnings_file and not offline else ''}) -> mode '{args.earnings}'")
+        src = []
+        if args.earnings_file:
+            src.append("file")
+        if args.earnings != "include" and not offline:
+            src.append("yfinance")
+        print(f"  earnings dates known: {len(earnings)} ({' + '.join(src) or 'file'}) -> mode '{args.earnings}'")
     elif not offline and args.earnings != "include":
         print("  earnings dates: none found (yfinance calendar is unreliable for small caps; pass --earnings-file to skip them)")
     regimes = regime_frame(daily)
 
     # ---- backtests
     def mk(**kw):
-        base = dict(side="call", delta=args.base_delta, width_pct=args.widths[0], iv_mult=iv_mults[0], rv_mode=args.rv_mode, skew=skew_s,
+        base = dict(side="call", delta=args.base_delta, width_pct=args.widths[0], iv_mult=1.0, rv_mode=args.rv_mode, skew=skew_s,
                     r=args.rate, strike_step=strike_step, snap_mode=args.snap, slip_frac=args.slip, slip_floor_per_leg=args.slip_floor,
                     mark_iv_mult=args.mark_iv_mult, commission=args.commission,
-                    mgmt=args.mgmt[0], earnings=args.earnings if earnings else "include", earnings_move=args.earnings_move,
+                    mgmt="hold", earnings=args.earnings if earnings else "include", earnings_move=args.earnings_move,
                     risk_budget=args.risk_budget)
         base.update(kw)
         return SpreadConfig(**base)
 
     rows, trade_sets = [], {}
-    for delta in args.deltas:
+    for delta in deltas:
         for m in iv_mults:
-            for mg in args.mgmt:
+            for mg in mgmts:
                 for w in args.widths:
                     cfg = mk(delta=delta, iv_mult=m, mgmt=mg, width_pct=w)
-                    tr = backtest_spreads(daily, wk, cfg, earnings, regimes)
+                    tr = backtest_spreads(dfull, wk, cfg, earnings, regimes)
                     trade_sets[cfg.label()] = (cfg, tr)
                     for plabel, months in (("1y", 12), ("2y", 24), ("3y", 36), ("all", None)):
                         s = summarize_trades(slice_period(tr, months))
@@ -1387,23 +1546,26 @@ def analyse_ticker(ticker: str, daily: pd.DataFrame, source: str, args) -> dict:
     sweep = pd.DataFrame(rows)
     if not sweep.empty and not args.no_breakeven:
         be_rows = {}
-        for delta in args.deltas:
-            for plabel, months in (("1y", 12), ("all", None)):
-                be_rows[(delta, plabel)] = breakeven_mult(daily, wk, mk(delta=delta, mgmt="hold"), earnings, regimes, months)
-        sweep["m_be"] = [be_rows.get((d, p), float("nan")) if mg == "hold" else float("nan") for d, p, mg in zip(sweep["delta"], sweep["period"], sweep["mgmt"])]
+        for delta in deltas:
+            for w in args.widths:
+                for plabel, months in (("1y", 12), ("all", None)):
+                    be_rows[(delta, w, plabel)] = breakeven_mult(dfull, wk, mk(delta=delta, width_pct=w, mgmt="hold"), earnings, regimes, months)
+        sweep["m_be"] = [be_rows.get((d, w, p), float("nan")) if mg == "hold" else float("nan")
+                         for d, w, p, mg in zip(sweep["delta"], sweep["width"], sweep["period"], sweep["mgmt"])]
 
     base_cfg = mk()
     base_label = base_cfg.label() if base_cfg.label() in trade_sets else next(iter(trade_sets))
     base_cfg, base_trades = trade_sets[base_label]
     put_cfg = replace(base_cfg, side="put")
-    put_trades = backtest_spreads(daily, wk, put_cfg, earnings, regimes)
+    put_trades = backtest_spreads(dfull, wk, put_cfg, earnings, regimes)
+    asof_tr = base_trades["expiry_date"].max() if "expiry_date" in base_trades.columns and len(base_trades) else asof
     m_be = {}
     if not args.no_breakeven:
         for plabel, months in (("1y", 12), ("2y", 24), ("all", None)):
-            m_be[plabel] = breakeven_mult(daily, wk, base_cfg, earnings, regimes, months)
+            m_be[plabel] = breakeven_mult(dfull, wk, base_cfg, earnings, regimes, months)
     mirror_rows = []
     for plabel, months in (("1y", 12), ("2y", 24), ("all", None)):
-        sc, sp = summarize_trades(slice_period(base_trades, months)), summarize_trades(slice_period(put_trades, months))
+        sc, sp = summarize_trades(slice_period(base_trades, months, asof_tr)), summarize_trades(slice_period(put_trades, months, asof_tr))
         if sc.get("trades"):
             mirror_rows.append({"period": plabel, "call_trades": sc["trades"], "call_win": sc["win_rate"], "call_pnl": sc["total_pnl"], "call_exp_pct_risk": sc["expectancy_pct_risk"],
                                 "put_trades": sp.get("trades", 0), "put_win": sp.get("win_rate", float("nan")), "put_pnl": sp.get("total_pnl", float("nan")),
@@ -1414,21 +1576,22 @@ def analyse_ticker(ticker: str, daily: pd.DataFrame, source: str, args) -> dict:
     # pricing-mode sensitivity: the same baseline priced off three realized-vol estimators
     mode_rows = []
     for mode in ("blend", "rv20", "longrun"):
-        tr_m = base_trades if mode == base_cfg.rv_mode else backtest_spreads(daily, wk, replace(base_cfg, rv_mode=mode), earnings, regimes)
+        tr_m = base_trades if mode == base_cfg.rv_mode else backtest_spreads(dfull, wk, replace(base_cfg, rv_mode=mode), earnings, regimes)
         for plabel, months in (("1y", 12), ("all", None)):
-            s = summarize_trades(slice_period(tr_m, months))
+            s = summarize_trades(slice_period(tr_m, months, asof_tr))
             if s.get("trades"):
                 mode_rows.append({"rv_mode": mode, "period": plabel, "trades": s["trades"], "win_rate": s["win_rate"], "total_pnl": s["total_pnl"],
                                   "expectancy_pct_risk": s["expectancy_pct_risk"], "full_loss_rate": s["full_loss_rate"], "avg_sigma_used": s["avg_sigma_used"]})
     pricing_modes = pd.DataFrame(mode_rows).set_index(["rv_mode", "period"]) if mode_rows else pd.DataFrame()
     n_variants = int(sweep["config"].nunique()) if not sweep.empty else 0
 
-    base_summary = summarize_trades(slice_period(base_trades, 12))
+    base_summary = summarize_trades(slice_period(base_trades, 12, asof_tr))
     base_all = summarize_trades(base_trades)
     yr = per_year(base_trades)
-    ok = base_trades[base_trades["skipped"].isna()].copy()
+    ok = completed(base_trades)
     if "rv20_pctile" in ok.columns:
         ok["rv_bucket"] = pd.cut(ok["rv20_pctile"], [-0.01, 0.33, 0.66, 1.01], labels=["low third", "mid third", "high third"]).astype(str)
+        ok.loc[ok["rv20_pctile"].isna(), "rv_bucket"] = "warm-up (no trailing-year percentile)"
     base_trend = group_summary(ok, "trend")
     base_rv = group_summary(ok, "rv_bucket") if "rv_bucket" in ok.columns else pd.DataFrame()
     ok["last_week"] = np.where(ok["prev_week_ret"] > 0.15, "after > +15%", np.where(ok["prev_week_ret"] > 0, "after up week", "after down week"))
@@ -1441,7 +1604,7 @@ def analyse_ticker(ticker: str, daily: pd.DataFrame, source: str, args) -> dict:
             rows_f = []
             for name, frame in (("unfiltered", ok), (f"filter: {args.regime_filter}", sub_f)):
                 for plabel, months in (("1y", 12), ("all", None)):
-                    s_f = summarize_trades(slice_period(frame, months))
+                    s_f = summarize_trades(slice_period(frame, months, asof_tr))
                     if s_f.get("trades"):
                         rows_f.append({"set": name, "period": plabel, "trades": s_f["trades"], "win_rate": s_f["win_rate"], "total_pnl": s_f["total_pnl"],
                                        "expectancy_pct_risk": s_f["expectancy_pct_risk"], "expectancy_se_pct_risk": s_f["expectancy_se_pct_risk"],
@@ -1450,7 +1613,7 @@ def analyse_ticker(ticker: str, daily: pd.DataFrame, source: str, args) -> dict:
         except Exception as exc:  # noqa: BLE001
             print(f"  (regime filter {args.regime_filter!r} failed: {exc}; columns: trend, pct_from_high52, rv20_pctile, above_dma200, prev_week_ret, earnings_week)")
     bench = {"buy_hold_100": float((ok["ST"].iloc[-1] - ok["S0"].iloc[0]) * 100.0) if len(ok) else float("nan"),
-             "leaky_short": leaky_short_benchmark(daily, base_trades)}
+             "leaky_short": leaky_short_benchmark(dfull, base_trades)}
 
     print_summary_dict(f"-- Baseline {base_label}: last 1 year --", base_summary)
     print_summary_dict(f"-- Baseline {base_label}: all data --", base_all)
@@ -1506,7 +1669,7 @@ def analyse_ticker(ticker: str, daily: pd.DataFrame, source: str, args) -> dict:
                "n_variants": n_variants, "pricing_modes": json.loads(pricing_modes.reset_index().to_json(orient="records")) if not pricing_modes.empty else None,
                "baseline": {"config": asdict(base_cfg), "last_1y": base_summary, "all": base_all, "m_be": m_be,
                             "mirror": json.loads(mirror.to_json(orient="index")) if not mirror.empty else None}}
-    (out_dir / "summary.json").write_text(json.dumps(summary, indent=1, default=str))
+    (out_dir / "summary.json").write_text(json.dumps(_json_safe(summary), indent=1, default=str, allow_nan=False))
     print(f"\nWrote {out_dir}/report.html (+ csv, summary.json)")
     return {"ticker": ticker, "wk": wk, "daily": daily, "stats": stats, "base_trades": base_trades, "put_trades": put_trades, "base_cfg": base_cfg,
             "summary": summary, "exceed": exceed, "sweep": sweep}
@@ -1519,7 +1682,7 @@ def pooled_report(results: list[dict], args) -> None:
     rows, pooled_exceed = [], {}
     for label, months in LOOKBACKS:
         cutoff = lookback_cutoff(asof, months)
-        subs = [r["wk"] if cutoff is None else r["wk"][r["wk"].index > cutoff] for r in results]
+        subs = [week_window(r["wk"], cutoff) for r in results]
         stacked = pd.concat(subs)
         m = window_metrics(stacked, None, pooled=True)
         if not m:
@@ -1533,7 +1696,20 @@ def pooled_report(results: list[dict], args) -> None:
             m["ann_vol"] = float(np.mean(vols))
         rows.append({"window": label, **m})
         if label in ("1y", "all"):
-            pooled_exceed[label] = exceedance_table(stacked["ret"], m["ann_vol"], rate=args.rate)
+            tbl_p = exceedance_table(stacked["ret"], m["ann_vol"], rate=args.rate)
+            # a basket is heterogeneous: benchmark each ticker at its own vol and weight by its weeks
+            parts = []
+            for r_, v_ in zip(results, vols):
+                sub_ = week_window(r_["wk"], cutoff)["ret"].dropna()
+                if len(sub_):
+                    parts.append((len(sub_), exceedance_table(sub_, v_, rate=args.rate)))
+            if parts:
+                wsum = sum(n_ for n_, _ in parts)
+                for col in ("lognormal_p", "bs_credit_w5", "bs_credit_w10"):
+                    tbl_p[col] = sum(n_ * t_[col] for n_, t_ in parts) / wsum
+                for w_ in (5, 10):
+                    tbl_p[f"credit_over_payout_w{w_}"] = tbl_p[f"bs_credit_w{w_}"] / tbl_p[f"payout_w{w_}"].where(tbl_p[f"payout_w{w_}"] > 0)
+            pooled_exceed[label] = tbl_p
     pstats = pd.DataFrame(rows).set_index("window") if rows else pd.DataFrame()
     print("\n-- Pooled direction --")
     print(fmt_table(pstats, DIR_COLS))
@@ -1570,11 +1746,14 @@ def run_ticker(ticker: str, args) -> dict:
     cache_dir = Path(os.path.expanduser(args.cache_dir))
     csv = args.csv if args.csv else (str(Path(args.csv_dir) / f"{ticker.upper()}.csv") if args.csv_dir else None)
     daily, source = load_prices(ticker, cache_dir, csv=csv, refresh=not args.no_refresh, source=args.source, force=args.refresh)
-    if args.start:
-        daily = daily[daily.index >= pd.Timestamp(args.start)]
     if args.end:
         daily = daily[daily.index <= pd.Timestamp(args.end)]
-    return analyse_ticker(ticker, daily, source, args)
+    daily_full = daily
+    if args.start:
+        daily = daily[daily.index >= pd.Timestamp(args.start)]   # analysis window; daily_full keeps the warm-up for vol/regimes
+    if len(daily) < 30:
+        raise SystemExit(f"{ticker}: only {len(daily)} daily bars in the window; need at least 30")
+    return analyse_ticker(ticker, daily, source, args, daily_full=daily_full)
 
 
 # ======================================================================================================
@@ -1656,6 +1835,26 @@ def selftest() -> int:
     hol["open"] = hol["high"] = hol["low"] = hol["close"]
     wkh = weekly_series(hol, drop_partial=False)
     check("holiday-Friday week closes on Thursday", len(wkh) == 1 and wkh["date"].iloc[0] == pd.Timestamp("2026-04-09") and wkh.index[0] == pd.Timestamp("2026-04-10"))
+    past_thu = weekly_series(hol, drop_partial=True, now=datetime(2026, 10, 13, 12, 0, tzinfo=NY))
+    check("a past week ending on a Thursday is kept as complete", len(past_thu) == 1)
+    cut_wed = pd.DataFrame({"close": [1.0, 2.0, 3.0]}, index=pd.to_datetime(["2026-04-06", "2026-04-07", "2026-04-08"]))
+    cut_wed["open"] = cut_wed["high"] = cut_wed["low"] = cut_wed["close"]
+    check("a week ending on a Wednesday is dropped as partial", len(weekly_series(cut_wed, drop_partial=True, now=datetime(2026, 10, 13, 12, 0, tzinfo=NY))) == 0)
+    cur = pd.DataFrame({"close": [1.0, 2.0, 3.0, 4.0]}, index=pd.to_datetime(["2026-10-12", "2026-10-13", "2026-10-14", "2026-10-15"]))
+    cur["open"] = cur["high"] = cur["low"] = cur["close"]
+    check("the current week is dropped before Friday's close and kept after",
+          len(weekly_series(cur, drop_partial=True, now=datetime(2026, 10, 16, 12, 0, tzinfo=NY))) == 0
+          and len(weekly_series(cur, drop_partial=True, now=datetime(2026, 10, 16, 16, 30, tzinfo=NY))) == 1)
+    gapd = pd.concat([pd.DataFrame({"close": [10.0] * 10}, index=pd.bdate_range("2026-01-05", periods=10)),
+                      pd.DataFrame({"close": [20.0] * 10}, index=pd.bdate_range("2026-03-02", periods=10))])
+    gapd["open"] = gapd["high"] = gapd["low"] = gapd["close"]
+    wkg = weekly_series(gapd, drop_partial=False)
+    check("a hole in the data does not become a +100% week", wkg["ret"].dropna().abs().max() < 1e-9 and wkg.attrs["data_gaps"] == 1)
+    one_y = week_window(weekly_series(_gbm_path(600, 0.0, 0.5, np.random.default_rng(1)), drop_partial=False), pd.Timestamp("2026-10-09") - pd.DateOffset(months=12))
+    check("a 1-year window holds 52 weekly returns, not 53", int(one_y["ret"].notna().sum()) == 52, f"got {int(one_y['ret'].notna().sum())}")
+    lo_m, hi_m = median_ci(pd.Series(np.arange(1, 53, dtype=float)))
+    check("median CI is symmetric in rank", abs((lo_m - 1) - (52 - hi_m)) <= 1, f"[{lo_m}, {hi_m}]")
+    check("poisson tail P(X>=3 | 0.8) = 0.047", abs(poisson_tail(3, 0.8) - 0.0474) < 0.002, f"got {poisson_tail(3, 0.8):.4f}")
     tue_noon = datetime(2026, 10, 13, 12, 0, tzinfo=NY)
     check("expected_last_session: Tuesday noon -> Monday", expected_last_session(tue_noon) == date(2026, 10, 12))
     check("expected_last_session: Tuesday 16:30 -> Tuesday", expected_last_session(datetime(2026, 10, 13, 16, 30, tzinfo=NY)) == date(2026, 10, 13))
@@ -1795,13 +1994,31 @@ def main(argv=None) -> int:
     if args.selftest:
         return selftest()
     if args.universe:
-        args.tickers = list(args.tickers) + [t for t in Path(args.universe).read_text().split() if t and not t.startswith("#")]
+        extra = []
+        for line in Path(args.universe).read_text().splitlines():
+            line = line.split("#", 1)[0]
+            extra += [tok.strip(",;") for tok in line.split() if tok.strip(",;")]
+        args.tickers = list(args.tickers) + extra
     if not args.tickers:
         build_parser().print_help()
         return 2
     if args.csv and len(args.tickers) != 1:
         raise SystemExit("--csv works with exactly one ticker; use --csv-dir for several")
-    results = [run_ticker(t.upper(), args) for t in args.tickers]
+    results, failed = [], []
+    for t in args.tickers:
+        try:
+            results.append(run_ticker(t.upper(), args))
+        except SystemExit as exc:
+            failed.append((t, str(exc)))
+            print(f"\n!! {t}: {exc}")
+        except Exception as exc:  # noqa: BLE001 - one bad ticker must not sink the basket
+            import traceback
+            failed.append((t, repr(exc)))
+            print(f"\n!! {t} failed: {exc!r}\n{traceback.format_exc(limit=3)}")
+    if failed:
+        print(f"\nFailed tickers: {', '.join(f'{t} ({msg[:80]})' for t, msg in failed)}")
+    if not results:
+        return 1
     if len(results) > 1:
         print(f"\n{'='*110}\nCROSS-TICKER (baseline call spreads, last 1y)\n{'='*110}")
         for r in results:
@@ -1809,7 +2026,7 @@ def main(argv=None) -> int:
             st = r["stats"].loc["1y"] if "1y" in r["stats"].index else None
             med = f"median wk {st['median_wk']*100:+.1f}% [{st['median_ci_lo']*100:+.1f},{st['median_ci_hi']*100:+.1f}] win {st['win_rate']*100:.0f}%" if st is not None else ""
             print(f"  {r['ticker']:<6} {med:<58} spreads: n={b.get('trades',0):<3} win {b.get('win_rate',float('nan'))*100:5.1f}%  exp {b.get('expectancy_pct_risk',float('nan'))*100:+5.1f}% of risk  "
-                  f"P&L ${b.get('total_pnl',0):>7,.0f}  m_be {r['summary']['baseline']['m_be'].get('1y', float('nan'))}  stock {b.get('stock_buy_hold',float('nan'))*100:+.0f}%")
+                  f"P&L ${b.get('total_pnl',0):>7,.0f}  m_be {_num(r['summary']['baseline']['m_be'].get('1y', float('nan')))}  stock {_pct(b.get('stock_buy_hold'), 0)}")
         if not args.no_pool:
             pooled_report(results, args)
     return 0
