@@ -92,6 +92,14 @@ How to read it: `rule` is what following the verdicts would have earned per unit
 
 Limits: the same week on several names is correlated, so the pooled standard error is optimistic; the year row has a handful of observations per name; on stocks under about $25 the $0.50 strike grid and the slippage floor dominate the credit, and the tool will mostly say NEITHER for the right reason; the IV you type applies to all three rows (term structure is ignored).
 
+## 0b. cycle.py: where a name sits in its own history of run-ups
+
+```
+python3 cycle.py ASTS RKLB HIMS --universe universe_highbeta.txt
+```
+
+Per name: how far below its 52-week and all-time highs it is and for how long; the current leg (down from a peak, or up from a trough) with its depth and age; where today's 26-week return sits in the name's own history; every trough-to-peak run-up of 2x or more (a 30% zigzag on weekly closes, `--run` and `--threshold` to change), each with the grind that preceded it; the waits from a peak to the trough that started the next run-up, today's wait against them, and what the waits that outlasted today's still had to run; and base rates: from weeks at least as far below the 52-week high as today, how often the next 13, 26 and 52 weeks held a +50% move (and a 2x), against the same rate from any week. With `--universe` the waits and base rates are pooled across the other names, which is where the statistics live: a single name has three to six episodes. A base rate close to the any-week rate means the depth of the drawdown carries no timing information; on a random walk the two are equal, which the self-test checks.
+
 ---
 
 ## 1. Your framing questions, answered
@@ -251,6 +259,7 @@ A browser version was deliberately not built yet. Yahoo and Stooq do not send CO
 |---|---|
 | `avgweek.py` | the tool: data, statistics, backtest, report, self-test, CLI |
 | `decide.py` | the one-screen verdict (CCS, PCS or NEITHER by week, month, year) with its walk-forward test and self-test |
+| `cycle.py` | run-up catalogue, waits between run-ups, and conditional base rates per name and pooled |
 | `iv_snapshot.py` | daily chain logger |
 | `universe_highbeta.txt` | 37 long-history high-beta optionable names for `--universe`; survivorship caveat in its comments |
 | `README.md` | this document |
