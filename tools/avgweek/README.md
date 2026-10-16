@@ -1,5 +1,10 @@
 # avgweek: the average week, and selling weekly call credit spreads
 
+**What this is.** Three small Python scripts that read free daily price history and answer, honestly, three questions about volatile stocks: what the average week looks like (it is usually down, and the year is made in a handful of weeks); whether selling weekly call or put credit spreads on the name would have paid, at full cost and at an assumed option price; and where the name sits in its own history of grinds and run-ups. Everything is tested on synthetic data first and on a 37-name basket back to the 1980s, and every number is printed with its error bar.
+
+**Disclaimer.** This is a personal research project, not investment advice, and nothing here is a recommendation to buy, sell or write any security or option. No historical option prices exist in free data, so every spread P&L is conditional on an assumed implied volatility; the universe is a list of names that survived, which flatters every long-biased result; one year of weekly data carries a noise band of about five points; free price feeds contain errors. Credit spreads can lose their full width in one week, and in these names they regularly do. Past results, real or simulated, do not predict future ones. Use at your own risk and do your own work.
+
+
 A standalone tool (separate from the barbell screener) that answers three questions for a ticker or a basket:
 
 1. On the average week, does this stock go up or down, by how much, and how sure can we be?
