@@ -30,7 +30,7 @@ import pandas as pd
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from avgweek import BENCHMARKS, _gbm_path, drop_shell_comment, load_prices, weekly_series  # noqa: E402
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 HORIZONS = (13, 26, 52)
 
 
@@ -111,23 +111,64 @@ def state_frame(wk: pd.DataFrame) -> pd.DataFrame:
     f["wks_since_hi52"] = argmax
     vals = c.values
     for h in HORIZONS:
-        fwd = np.full(len(vals), np.nan)
+        fwd, fmin, fret = (np.full(len(vals), np.nan) for _ in range(3))
         for i in range(len(vals) - 1 - h):              # full windows only; the last h weeks are censored, not failures
-            fwd[i] = vals[i + 1:i + 1 + h].max() / vals[i] - 1.0
-        f[f"fwd{h}"] = fwd
+            win = vals[i + 1:i + 1 + h]
+            fwd[i], fmin[i], fret[i] = win.max() / vals[i] - 1.0, win.min() / vals[i] - 1.0, vals[i + h] / vals[i] - 1.0
+        f[f"fwd{h}"], f[f"fwdmin{h}"], f[f"fwdret{h}"] = fwd, fmin, fret
     return f
 
 
 def base_rates(f: pd.DataFrame, dd_now: float, slack: float = 0.10) -> dict:
-    """P(+50%) and P(2x) within each horizon, from weeks at least (dd_now - slack) below the 52-week high, vs any week."""
+    """Within each horizon, from weeks at least (dd_now - slack) below the 52-week high and from any week: the chance of a
+    +50% and a 2x move (forward maximum), of a -30% and a -50% move (forward minimum), and the quartiles of the point return."""
     out = {}
     like = f[f["dd52"] >= max(dd_now - slack, 0.0)]
+    def share(series, test):
+        return float(test(series).mean()) if len(series) else float("nan")
+    def quart(series):
+        return tuple(float(np.percentile(series, q)) for q in (25, 50, 75)) if len(series) else (float("nan"),) * 3
     for h in HORIZONS:
-        a = f[f"fwd{h}"].dropna()
-        l = like[f"fwd{h}"].dropna()
-        out[h] = {"n_all": int(len(a)), "p50_all": float((a >= 0.5).mean()) if len(a) else float("nan"), "p100_all": float((a >= 1.0).mean()) if len(a) else float("nan"),
-                  "n_like": int(len(l)), "p50_like": float((l >= 0.5).mean()) if len(l) else float("nan"), "p100_like": float((l >= 1.0).mean()) if len(l) else float("nan")}
+        rows = {}
+        for tag, sub in (("all", f), ("like", like)):
+            mx, mn, rt = sub[f"fwd{h}"].dropna(), sub[f"fwdmin{h}"].dropna(), sub[f"fwdret{h}"].dropna()
+            rows[f"n_{tag}"] = int(len(mx))
+            rows[f"p50_{tag}"], rows[f"p100_{tag}"] = share(mx, lambda x: x >= 0.5), share(mx, lambda x: x >= 1.0)
+            rows[f"d30_{tag}"], rows[f"d50_{tag}"] = share(mn, lambda x: x <= -0.3), share(mn, lambda x: x <= -0.5)
+            rows[f"q_{tag}"] = quart(rt)
+        out[h] = rows
     return out
+
+
+def down_legs(wk: pd.DataFrame, thr: float) -> list[dict]:
+    """Every completed peak-to-trough leg (zigzag H -> L) with its week-by-week drawdown path from the peak."""
+    close = wk["close"].values.astype(float)
+    piv = zigzag(close, thr)
+    legs = []
+    for k in range(1, len(piv)):
+        (i0, p0, k0), (i1, p1, k1) = piv[k - 1], piv[k]
+        if k0 == "H" and k1 == "L":
+            path = 1.0 - close[i0:i1 + 1] / p0
+            legs.append({"peak_idx": i0, "trough_idx": i1, "depth": float(path[-1]), "weeks": i1 - i0, "path": path,
+                         "slope": math.log(1.0 - float(path[-1])) / max(i1 - i0, 1)})
+    return legs
+
+
+def grind_context(legs: list[dict], depth_now: float, age_now: int) -> dict:
+    """Among completed down legs: how many got as deep as today's, and from the week they first did, how many more weeks
+    and how much further they fell to the trough; and how long the legs that were still falling at today's age ran in total."""
+    remaining, further, final = [], [], []
+    for leg in legs:
+        hits = np.nonzero(leg["path"] >= depth_now - 1e-9)[0]
+        if not len(hits):
+            continue
+        h = int(hits[0])
+        remaining.append(leg["weeks"] - h)
+        further.append(1.0 - (1.0 - leg["depth"]) / (1.0 - float(leg["path"][h])))
+        final.append(leg["depth"])
+    older = [leg["weeks"] for leg in legs if leg["weeks"] >= age_now]
+    return {"n": len(legs), "reached": len(remaining), "remaining": remaining, "further": further, "final": final, "older": older,
+            "slopes": [leg["slope"] for leg in legs]}
 
 
 def pct_rank(series: pd.Series, x: float) -> float:
@@ -150,7 +191,7 @@ def residual_waits(gaps: list[int], elapsed: int) -> tuple[int, int, list[int]]:
 
 
 def describe(ticker: str, wk: pd.DataFrame, runs: list[dict], state: dict, f: pd.DataFrame, rates: dict, pooled: dict | None,
-             thr: float, min_run: float) -> str:
+             thr: float, min_run: float, legs_ctx: tuple | None = None) -> str:
     c = float(wk["close"].iloc[-1])
     last = f.iloc[-1]
     ath_i = int(np.argmax(wk["close"].values))
@@ -189,20 +230,60 @@ def describe(ticker: str, wk: pd.DataFrame, runs: list[dict], state: dict, f: pd
         more = (f"those that lasted longer still had a median {int(np.median(longer))} weeks to run (quartiles {int(np.percentile(longer, 25))} to {int(np.percentile(longer, 75))})" if longer
                 else "none lasted longer")
         L.append(f"  Across the other {pooled['names']} names ({tot} waits, median {int(np.median(pg))} weeks): {done} of {tot} had ended by {elapsed} weeks; {more}")
+    # the grind itself
+    def q(xs, d=0, pct=True):
+        if not xs:
+            return "n/a"
+        one = (lambda x: f"{x*100:.{d}f}%") if pct else (lambda x: f"{x:.0f}")
+        if len(xs) == 1:
+            return one(xs[0])
+        if len(xs) == 2:
+            return f"{one(min(xs))} and {one(max(xs))}"
+        lo, md, hi = (np.percentile(xs, 25), np.percentile(xs, 50), np.percentile(xs, 75))
+        return (f"{md*100:.{d}f}% ({lo*100:.{d}f} to {hi*100:.{d}f})" if pct else f"{md:.0f} ({lo:.0f} to {hi:.0f})")
+    def grind_line(tag, gc):
+        if not gc or not gc["n"]:
+            return f"  {tag}: no completed down legs"
+        reached = f"{gc['reached']} of {gc['n']} legs got this deep" if gc["n"] < 40 else f"{gc['reached']/gc['n']*100:.0f}% of {gc['n']} legs got this deep"
+        rest = (f"; from that point the trough came {q(gc['remaining'], pct=False)} weeks later and {q(gc['further'])} lower, final depth {q(gc['final'])}"
+                if gc["reached"] else "")
+        older = (f"; legs still falling at this age ran {q(gc['older'], pct=False)} weeks in total" if gc["older"] else "; none was still falling at this age")
+        return f"  {tag}: {reached}{rest}{older} [median: quartiles]"
+    if state["leg"] == "down" and legs_ctx is not None:
+        own_gc, pool_gc = legs_ctx
+        slope = math.log(max(1.0 - state["depth_so_far"], 1e-9)) / max(state["weeks_since_peak"], 1)
+        med_slope = np.median(own_gc["slopes"]) if own_gc and own_gc["slopes"] else float("nan")
+        L.append(f"  This down leg: {state['weeks_since_peak']} weeks, {_u(state['depth_so_far'])} deep, {slope*100:.1f}% a week"
+                 + (f" (this name's past legs fell a median {med_slope*100:.1f}% a week)" if med_slope == med_slope else ""))
+        L.append(grind_line("    own history ", own_gc))
+        if pool_gc:
+            L.append(grind_line("    basket      ", pool_gc))
+    elif state["leg"] == "up" and legs_ctx is not None and legs_ctx[0] and legs_ctx[0].get("last_leg"):
+        ll = legs_ctx[0]["last_leg"]
+        L.append(f"  The grind before this leg: {ll['weeks']} weeks, {_u(ll['depth'])} deep")
     # base rates
     dd_now = float(last["dd52"]) if last["dd52"] == last["dd52"] else 0.0
-    def line(tag, R):
-        parts = []
-        for h in HORIZONS:
-            r = R[h]
-            parts.append(f"{h}wk {_u(r['p50_like'])} (n={r['n_like']}) vs {_u(r['p50_all'])} any week")
-        return f"  {tag}: " + "; ".join(parts)
-    L.append(f"  Chance of a +50% move from here, from weeks at least {_u(max(dd_now - 0.10, 0))} below the 52-week high:")
-    L.append(line("    own history ", rates))
+    def trio(R, key):
+        return " / ".join(f"{R[h][key]*100:.0f}" for h in HORIZONS) + "%"
+    def rate_line(label, key):
+        own = f"own {trio(rates, key):<16} (any week {trio(rates, key.replace('_like', '_all')):<14})"
+        bask = (f"   basket {trio(pooled['rates'], key):<14} (any week {trio(pooled['rates'], key.replace('_like', '_all'))})" if pooled and pooled.get("rates") else "")
+        return f"      {label:<16}{own}{bask}"
+    def ns(R):
+        return "/".join(f"{R[h]['n_like']:,}" for h in HORIZONS)
+    n_b = f", basket n={ns(pooled['rates'])}" if pooled and pooled.get("rates") else ""
+    L.append(f"  From weeks at least {_u(max(dd_now - 0.10, 0))} below the 52-week high (own n={ns(rates)}{n_b} at the three horizons), "
+             f"within 13 / 26 / 52 weeks:")
+    L.append(rate_line("+50% or more", "p50_like"))
+    L.append(rate_line("2x or more", "p100_like"))
+    L.append(rate_line("-30% or more", "d30_like"))
+    L.append(rate_line("-50% or more", "d50_like"))
+    def qline(R):
+        lo, md, hi = R[26]["q_like"]; alo, amd, ahi = R[26]["q_all"]
+        return f"median {_p(md)} (quartiles {_p(lo)} to {_p(hi)}; any week {_p(amd)}, {_p(alo)} to {_p(ahi)})"
+    L.append(f"      26 weeks later   own {qline(rates)}")
     if pooled and pooled.get("rates"):
-        L.append(line("    basket      ", pooled["rates"]))
-    parts = [f"{h}wk {_u(rates[h]['p100_like'])} vs {_u(rates[h]['p100_all'])}" for h in HORIZONS]
-    L.append("  Same for a 2x move, own history: " + "; ".join(parts))
+        L.append(f"                       basket {qline(pooled['rates'])}")
     return "\n".join(L)
 
 
@@ -234,14 +315,16 @@ def analyse(ticker: str, daily: pd.DataFrame, thr: float, min_run: float) -> dic
     wk = weekly_series(daily)
     runs, state = episodes(wk, thr, min_run)
     f = state_frame(wk)
-    return {"ticker": ticker, "wk": wk, "runs": runs, "state": state, "f": f}
+    return {"ticker": ticker, "wk": wk, "runs": runs, "state": state, "f": f, "legs": down_legs(wk, thr)}
 
 
-def pooled_from(results: list[dict], dd_now: float) -> dict:
+def pooled_from(results: list[dict], dd_now: float, depth_now: float | None = None, age_now: int | None = None) -> dict:
     gaps = [r["grind_weeks"] for res in results for r in res["runs"] if r["grind_weeks"] is not None]
     frames = [res["f"] for res in results]
     f = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
-    return {"names": len(results), "gaps": gaps, "rates": base_rates(f, dd_now) if len(f) else None}
+    legs = [leg for res in results for leg in res["legs"]]
+    gc = grind_context(legs, depth_now, age_now) if (depth_now is not None and age_now is not None) else None
+    return {"names": len(results), "gaps": gaps, "rates": base_rates(f, dd_now) if len(f) else None, "grind": gc}
 
 
 def main() -> int:
@@ -288,11 +371,17 @@ def main() -> int:
         last = res["f"].iloc[-1]
         dd_now = float(last["dd52"]) if last["dd52"] == last["dd52"] else 0.0
         rates = base_rates(res["f"], dd_now)
-        pooled = pooled_from([r for k, r in results.items() if k != t], dd_now) if (args.universe and len(results) > 1) else None
-        print(describe(t, res["wk"], res["runs"], res["state"], res["f"], rates, pooled, args.threshold, args.run))
+        st = res["state"]
+        depth_now, age_now = (st["depth_so_far"], st["weeks_since_peak"]) if st["leg"] == "down" else (None, None)
+        pooled = pooled_from([r for k, r in results.items() if k != t], dd_now, depth_now, age_now) if (args.universe and len(results) > 1) else None
+        own_gc = grind_context(res["legs"], depth_now, age_now) if depth_now is not None else {"last_leg": res["legs"][-1] if res["legs"] else None}
+        legs_ctx = (own_gc, pooled["grind"] if pooled else None)
+        print(describe(t, res["wk"], res["runs"], res["state"], res["f"], rates, pooled, args.threshold, args.run, legs_ctx))
         print()
-    print("Read: a name has a handful of episodes, so its own waits and rates are anecdotes; the basket rows carry the statistics. "
-          "A base rate near the any-week rate means the depth of the drawdown says nothing about timing.")
+    print("Read: a name has a handful of episodes, so its own waits, legs and rates are anecdotes; the basket rows carry the statistics. "
+          "A rate near its any-week rate means the depth of the drawdown says nothing about what comes next; the grind lines say how past legs that "
+          "were already this deep finished, which is a different question from whether this one is near its end. Each horizon counts only weeks "
+          "with a full forward window, so the sample shrinks from left to right and the three rates in a row are not nested.")
     return 0
 
 
@@ -331,14 +420,22 @@ def selftest() -> int:
     check("current leg is DOWN, 25 weeks old", state["leg"] == "down" and state["weeks_since_peak"] == 25, f"{state.get('leg')} {state.get('weeks_since_peak')}")
     done, tot, longer = residual_waits(gaps, 25)
     check("residual wait from 25 weeks in is 15 weeks for every past cycle", len(longer) == 5 and all(x == 15 for x in longer) and done == 0, f"{longer}")
+    legs = down_legs(wk, 0.30)
+    gc = grind_context(legs, state["depth_so_far"], state["weeks_since_peak"])
+    check("five completed down legs of 40 weeks and -60%", len(legs) == 5 and all(l["weeks"] == 40 for l in legs) and all(abs(l["depth"] - 0.6) < 1e-9 for l in legs),
+          f"{[(l['weeks'], round(l['depth'], 3)) for l in legs]}")
+    check("every past leg reached today's depth with 15 weeks and a further 29% to go", gc["reached"] == 5 and all(x == 15 for x in gc["remaining"]) and all(abs(x - (1 - 0.4 / 0.4 ** (25 / 40))) < 1e-6 for x in gc["further"]),
+          f"remaining {gc['remaining']} further {[round(x, 3) for x in gc['further']]}")
     f = state_frame(wk)
     r = base_rates(f, float(f["dd52"].iloc[-1]))
+    check("from a grind this deep a further -30% within 26 weeks was LESS likely than from any week (closer to the trough)",
+          r[26]["d30_like"] < r[26]["d30_all"] and r[26]["d30_like"] < 0.45, f"like {r[26]['d30_like']:.2f} all {r[26]['d30_all']:.2f}")
     check("from a grind this deep, a 2x within 26 weeks was far more likely than from any week",
           r[26]["p100_like"] >= 0.6 and r[26]["p100_like"] > r[26]["p100_all"] + 0.2, f"like {r[26]['p100_like']:.2f} all {r[26]['p100_all']:.2f}")
 
     print("Self-test 2: a random walk has no cycle: depth of drawdown does not change the +50% base rate much")
     rng = np.random.default_rng(3)
-    diffs = []
+    diffs, ddiffs = [], []
     for _ in range(12):
         d = _gbm_path(8 * 252, 0.1, 0.8, rng, S0=1000.0)
         w = weekly_series(d, drop_partial=False)
@@ -346,8 +443,10 @@ def selftest() -> int:
         rr = base_rates(ff, 0.5)
         if rr[26]["n_like"] >= 30:
             diffs.append(rr[26]["p50_like"] - rr[26]["p50_all"])
-    check("average (like minus any-week) across 12 paths is within 10 points", len(diffs) >= 6 and abs(float(np.mean(diffs))) < 0.10,
+            ddiffs.append(rr[26]["d30_like"] - rr[26]["d30_all"])
+    check("average (like minus any-week) for +50% across 12 paths is within 10 points", len(diffs) >= 6 and abs(float(np.mean(diffs))) < 0.10,
           f"mean diff {np.mean(diffs)*100:+.1f} pts over {len(diffs)} paths")
+    check("the same for a -30% fall", len(ddiffs) >= 6 and abs(float(np.mean(ddiffs))) < 0.10, f"mean diff {np.mean(ddiffs)*100:+.1f} pts")
     z = zigzag(np.array([1, 2, 3, 2.0, 1.4, 2.1, 3.5]), 0.3)
     check("zigzag confirms the opening low, a peak at 3 and a trough at 1.4", [(i, k) for i, _, k in z] == [(0, "L"), (2, "H"), (4, "L")], str(z))
     print(f"\nSelf-test {'PASSED' if fails == 0 else 'FAILED'} ({fails} failures)")
