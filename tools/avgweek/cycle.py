@@ -12,8 +12,13 @@ Per ticker:
      --threshold (default 30%) reversals; for each, the grind that preceded it (depth and weeks) and the run-up's size and length.
   3. Waiting times: weeks from a peak to the trough that started the next run-up, in this name and (with --universe) across
      the basket; today's elapsed wait against that distribution, and what the waits that outlasted today's still had to run.
-  4. Base rates: from weeks at least as far below the 52-week high as today, how often the next 13 / 26 / 52 weeks held a
-     +50% (and a 2x) move from that week's close, against the same rate from any week. Own history and pooled.
+  4. The grind now, for a name in a down leg: the leg's depth at its low and its pace against the name's past legs; among
+     past legs (own and basket) that got as deep, how many more weeks and how much further they fell before the trough, and
+     how long the legs that lasted as long ran in total. Measured from the leg's low so far, which may be weeks ago.
+  5. Base rates: from weeks at least as far below the 52-week high as today, how often the next 13 / 26 / 52 weeks held a
+     +50% move, a 2x, a -30% fall and a -50% fall from that week's close, against the same rate from any week, the quartiles
+     of the 26-week return, and the years those weeks come from. Own history and pooled; with --universe a last line counts
+     how many names in the basket are in a down leg today.
 
 Nothing here is a forecast. A name has three to six episodes; the pooled numbers have power, the single-name ones do not.
 """
@@ -30,7 +35,7 @@ import pandas as pd
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from avgweek import BENCHMARKS, _gbm_path, drop_shell_comment, load_prices, weekly_series  # noqa: E402
 
-__version__ = "0.2.0"
+__version__ = "0.2.1"
 HORIZONS = (13, 26, 52)
 
 
@@ -82,16 +87,22 @@ def episodes(wk: pd.DataFrame, thr: float, min_run: float) -> tuple[list[dict], 
         if lk == "H":
             trough_i = li + int(np.argmin(close[li:]))
             state = {"leg": "down", "peak_date": pd.Timestamp(dates[li]), "peak_price": lp, "weeks_since_peak": last - li,
-                     "depth_so_far": 1.0 - float(close[trough_i]) / lp, "trough_date": pd.Timestamp(dates[trough_i]),
-                     "off_trough": float(close[last]) / float(close[trough_i]) - 1.0}
+                     "weeks_to_low": trough_i - li, "depth_so_far": 1.0 - float(close[trough_i]) / lp,
+                     "trough_date": pd.Timestamp(dates[trough_i]), "off_trough": float(close[last]) / float(close[trough_i]) - 1.0}
         else:
             state = {"leg": "up", "trough_date": pd.Timestamp(dates[li]), "trough_price": lp, "weeks_since_trough": last - li,
                      "gain_so_far": float(close[last]) / lp - 1.0}
-    else:
+    else:                                   # no swing confirmed yet: measure from the highest (or lowest) close
         hi_i = int(np.argmax(close))
-        state = {"leg": "down" if hi_i < last else "up", "peak_date": pd.Timestamp(dates[hi_i]), "peak_price": float(close[hi_i]),
-                 "weeks_since_peak": last - hi_i, "depth_so_far": 1.0 - float(close[last:].min()) / float(close[hi_i]),
-                 "trough_date": pd.Timestamp(dates[last]), "off_trough": 0.0}
+        if hi_i < last:
+            trough_i = hi_i + int(np.argmin(close[hi_i:]))
+            state = {"leg": "down", "peak_date": pd.Timestamp(dates[hi_i]), "peak_price": float(close[hi_i]), "weeks_since_peak": last - hi_i,
+                     "weeks_to_low": trough_i - hi_i, "depth_so_far": 1.0 - float(close[trough_i]) / float(close[hi_i]),
+                     "trough_date": pd.Timestamp(dates[trough_i]), "off_trough": float(close[last]) / float(close[trough_i]) - 1.0}
+        else:
+            lo_i = int(np.argmin(close))
+            state = {"leg": "up", "trough_date": pd.Timestamp(dates[lo_i]), "trough_price": float(close[lo_i]),
+                     "weeks_since_trough": last - lo_i, "gain_so_far": float(close[last]) / float(close[lo_i]) - 1.0}
     return runs, state
 
 
@@ -102,11 +113,11 @@ def state_frame(wk: pd.DataFrame) -> pd.DataFrame:
     c = wk["close"].astype(float)
     f = pd.DataFrame(index=wk.index)
     f["close"] = c
+    f["year"] = np.asarray(pd.DatetimeIndex(wk.index).year)
     hi52 = c.rolling(52, min_periods=26).max()
     f["dd52"] = 1.0 - c / hi52
     f["ret26"] = c / c.shift(26) - 1.0
     # weeks since the 52-week high
-    pos = np.arange(len(c))
     argmax = c.rolling(52, min_periods=26).apply(lambda x: len(x) - 1 - int(np.argmax(x)), raw=True)
     f["wks_since_hi52"] = argmax
     vals = c.values
@@ -136,6 +147,8 @@ def base_rates(f: pd.DataFrame, dd_now: float, slack: float = 0.10) -> dict:
             rows[f"p50_{tag}"], rows[f"p100_{tag}"] = share(mx, lambda x: x >= 0.5), share(mx, lambda x: x >= 1.0)
             rows[f"d30_{tag}"], rows[f"d50_{tag}"] = share(mn, lambda x: x <= -0.3), share(mn, lambda x: x <= -0.5)
             rows[f"q_{tag}"] = quart(rt)
+        yrs = like.loc[like[f"fwdret{h}"].notna(), "year"] if "year" in like.columns else pd.Series(dtype=float)
+        rows["years_like"] = [(int(y), float(v)) for y, v in yrs.value_counts(normalize=True).head(3).items()]
         out[h] = rows
     return out
 
@@ -146,7 +159,7 @@ def down_legs(wk: pd.DataFrame, thr: float) -> list[dict]:
     piv = zigzag(close, thr)
     legs = []
     for k in range(1, len(piv)):
-        (i0, p0, k0), (i1, p1, k1) = piv[k - 1], piv[k]
+        (i0, p0, k0), (i1, _, k1) = piv[k - 1], piv[k]
         if k0 == "H" and k1 == "L":
             path = 1.0 - close[i0:i1 + 1] / p0
             legs.append({"peak_idx": i0, "trough_idx": i1, "depth": float(path[-1]), "weeks": i1 - i0, "path": path,
@@ -168,7 +181,20 @@ def grind_context(legs: list[dict], depth_now: float, age_now: int) -> dict:
         final.append(leg["depth"])
     older = [leg["weeks"] for leg in legs if leg["weeks"] >= age_now]
     return {"n": len(legs), "reached": len(remaining), "remaining": remaining, "further": further, "final": final, "older": older,
-            "slopes": [leg["slope"] for leg in legs]}
+            "age": age_now, "slopes": [leg["slope"] for leg in legs]}
+
+
+def basket_now(results: dict, slack_days: int = 7) -> dict:
+    """Today's leg for every name whose prices run to the latest week: how many are in a down leg, and how old and deep."""
+    if not results:
+        return {}
+    lasts = {t: pd.Timestamp(res["wk"]["date"].iloc[-1]) for t, res in results.items()}
+    latest = max(lasts.values())
+    cur = [res["state"] for t, res in results.items() if (latest - lasts[t]).days <= slack_days]
+    down = [st for st in cur if st["leg"] == "down"]
+    return {"names": len(cur), "latest": latest, "stale": len(results) - len(cur), "down": len(down),
+            "up": sum(st["leg"] == "up" for st in cur),
+            "down_weeks": [st["weeks_since_peak"] for st in down], "down_depth": [st["depth_so_far"] for st in down]}
 
 
 def pct_rank(series: pd.Series, x: float) -> float:
@@ -183,6 +209,14 @@ def _p(x, d=0):
 
 def _u(x, d=0):
     return "n/a" if x is None or x != x else f"{x*100:.{d}f}%"
+
+
+def basket_line(bn: dict) -> str:
+    dw, dd = bn["down_weeks"], bn["down_depth"]
+    down = (f"{bn['down']} are in a down leg (median {np.median(dw):.0f} weeks since the peak and {_u(float(np.median(dd)))} deep at the low; "
+            f"{sum(d >= 0.5 for d in dd)} of them 50% or deeper)" if dw else "none is in a down leg")
+    stale = f"; {bn['stale']} with older prices left out" if bn["stale"] else ""
+    return f"Basket now: of {bn['names']} names with prices to {bn['latest'].date()}, {down}, and {bn['up']} in an up leg{stale}."
 
 
 def residual_waits(gaps: list[int], elapsed: int) -> tuple[int, int, list[int]]:
@@ -206,7 +240,7 @@ def describe(ticker: str, wk: pd.DataFrame, runs: list[dict], state: dict, f: pd
         past = (f"; finished run-ups here ran {_p(min(r['gain'] for r in runs))} to {_p(max(r['gain'] for r in runs))} over {min(r['weeks'] for r in runs)} to {max(r['weeks'] for r in runs)} weeks" if runs else "")
         L.append(f"  Current leg: UP from ${state['trough_price']:,.2f} on {state['trough_date'].date()}, {state['weeks_since_trough']} weeks, {_p(state['gain_so_far'])} so far{past}")
     r26 = float(last["ret26"]) if last["ret26"] == last["ret26"] else float("nan")
-    L.append(f"  26-week return now {_p(r26)}: lower than {_u(pct_rank(f['ret26'], r26))} of this name's own 26-week windows")
+    L.append(f"  26-week return now {_p(r26)}: {_u(pct_rank(f['ret26'], r26))} of this name's own 26-week windows were lower")
     # catalogue
     L.append(f"  Run-ups of {min_run + 1:.0f}x or more, trough to peak ({thr:.0%} swing filter): {len(runs)}")
     for r in runs:
@@ -220,7 +254,7 @@ def describe(ticker: str, wk: pd.DataFrame, runs: list[dict], state: dict, f: pd
         if elapsed is not None:
             done, tot, longer = residual_waits(gaps, elapsed)
             more = (f"the {len(longer)} that lasted longer still had {min(longer)} to {max(longer)} weeks to run (median {int(np.median(longer))})" if longer
-                    else "every past wait was shorter than this one")
+                    else f"none lasted longer than this one (the longest was {max(gaps)} weeks)")
             L.append(f"  Today's wait: {elapsed} weeks since the peak; {done} of {tot} past waits had ended by now; {more}")
     elif elapsed is not None:
         L.append(f"  Today's wait: {elapsed} weeks since the peak; no completed {min_run + 1:.0f}x run-up in this name's history to compare with")
@@ -247,14 +281,24 @@ def describe(ticker: str, wk: pd.DataFrame, runs: list[dict], state: dict, f: pd
         reached = f"{gc['reached']} of {gc['n']} legs got this deep" if gc["n"] < 40 else f"{gc['reached']/gc['n']*100:.0f}% of {gc['n']} legs got this deep"
         rest = (f"; from that point the trough came {q(gc['remaining'], pct=False)} weeks later and {q(gc['further'])} lower, final depth {q(gc['final'])}"
                 if gc["reached"] else "")
-        older = (f"; legs still falling at this age ran {q(gc['older'], pct=False)} weeks in total" if gc["older"] else "; none was still falling at this age")
-        return f"  {tag}: {reached}{rest}{older} [median: quartiles]"
+        older = (f"; legs that lasted at least {gc['age']} weeks ran {q(gc['older'], pct=False)} weeks in total" if gc["older"]
+                 else f"; none lasted {gc['age']} weeks")
+        legend = " [median (quartiles)]" if max(len(gc["remaining"]), len(gc["older"])) >= 3 else ""
+        return f"  {tag}: {reached}{rest}{older}{legend}"
     if state["leg"] == "down" and legs_ctx is not None:
         own_gc, pool_gc = legs_ctx
-        slope = math.log(max(1.0 - state["depth_so_far"], 1e-9)) / max(state["weeks_since_peak"], 1)
-        med_slope = np.median(own_gc["slopes"]) if own_gc and own_gc["slopes"] else float("nan")
-        L.append(f"  This down leg: {state['weeks_since_peak']} weeks, {_u(state['depth_so_far'])} deep, {slope*100:.1f}% a week"
-                 + (f" (this name's past legs fell a median {med_slope*100:.1f}% a week)" if med_slope == med_slope else ""))
+        a_low = max(int(state.get("weeks_to_low", state["weeks_since_peak"])), 1)
+        pace = math.exp(math.log(max(1.0 - state["depth_so_far"], 1e-9)) / a_low) - 1.0
+        med = float(np.median(own_gc["slopes"])) if own_gc and own_gc.get("slopes") else float("nan")
+        past = f"; this name's past legs: median {(math.exp(med) - 1.0)*100:.1f}% a week, peak to trough" if med == med else ""
+        if a_low >= state["weeks_since_peak"]:
+            L.append(f"  This down leg: {_u(state['depth_so_far'])} deep at its low this week, week {a_low}, an average of {pace*100:.1f}% a week{past}")
+        else:
+            off = state["off_trough"]
+            where = "level with it" if off < 0.005 else f"{_p(off)} above it"
+            L.append(f"  This down leg: {_u(state['depth_so_far'])} deep at its low in week {a_low} ({state['trough_date'].date()}), "
+                     f"an average of {pace*100:.1f}% a week{past}. The two lines below start from that low; today, week "
+                     f"{state['weeks_since_peak']}, is {where}")
         L.append(grind_line("    own history ", own_gc))
         if pool_gc:
             L.append(grind_line("    basket      ", pool_gc))
@@ -284,6 +328,10 @@ def describe(ticker: str, wk: pd.DataFrame, runs: list[dict], state: dict, f: pd
     L.append(f"      26 weeks later   own {qline(rates)}")
     if pooled and pooled.get("rates"):
         L.append(f"                       basket {qline(pooled['rates'])}")
+    def yrs(R):
+        ys = R[26].get("years_like") or []
+        return ", ".join(f"{y} ({v*100:.0f}%)" for y, v in ys) if ys else "n/a"
+    L.append(f"      These weeks by year, top three: own {yrs(rates)}" + (f"; basket {yrs(pooled['rates'])}" if pooled and pooled.get("rates") else ""))
     return "\n".join(L)
 
 
@@ -372,16 +420,21 @@ def main() -> int:
         dd_now = float(last["dd52"]) if last["dd52"] == last["dd52"] else 0.0
         rates = base_rates(res["f"], dd_now)
         st = res["state"]
-        depth_now, age_now = (st["depth_so_far"], st["weeks_since_peak"]) if st["leg"] == "down" else (None, None)
+        depth_now, age_now = (st["depth_so_far"], st.get("weeks_to_low", st["weeks_since_peak"])) if st["leg"] == "down" else (None, None)
         pooled = pooled_from([r for k, r in results.items() if k != t], dd_now, depth_now, age_now) if (args.universe and len(results) > 1) else None
         own_gc = grind_context(res["legs"], depth_now, age_now) if depth_now is not None else {"last_leg": res["legs"][-1] if res["legs"] else None}
         legs_ctx = (own_gc, pooled["grind"] if pooled else None)
         print(describe(t, res["wk"], res["runs"], res["state"], res["f"], rates, pooled, args.threshold, args.run, legs_ctx))
         print()
+    bn = basket_now(results) if args.universe else {}
+    if bn and bn["names"] > 1:
+        print(basket_line(bn))
+        print()
     print("Read: a name has a handful of episodes, so its own waits, legs and rates are anecdotes; the basket rows carry the statistics. "
           "A rate near its any-week rate means the depth of the drawdown says nothing about what comes next; the grind lines say how past legs that "
           "were already this deep finished, which is a different question from whether this one is near its end. Each horizon counts only weeks "
-          "with a full forward window, so the sample shrinks from left to right and the three rates in a row are not nested.")
+          "with a full forward window, so the sample shrinks from left to right and the three rates in a row are not nested. When most of the "
+          "basket is in a down leg at once, the grind is the sector's rather than the name's, and positions across those names are one bet.")
     return 0
 
 
@@ -432,6 +485,56 @@ def selftest() -> int:
           r[26]["d30_like"] < r[26]["d30_all"] and r[26]["d30_like"] < 0.45, f"like {r[26]['d30_like']:.2f} all {r[26]['d30_all']:.2f}")
     check("from a grind this deep, a 2x within 26 weeks was far more likely than from any week",
           r[26]["p100_like"] >= 0.6 and r[26]["p100_like"] > r[26]["p100_all"] + 0.2, f"like {r[26]['p100_like']:.2f} all {r[26]['p100_all']:.2f}")
+
+    txt = describe("SAW", wk, runs, state, f, r, None, 0.30, 1.0, (gc, None))
+    line = lambda t, key: next((ln.strip()[:140] for ln in t.splitlines() if key in ln), "")
+    check("pct_rank is the share of windows below the value", abs(pct_rank(pd.Series([1.0, 2.0, 3.0, 4.0]), 3.5) - 0.75) < 1e-12)
+    pr = pct_rank(f["ret26"], float(f["ret26"].iloc[-1]))
+    check("the 26-week line reads that share as the windows that were lower", f"{pr*100:.0f}% of this name's own 26-week windows were lower" in txt,
+          line(txt, "26-week return now"))
+    check("a leg at its low this week: pace -2.3% a week, the same as every past leg",
+          "deep at its low this week, week 25, an average of -2.3% a week" in txt and "median -2.3% a week" in txt, line(txt, "This down leg"))
+    ys = r[26]["years_like"]
+    check("the like-today weeks carry their years, largest share first", bool(ys) and all(a[1] >= b[1] for a, b in zip(ys, ys[1:]))
+          and sum(v for _, v in ys) <= 1 + 1e-9 and line(txt, "These weeks by year") != "", str(ys))
+
+    print("Self-test 1b: the same grind, then a 5-week bounce of +10% that does not confirm a trough")
+    weeks_b = list(weeks)
+    pb = weeks_b[-1]
+    for w in range(5):
+        pb *= 1.10 ** (1 / 5)
+        weeks_b.append(pb)
+
+    def mk(series, end):
+        ix = pd.bdate_range(end=pd.Timestamp(end), periods=len(series) * 5)
+        d = pd.DataFrame({"close": np.repeat(series, 5)}, index=ix)
+        d["open"] = d["high"] = d["low"] = d["close"]
+        w = weekly_series(d, drop_partial=False)
+        rn, st = episodes(w, 0.30, 1.0)
+        return {"wk": w, "runs": rn, "state": st, "f": state_frame(w), "legs": down_legs(w, 0.30)}
+    b = mk(weeks_b, "2026-10-09")
+    st_b = b["state"]
+    check("still a DOWN leg, 30 weeks since the peak, its low in week 25, +10% off it",
+          st_b["leg"] == "down" and st_b["weeks_since_peak"] == 30 and st_b.get("weeks_to_low") == 25 and abs(st_b["off_trough"] - 0.10) < 1e-9,
+          f"{st_b.get('leg')} {st_b.get('weeks_since_peak')} {st_b.get('weeks_to_low')} {st_b.get('off_trough', 0):.3f}")
+    gc_b = grind_context(b["legs"], st_b["depth_so_far"], st_b["weeks_to_low"])
+    r_b = base_rates(b["f"], float(b["f"]["dd52"].iloc[-1]))
+    txt_b = describe("SAWB", b["wk"], b["runs"], st_b, b["f"], r_b, None, 0.30, 1.0, (gc_b, None))
+    check("the pace runs to the low, not to today, and the grind lines say they start from that low",
+          "deep at its low in week 25" in txt_b and "an average of -2.3% a week" in txt_b and "today, week 30, is +10% above it" in txt_b,
+          line(txt_b, "This down leg"))
+    check("legs that lasted as long as this one did to its low: all five, 40 weeks each", gc_b["age"] == 25 and gc_b["older"] == [40] * 5
+          and "legs that lasted at least 25 weeks ran 40 (40 to 40) weeks in total" in txt_b, str(gc_b["older"]))
+
+    print("Self-test 1c: the basket-now line counts legs on the latest common week")
+    up_path = [100.0 * 2.0 ** (i / 50) for i in range(51)]
+    up_path += [up_path[-1] * 0.6 ** (i / 20) for i in range(1, 21)]
+    up_path += [up_path[-1] * 1.5 ** (i / 30) for i in range(1, 31)]
+    pool = {"A": mk(weeks, "2026-10-09"), "B": b, "C": mk(up_path, "2026-10-09"), "D": mk(up_path, "2026-08-28")}
+    bn = basket_now(pool)
+    check("two names down, one up, one left out for older prices", (bn["names"], bn["down"], bn["up"], bn["stale"]) == (3, 2, 1, 1), basket_line(bn))
+    pr_all = pooled_from(list(pool.values()), 0.4)
+    check("pooled years come through the concat", bool(pr_all["rates"][26]["years_like"]), str(pr_all["rates"][26]["years_like"]))
 
     print("Self-test 2: a random walk has no cycle: depth of drawdown does not change the +50% base rate much")
     rng = np.random.default_rng(3)
