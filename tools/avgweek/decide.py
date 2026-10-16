@@ -23,7 +23,9 @@ The year row answers "which side, every week, for the coming year": the weekly d
 --test runs the identical rule at every past Friday using only data up to that Friday, then scores the realized
 result of the side it chose against always-CCS, always-PCS, cash and the best side in hindsight. That is the only
 evidence the verdicts deserve; read it before acting on them. No IV history exists in free data, so the test assumes
-IV = m x realized throughout (--m, or --m-grid for 1.0 / 1.15 / 1.3).
+IV = m x realized throughout (--m, or --m-grid for 1.0 / 1.15 / 1.3). The week and month rows of the test are also split by
+state at entry: trades opened while the name was 40% or more below its 52-week high (in a grind), and the rest. Fridays
+with enough history but no sellable spread on the listed strike grid are counted as unsellable and left out.
 """
 from __future__ import annotations
 
@@ -41,11 +43,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from avgweek import (BENCHMARKS, SpreadConfig, _gbm_path, load_prices, price_spread, realized_vol_series,  # noqa: E402
                      spread_pnl_at_expiry, weekly_series)
 
-__version__ = "0.2.1"
+__version__ = "0.2.2"
 MIN_WEEKS = 52            # analog returns needed before a verdict is given
 WINDOW_WEEKS = 156        # trailing window for the week and month rows
 SCALE_CLIP = (0.25, 4.0)  # bounds on the vol-rescaling ratio in the filtered historical simulation
 ROWS = (("week", 1, True), ("month", 4, True), ("year", 1, False))   # name, horizon in weeks, windowed?
+DEEP = 0.40               # --test also scores trades entered at least this far below the 52-week high (in a grind) separately
 
 
 # ----------------------------------------------------------------------------------------------------- data shaping
@@ -145,11 +148,15 @@ def realized_ror(wk: pd.DataFrame, pos: int, h: int, side: str, sigma: float, cf
 
 
 def walk_forward(wk: pd.DataFrame, cfg: SpreadConfig, m: float, hurdle_pts: float, market_drift: float,
-                 window_weeks: int = WINDOW_WEEKS, min_weeks: int = MIN_WEEKS) -> dict[str, list[dict]]:
-    """Verdict at each Friday from data up to that Friday only, scored on what happened next. Non-overlapping trades."""
-    out: dict[str, list[dict]] = {"week": [], "month": [], "year": []}
+                 window_weeks: int = WINDOW_WEEKS, min_weeks: int = MIN_WEEKS) -> dict:
+    """Verdict at each Friday from data up to that Friday only, scored on what happened next. Non-overlapping trades.
+    out["eligible"] counts the Fridays with enough history for a verdict; those without a row had no sellable spread on
+    the listed strike grid (or a gap in the data)."""
+    out: dict = {"week": [], "month": [], "year": [], "eligible": {"week": 0, "month": 0}}
     n = len(wk)
     rv = wk["rv"].values
+    closes = wk["close"].values.astype(float)
+    dd52 = 1.0 - closes / pd.Series(closes).rolling(52, min_periods=26).max().values   # depth below the 52-week high, known that Friday
 
     def first_eligible(h, windowed):
         """First weekly position with enough analog returns (the realized-vol warm-up eats the first weeks)."""
@@ -164,6 +171,7 @@ def walk_forward(wk: pd.DataFrame, cfg: SpreadConfig, m: float, hurdle_pts: floa
         while pos + h < n:
             r_s, rv_now = analog_returns(wk, pos, h, window_weeks if windowed else None)
             if len(r_s) >= min_weeks and rv_now == rv_now and rv_now > 0:
+                out["eligible"][name] += 1
                 sigma, T = m * rv_now, 7.0 * h / 365.0
                 S0 = float(wk["close"].values[pos])
                 ec, ep = side_eval("call", S0, T, sigma, r_s, h, cfg), side_eval("put", S0, T, sigma, r_s, h, cfg)
@@ -171,7 +179,7 @@ def walk_forward(wk: pd.DataFrame, cfg: SpreadConfig, m: float, hurdle_pts: floa
                 rc, rp = realized_ror(wk, pos, h, "call", sigma, cfg), realized_ror(wk, pos, h, "put", sigma, cfg)
                 if rc is not None and rp is not None:
                     out[name].append({"date": wk["date"].values[pos], "verdict": v, "rule": rc if v == "CCS" else rp if v == "PCS" else 0.0,
-                                      "ccs": rc, "pcs": rp, "E_call": ec["E"], "E_put": ep["E"]})
+                                      "ccs": rc, "pcs": rp, "E_call": ec["E"], "E_put": ep["E"], "dd52": float(dd52[pos])})
             pos += h
     pos = first_eligible(1, False)
     while pos + 52 < n:
@@ -194,7 +202,7 @@ def walk_forward(wk: pd.DataFrame, cfg: SpreadConfig, m: float, hurdle_pts: floa
             if len(cc) >= 26:
                 ac, ap = float(np.mean(cc)), float(np.mean(pp))
                 out["year"].append({"date": wk["date"].values[pos], "verdict": v, "rule": ac if v == "CCS" else ap if v == "PCS" else 0.0,
-                                    "ccs": ac, "pcs": ap, "weeks": len(cc), "E_call": ec["E"], "E_put": ep["E"]})
+                                    "ccs": ac, "pcs": ap, "weeks": len(cc), "E_call": ec["E"], "E_put": ep["E"], "dd52": float(dd52[pos])})
         pos += 52
     return out
 
@@ -208,10 +216,20 @@ def score(rows: list[dict]) -> dict:
     other = np.where(traded["verdict"] == "CCS", traded["pcs"], traded["ccs"])
     return {"n": n, "rule": float(df["rule"].mean()), "se": float(df["rule"].std(ddof=1) / math.sqrt(n)) if n > 2 else float("nan"),
             "ccs": float(df["ccs"].mean()), "pcs": float(df["pcs"].mean()), "best": float(np.maximum(np.maximum(df["ccs"], df["pcs"]), 0.0).mean()),
+            "ccs_se": float(df["ccs"].std(ddof=1) / math.sqrt(n)) if n > 2 else float("nan"),
+            "pcs_se": float(df["pcs"].std(ddof=1) / math.sqrt(n)) if n > 2 else float("nan"),
             "frac_ccs": float((df["verdict"] == "CCS").mean()), "frac_pcs": float((df["verdict"] == "PCS").mean()),
             "edge": float((traded["rule"].values - other).mean()) if len(traded) else float("nan"),
             "edge_se": float((traded["rule"].values - other).std(ddof=1) / math.sqrt(len(traded))) if len(traded) > 2 else float("nan"), "n_traded": int(len(traded)),
             "first": str(pd.Timestamp(df["date"].min()).date()), "last": str(pd.Timestamp(df["date"].max()).date())}
+
+
+def split_by_state(rows: list[dict], deep: float = DEEP) -> tuple[dict, dict]:
+    """Score the trades entered while the name was at least `deep` below its 52-week high, and the rest, separately."""
+    def in_grind(r):
+        x = r.get("dd52")
+        return x is not None and x == x and x >= deep
+    return score([r for r in rows if in_grind(r)]), score([r for r in rows if not in_grind(r)])
 
 
 # ----------------------------------------------------------------------------------------------------- presentation
@@ -221,6 +239,29 @@ def _pct(x, d=1):
 
 def _upct(x, d=1):
     return "n/a" if x is None or x != x else f"{x*100:.{d}f}%"
+
+
+def skip_notes(rows: list[dict], S0: float) -> list[str]:
+    """Why a side shows n/a: no listed spread near the target delta pays more than its costs, or one strike would be at or below zero."""
+    seen: dict[tuple[str, str], list[str]] = {}
+    step = None
+    for r in rows:
+        for side in ("call", "put"):
+            ev = r[side]
+            if ev.get("skipped"):
+                seen.setdefault(("CCS" if side == "call" else "PCS", ev["skipped"]), []).append(r["row"])
+                step = step or ev["q"].get("step")
+    out = []
+    for (lbl, why), rws in seen.items():
+        reason = ("the nearest listed spread pays less than its trading costs" if why == "credit too small"
+                  else "the spread would need a strike at or below zero")
+        where = rws[0] if len(rws) == 1 else ", ".join(rws[:-1]) + " and " + rws[-1]
+        out.append(f"{lbl} n/a in the {where} row{'s' if len(rws) > 1 else ''}: on the ${step:.2f} strike grid at ${S0:,.2f}, {reason}")
+    return out
+
+
+def state_text(s: dict) -> str:
+    return f"rule {_pct(s['rule'])}, always PCS {_pct(s['pcs'])} (SE {_upct(s['pcs_se'])}), always CCS {_pct(s['ccs'])}"
 
 
 def strikes_text(ev: dict) -> str:
@@ -249,28 +290,43 @@ def card(ticker: str, rows: list[dict], asof, iv: float | None, m: float, first_
             L.append(f"         n={r['n']} analog {r['h']}-week returns; SE CCS {_upct(c['SE'])} PCS {_upct(p['SE'])}; win CCS {_upct(c['win'], 0)} PCS {_upct(p['win'], 0)}; "
                      f"credit CCS {c.get('credit_frac', float('nan'))*100:.0f}% / PCS {p.get('credit_frac', float('nan'))*100:.0f}% of width; sigma {r['sigma']*100:.0f}%"
                      + (f"; CCS {c['skipped']}" if c["skipped"] else "") + (f"; PCS {p['skipped']}" if p["skipped"] else ""))
+    L.extend(f"  ({note})" for note in skip_notes(rows, S0))
     if not iv:
         L.append(f"  (pass {ticker}=<IV%> with your screener's implied vol; the verdict moves with it)")
     return "\n".join(L)
 
 
-def test_report(pooled: dict[str, list[dict]], names: int, m: float, hurdle_pts: float, market_drift: float, spy: dict | None) -> str:
+def test_report(pooled: dict[str, list[dict]], names: int, m: float, hurdle_pts: float, market_drift: float, spy: dict | None,
+                eligible: dict | None = None) -> str:
     L = [f"Walk-forward, {names} name(s), IV assumed {m:.2f}x realized, hurdle = market + {hurdle_pts*100:.1f} points per unit of risk"]
+    any_unsold = False
     for name, h, _ in ROWS:
         s = score(pooled[name])
         if s["n"] == 0:
-            L.append(f"  {name:<6} no trades")
+            unsold = (eligible or {}).get(name, 0) if name != "year" else 0
+            any_unsold = any_unsold or unsold > 0
+            L.append(f"  {name:<6} no trades" + (f": none of the {unsold:,} entries with enough history was sellable" if unsold > 0 else ""))
             continue
         unit = "trade" if name != "year" else "week"
-        n_lbl = f"n {s['n']:,} {'name-years' if name == 'year' else 'trades'}"
+        unsold = (eligible or {}).get(name, 0) - s["n"] if name != "year" else 0
+        any_unsold = any_unsold or unsold > 0
+        n_lbl = f"n {s['n']:,} {'name-years' if name == 'year' else 'trades'}" + (f", {unsold:,} unsellable" if unsold > 0 else "")
         L.append(f"  {name:<6} rule {_pct(s['rule'])} of risk per {unit} (SE {_upct(s['se'])}, {n_lbl}, {s['first']} to {s['last']})   "
                  f"traded {(s['frac_ccs']+s['frac_pcs'])*100:.0f}% (CCS {s['frac_ccs']*100:.0f}%, PCS {s['frac_pcs']*100:.0f}%), "
                  f"chosen side minus the other {_pct(s['edge'])} (SE {_upct(s['edge_se'])})   "
                  f"always CCS {_pct(s['ccs'])}   always PCS {_pct(s['pcs'])}   best in hindsight {_pct(s['best'])}")
         if spy and name in spy and spy[name] == spy[name]:
             L.append(f"         SPY over the same span {_pct(spy[name])} per {unit}; rule minus SPY {(s['rule']-spy[name])*100:+.1f} points (target +{hurdle_pts*100:.1f})")
+        if name != "year":
+            g, rest = split_by_state(pooled[name])
+            if g["n"] and rest["n"]:
+                L.append(f"         entered {DEEP*100:.0f}%+ below the 52-week high, n {g['n']:,}: {state_text(g)};   the rest, n {rest['n']:,}: {state_text(rest)}")
     L.append("  (n counts stock-weeks: the same week on several names is correlated, so the SE is optimistic; "
              "the year row cannot be more than a handful of observations per name)")
+    if any_unsold:
+        L.append("  (unsellable: weeks with enough history for a verdict where the call or the put spread could not be sold, because no listed "
+                 "strike near the target delta paid more than its costs, mostly at prices under about $10 where strikes are $0.50 apart, or because "
+                 "of a gap in the data; both sides are scored on the same weeks, so these are left out, not scored as zero)")
     return "\n".join(L)
 
 
@@ -371,6 +427,9 @@ def card_html(c: dict) -> str:
                    + _bar_html(r["put"], lim, r["hurdle"], "--pcs", "PCS", v == "PCS", r["h"])
                    + f'<div class="bar"><span class="k"></span><span class="scale" style="grid-column:auto;margin:0"><span>{_pct(-lim, 0)}</span>'
                    f'<span>hurdle {_pct(r["hurdle"])} of risk {unit}</span><span>{_pct(lim, 0)}</span></span><span></span></div></div></div>')
+    notes = skip_notes(rows, S0)
+    if notes:
+        out.append('<p class="sub">' + "<br>".join(_html.escape(nt) for nt in notes) + '</p>')
     out.append(f'<details><summary>numbers behind this card</summary><pre>{_html.escape(c["text"])}</pre></details></section>')
     return "".join(out)
 
@@ -384,14 +443,18 @@ def test_block_html(b: dict, hurdle_pts: float) -> str:
     for name, h, _ in ROWS:
         s = b["scores"].get(name, {"n": 0})
         if not s.get("n"):
-            out.append(f'<tr><td>{name}</td><td colspan="10" style="text-align:left;color:var(--muted)">no trades</td></tr>')
+            unsold = (b.get("eligible") or {}).get(name, 0) if name != "year" else 0
+            msg = "no trades" + (f": none of the {unsold:,} entries with enough history was sellable" if unsold > 0 else "")
+            out.append(f'<tr><td>{name}</td><td colspan="10" style="text-align:left;color:var(--muted)">{msg}</td></tr>')
             continue
         spy = (b.get("spy") or {}).get(name)
         has_spy = spy is not None and spy == spy
         diff = s["rule"] - spy if has_spy else float("nan")
         ok = has_spy and diff >= hurdle_pts
         unit = "trade" if name != "year" else "week"
-        out.append(f'<tr><td>{name} <span style="color:var(--muted)">per {unit}</span></td><td><b>{_pct(s["rule"])}</b> <span class="se">&plusmn;{_upct(s["se"])}</span></td><td>{s["n"]:,}</td>'
+        unsold = (b.get("eligible") or {}).get(name, 0) - s["n"] if name != "year" else 0
+        n_cell = f'{s["n"]:,}' + (f' <span class="se">+{unsold:,} unsellable</span>' if unsold > 0 else "")
+        out.append(f'<tr><td>{name} <span style="color:var(--muted)">per {unit}</span></td><td><b>{_pct(s["rule"])}</b> <span class="se">&plusmn;{_upct(s["se"])}</span></td><td>{n_cell}</td>'
                    f'<td>{(s["frac_ccs"]+s["frac_pcs"])*100:.0f}% <span class="se">({s["frac_ccs"]*100:.0f} / {s["frac_pcs"]*100:.0f})</span></td>'
                    f'<td>{_pct(s["edge"])} <span class="se">&plusmn;{_upct(s["edge_se"])}</span></td>'
                    f'<td>{_pct(s["ccs"])}</td><td>{_pct(s["pcs"])}</td><td>{_pct(s["best"])}</td>'
@@ -399,11 +462,19 @@ def test_block_html(b: dict, hurdle_pts: float) -> str:
                    + (f'<td class="{"ok" if ok else "no"}">{"&#10003; clears" if ok else "&#10007; below"} +{hurdle_pts*100:.1f}</td>' if has_spy else '<td style="color:var(--muted)">no SPY data</td>')
                    + '</tr>')
     out.append('</table></div>')
+    split_lines = []
+    for name in ("week", "month"):
+        g, rest = (b.get("split") or {}).get(name, ({"n": 0}, {"n": 0}))
+        if g.get("n") and rest.get("n"):
+            split_lines.append(f'<b>{name}</b>: entered {DEEP*100:.0f}%+ below the 52-week high, n {g["n"]:,}: {_html.escape(state_text(g))}. '
+                               f'The rest, n {rest["n"]:,}: {_html.escape(state_text(rest))}.')
+    if split_lines:
+        out.append('<p class="sub">By state at entry. ' + "<br>".join(split_lines) + '</p>')
     if b.get("per_name"):
-        out.append('<details><summary>per name, weekly</summary><div class="tablewrap"><table><tr><th>name</th><th>rule</th><th>always CCS</th><th>always PCS</th><th>traded</th><th>weeks</th></tr>')
+        out.append('<details><summary>per name, weekly</summary><div class="tablewrap"><table><tr><th>name</th><th>rule</th><th>always CCS</th><th>always PCS</th><th>traded</th><th>weeks</th><th>unsellable</th></tr>')
         for r in b["per_name"]:
             out.append(f'<tr><td>{_html.escape(r["ticker"])}</td><td>{_pct(r["rule"])}</td><td>{_pct(r["ccs"])}</td><td>{_pct(r["pcs"])}</td>'
-                       f'<td>{(r["frac_ccs"]+r["frac_pcs"])*100:.0f}%</td><td>{r["n"]}</td></tr>')
+                       f'<td>{(r["frac_ccs"]+r["frac_pcs"])*100:.0f}%</td><td>{r["n"]}</td><td>{r.get("unsellable", 0)}</td></tr>')
         out.append('</table></div></details>')
     return "".join(out)
 
@@ -561,16 +632,21 @@ def run_test(tickers: list[str], args) -> int:
     blocks = []
     for m in ms:
         pooled: dict[str, list[dict]] = {"week": [], "month": [], "year": []}
+        elig = {"week": 0, "month": 0}
         per_name, per_name_rows = [], []
         for t, (daily, wk) in frames.items():
             skew = args.skew if args.skew is not None else default_skew(vol_1y(daily))
             res = walk_forward(wk, make_cfg(args, skew), m, args.hurdle / 100.0, args.market_drift / 100.0, int(round(args.window * 52)))
             for k in pooled:
                 pooled[k].extend(res[k])
+            for k in elig:
+                elig[k] += res["eligible"][k]
             s = score(res["week"])
+            unsold = res["eligible"]["week"] - len(res["week"])
             if s["n"]:
-                per_name.append(f"  {t:<6} week: rule {_pct(s['rule'])} vs always CCS {_pct(s['ccs'])} / PCS {_pct(s['pcs'])}, traded {(s['frac_ccs']+s['frac_pcs'])*100:.0f}% of {s['n']} weeks")
-                per_name_rows.append({"ticker": t, **s})
+                per_name.append(f"  {t:<6} week: rule {_pct(s['rule'])} vs always CCS {_pct(s['ccs'])} / PCS {_pct(s['pcs'])}, traded {(s['frac_ccs']+s['frac_pcs'])*100:.0f}% of {s['n']} weeks"
+                                + (f", {unsold} more unsellable" if unsold > 0 else ""))
+                per_name_rows.append({"ticker": t, **s, "unsellable": unsold})
         spy_means = None
         if spy:
             spy_means = {}
@@ -584,12 +660,12 @@ def run_test(tickers: list[str], args) -> int:
                 c = sub["close"].values
                 hh = h if name != "year" else 1
                 spy_means[name] = float(np.mean(c[hh:] / c[:-hh] - 1.0)) if len(c) > hh else float("nan")
-        print(test_report(pooled, len(frames), m, args.hurdle / 100.0, args.market_drift / 100.0, spy_means))
+        print(test_report(pooled, len(frames), m, args.hurdle / 100.0, args.market_drift / 100.0, spy_means, elig))
         if args.why and per_name:
             print("\n".join(per_name))
         print()
         blocks.append({"m": m, "names": len(frames), "scores": {k: score(v) for k, v in pooled.items()}, "spy": spy_means, "per_name": per_name_rows,
-                       "tickers": list(frames)})
+                       "tickers": list(frames), "split": {k: split_by_state(pooled[k]) for k in ("week", "month")}, "eligible": dict(elig)})
     write_html(args, [], blocks)
     return 0
 
@@ -672,6 +748,42 @@ def selftest() -> int:
     check("with the +2.5 point hurdle it stands aside most weeks", (s2["frac_ccs"] + s2["frac_pcs"]) < 0.35, f"traded {(s2['frac_ccs']+s2['frac_pcs'])*100:.0f}%")
     sm = score(pooled2["month"])
     check("month and year rows produce trades", sm["n"] > 0 and score(pooled2["year"])["n"] > 0, f"month n={sm['n']} year n={score(pooled2['year'])['n']}")
+    rows_w = pooled2["week"]
+    g, rest = split_by_state(rows_w)
+    check("every weekly test row carries its depth below the 52-week high, and the state split partitions the rows",
+          all(0.0 <= r["dd52"] < 1.0 for r in rows_w) and g["n"] + rest["n"] == len(rows_w) and g["n"] > 0 and rest["n"] > 0,
+          f"in a grind {g['n']}, the rest {rest['n']}")
+    wk0 = weekly_frame(paths[0], drop_partial=False)
+    r0 = walk_forward(wk0, nocost, 1.0, 0.0, 0.0)["week"][-1]
+    pos0 = int(np.nonzero(wk0["date"].values == r0["date"])[0][0])
+    c0 = wk0["close"].values[max(0, pos0 - 51):pos0 + 1]
+    check("the depth is measured against the trailing 52 weekly closes, known on the day", abs(r0["dd52"] - (1.0 - c0[-1] / c0.max())) < 1e-12,
+          f"{r0['dd52']:.4f}")
+    diff = g["pcs"] - rest["pcs"]
+    se = math.sqrt(g["pcs_se"] ** 2 + rest["pcs_se"] ** 2)
+    check("on fair random walks, always-PCS in a grind is no different from the rest (within 3 SE)", abs(diff) < 3 * se,
+          f"in a grind {g['pcs']*100:+.2f}%, the rest {rest['pcs']*100:+.2f}%, diff {diff*100:+.2f}% SE {se*100:.2f}%")
+    page = render_page([], [{"m": 1.0, "names": 20, "scores": {k: score(v) for k, v in pooled2.items()}, "spy": None, "per_name": [], "tickers": ["SIM"],
+                             "split": {k: split_by_state(pooled2[k]) for k in ("week", "month")}}], argparse.Namespace(hurdle=2.5))
+    check("the test page shows the state split", "By state at entry." in page and "below the 52-week high" in page)
+
+    print("Self-test 6: a low-priced stock on the listed strike grid says why a side is n/a, and the test counts the weeks it could not sell")
+    grid = replace(costs, strike_step=None)
+    wk_g = weekly_frame(paths[0], drop_partial=False)
+    rows_g = decide_at(wk_g, len(wk_g) - 1, grid, 1.15, 1.10, hurdle, drift, S0=6.0)
+    txt_g = card("LOW", rows_g, "2026-10-09", 1.10, 1.15, "2021", len(wk_g))
+    check("at $6.00 and 110% IV the weekly call spread is unsellable, and the card says why",
+          "CCS n/a in the week and year rows: on the $0.50 strike grid at $6.00, the nearest listed spread pays less than its trading costs" in txt_g,
+          next((ln.strip() for ln in txt_g.splitlines() if "n/a in the" in ln), "no note"))
+    low = weekly_frame(_gbm_path(5 * 252, 0.04, 0.9, rng, S0=2.0), drop_partial=False)
+    res_low = walk_forward(low, grid, 1.15, hurdle, drift)
+    res_hi = walk_forward(weekly_frame(paths[1], drop_partial=False), nocost, 1.0, hurdle, drift)
+    check("a $2 stock on the $0.50 grid leaves eligible weeks unsold; a fine grid sells them all",
+          res_low["eligible"]["week"] > len(res_low["week"]) and res_hi["eligible"]["week"] == len(res_hi["week"]),
+          f"$2 stock: {len(res_low['week'])} of {res_low['eligible']['week']} sold; fine grid: {len(res_hi['week'])} of {res_hi['eligible']['week']}")
+    rep_low = test_report({k: res_low[k] for k in ("week", "month", "year")}, 1, 1.15, hurdle, drift, None, res_low["eligible"])
+    check("the report prints the unsellable count and what it means", "unsellable" in rep_low and "left out, not scored as zero" in rep_low,
+          rep_low.splitlines()[1].strip()[:120])
     print(f"\nSelf-test {'PASSED' if fails == 0 else 'FAILED'} ({fails} failures)")
     return 1 if fails else 0
 
