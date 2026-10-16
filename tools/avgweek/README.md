@@ -72,7 +72,7 @@ ASTS  $52.10 on 2026-10-09   IV 105% (screener), 1.14x realized   283 weeks sinc
   year   PCS      every week; this week sell 48p / buy 43p   CCS  -3.1%  PCS  +2.9%  of risk per week (hurdle +2.7%)
 ```
 
-Run it with no arguments for a prompt (`ASTS=105`, `RKLB 80`, `q`). `--why` adds one line per row with the sample size, standard errors, win rates and credits. `--asof 2025-10-10` shows what it would have said a year ago. Index ETFs are refused as candidates.
+Run it with no arguments for a prompt: type a ticker and its IV from your screener, `ASTS 105` or `ASTS=105`, several on one line if you like, and `q` to finish. `--why` adds one line per row with the sample size, standard errors, win rates and credits. `--asof 2025-10-10` shows what it would have said a year ago. Index ETFs are refused as candidates.
 
 Every run also writes a page: `decide.html` with one card per ticker (the verdict, the strikes, and the two sides' expectancies as bars against the hurdle tick; "numbers behind this card" unfolds the full text), or `decide_test.html` for `--test`. It follows your system's light or dark theme, needs no network, and in prompt mode grows as you type, so open it once and refresh. `--html path` renames it, `--no-html` skips it.
 
@@ -97,7 +97,7 @@ How to read it: `rule` is what following the verdicts would have earned per unit
 
 The week and month rows also print a state split: trades opened while the name was 40% or more below its 52-week high, against the rest. It answers whether put spreads did worse in a grind, which the verdicts themselves cannot see: they rescale past weeks to today's volatility whatever state the name was in. On fair random walks the two halves agree within their error bars, which the self-test checks; a gap of one standard error is noise.
 
-Limits: the same week on several names is correlated, so the pooled standard error is optimistic; the year row has a handful of observations per name; on stocks under about $25 the $0.50 strike grid and the slippage floor dominate the credit, and the tool will mostly say NEITHER for the right reason. When a side shows n/a, a line under the card says why, and the test counts such weeks as unsellable and leaves them out rather than scoring them as zero, so a name that spent years under $10 (ONDS, or ASTS and RKLB in 2023) contributes few trades; the IV you type applies to all three rows (term structure is ignored).
+Limits: the same week on several names is correlated, so each standard error clusters trades entered in the same week (for the month and year rows, trades whose holding periods overlap), and the naive figure beside it, which treats every stock-week as independent, shows how much that matters; the year row has a handful of observations per name; on stocks under about $25 the $0.50 strike grid and the slippage floor dominate the credit, and the tool will mostly say NEITHER for the right reason. When a side shows n/a, a line under the card says why, and the test counts such weeks as unsellable and leaves them out rather than scoring them as zero, so a name that spent years under $10 (ONDS, or ASTS and RKLB in 2023) contributes few trades; the IV you type applies to all three rows (term structure is ignored).
 
 ## 0b. cycle.py: where a name sits in its own history of run-ups
 

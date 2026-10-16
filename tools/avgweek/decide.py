@@ -43,12 +43,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from avgweek import (BENCHMARKS, SpreadConfig, _gbm_path, load_prices, price_spread, realized_vol_series,  # noqa: E402
                      spread_pnl_at_expiry, weekly_series)
 
-__version__ = "0.2.2"
+__version__ = "0.2.3"
 MIN_WEEKS = 52            # analog returns needed before a verdict is given
 WINDOW_WEEKS = 156        # trailing window for the week and month rows
 SCALE_CLIP = (0.25, 4.0)  # bounds on the vol-rescaling ratio in the filtered historical simulation
 ROWS = (("week", 1, True), ("month", 4, True), ("year", 1, False))   # name, horizon in weeks, windowed?
 DEEP = 0.40               # --test also scores trades entered at least this far below the 52-week high (in a grind) separately
+BLOCK_WEEKS = {"week": 1, "month": 8, "year": 104}   # trades entered in the same block share a cluster for the standard error
+EPOCH = pd.Timestamp("1970-01-03")                   # a Saturday, so a holiday-shortened Thursday falls in its Friday's week
 
 
 # ----------------------------------------------------------------------------------------------------- data shaping
@@ -207,29 +209,66 @@ def walk_forward(wk: pd.DataFrame, cfg: SpreadConfig, m: float, hurdle_pts: floa
     return out
 
 
-def score(rows: list[dict]) -> dict:
+def clustered_se(x, groups) -> float:
+    """Standard error of the mean when observations in the same group move together (cluster-robust, with the G/(G-1)
+    small-sample factor). The same week on 38 high-beta names is closer to one bet than to 38."""
+    x = np.asarray(x, dtype=float)
+    n = len(x)
+    if n < 3:
+        return float("nan")
+    e = pd.Series(x - x.mean()).groupby(np.asarray(groups)).sum().values
+    G = len(e)
+    if G < 2:
+        return float("nan")
+    return float(math.sqrt(float((e ** 2).sum()) * G / (G - 1)) / n)
+
+
+def _at_least(se_cl: float, x) -> float:
+    """The clustered SE, floored at the naive one: with few clusters the clustered estimate is itself noisy and can dip below."""
+    x = np.asarray(x, dtype=float)
+    naive = float(x.std(ddof=1) / math.sqrt(len(x))) if len(x) > 2 else float("nan")
+    if se_cl != se_cl:
+        return naive
+    return max(se_cl, naive) if naive == naive else se_cl
+
+
+def time_blocks(dates, block_weeks: int) -> np.ndarray:
+    d = pd.to_datetime(pd.Series(np.asarray(dates)))
+    return ((d - EPOCH).dt.days // (7 * block_weeks)).values
+
+
+def score(rows: list[dict], block_weeks: int = 1) -> dict:
+    """Averages of the rule, both always-sides and the side-picking edge, each with a naive standard error (every stock-week
+    independent) and a clustered one (trades entered in the same block of `block_weeks` weeks share a cluster)."""
     if not rows:
         return {"n": 0}
     df = pd.DataFrame(rows)
     n = len(df)
-    traded = df[df["verdict"] != "NEITHER"]
+    g = time_blocks(df["date"].values, block_weeks)
+    is_traded = (df["verdict"] != "NEITHER").values
+    traded = df[is_traded]
     other = np.where(traded["verdict"] == "CCS", traded["pcs"], traded["ccs"])
+    diff = traded["rule"].values - other
     return {"n": n, "rule": float(df["rule"].mean()), "se": float(df["rule"].std(ddof=1) / math.sqrt(n)) if n > 2 else float("nan"),
             "ccs": float(df["ccs"].mean()), "pcs": float(df["pcs"].mean()), "best": float(np.maximum(np.maximum(df["ccs"], df["pcs"]), 0.0).mean()),
             "ccs_se": float(df["ccs"].std(ddof=1) / math.sqrt(n)) if n > 2 else float("nan"),
             "pcs_se": float(df["pcs"].std(ddof=1) / math.sqrt(n)) if n > 2 else float("nan"),
             "frac_ccs": float((df["verdict"] == "CCS").mean()), "frac_pcs": float((df["verdict"] == "PCS").mean()),
-            "edge": float((traded["rule"].values - other).mean()) if len(traded) else float("nan"),
-            "edge_se": float((traded["rule"].values - other).std(ddof=1) / math.sqrt(len(traded))) if len(traded) > 2 else float("nan"), "n_traded": int(len(traded)),
+            "edge": float(diff.mean()) if len(traded) else float("nan"),
+            "edge_se": float(diff.std(ddof=1) / math.sqrt(len(traded))) if len(traded) > 2 else float("nan"), "n_traded": int(len(traded)),
+            "se_cl": _at_least(clustered_se(df["rule"].values, g), df["rule"].values),
+            "edge_se_cl": _at_least(clustered_se(diff, g[is_traded]), diff),
+            "ccs_se_cl": _at_least(clustered_se(df["ccs"].values, g), df["ccs"].values),
+            "pcs_se_cl": _at_least(clustered_se(df["pcs"].values, g), df["pcs"].values), "clusters": int(len(np.unique(g))),
             "first": str(pd.Timestamp(df["date"].min()).date()), "last": str(pd.Timestamp(df["date"].max()).date())}
 
 
-def split_by_state(rows: list[dict], deep: float = DEEP) -> tuple[dict, dict]:
+def split_by_state(rows: list[dict], deep: float = DEEP, block_weeks: int = 1) -> tuple[dict, dict]:
     """Score the trades entered while the name was at least `deep` below its 52-week high, and the rest, separately."""
     def in_grind(r):
         x = r.get("dd52")
         return x is not None and x == x and x >= deep
-    return score([r for r in rows if in_grind(r)]), score([r for r in rows if not in_grind(r)])
+    return (score([r for r in rows if in_grind(r)], block_weeks), score([r for r in rows if not in_grind(r)], block_weeks))
 
 
 # ----------------------------------------------------------------------------------------------------- presentation
@@ -261,7 +300,7 @@ def skip_notes(rows: list[dict], S0: float) -> list[str]:
 
 
 def state_text(s: dict) -> str:
-    return f"rule {_pct(s['rule'])}, always PCS {_pct(s['pcs'])} (SE {_upct(s['pcs_se'])}), always CCS {_pct(s['ccs'])}"
+    return f"rule {_pct(s['rule'])}, always PCS {_pct(s['pcs'])} (SE {_upct(s['pcs_se_cl'])}), always CCS {_pct(s['ccs'])}"
 
 
 def strikes_text(ev: dict) -> str:
@@ -301,7 +340,7 @@ def test_report(pooled: dict[str, list[dict]], names: int, m: float, hurdle_pts:
     L = [f"Walk-forward, {names} name(s), IV assumed {m:.2f}x realized, hurdle = market + {hurdle_pts*100:.1f} points per unit of risk"]
     any_unsold = False
     for name, h, _ in ROWS:
-        s = score(pooled[name])
+        s = score(pooled[name], BLOCK_WEEKS[name])
         if s["n"] == 0:
             unsold = (eligible or {}).get(name, 0) if name != "year" else 0
             any_unsold = any_unsold or unsold > 0
@@ -311,18 +350,19 @@ def test_report(pooled: dict[str, list[dict]], names: int, m: float, hurdle_pts:
         unsold = (eligible or {}).get(name, 0) - s["n"] if name != "year" else 0
         any_unsold = any_unsold or unsold > 0
         n_lbl = f"n {s['n']:,} {'name-years' if name == 'year' else 'trades'}" + (f", {unsold:,} unsellable" if unsold > 0 else "")
-        L.append(f"  {name:<6} rule {_pct(s['rule'])} of risk per {unit} (SE {_upct(s['se'])}, {n_lbl}, {s['first']} to {s['last']})   "
+        L.append(f"  {name:<6} rule {_pct(s['rule'])} of risk per {unit} (SE {_upct(s['se_cl'])}, naive {_upct(s['se'])}; {n_lbl}, {s['first']} to {s['last']})   "
                  f"traded {(s['frac_ccs']+s['frac_pcs'])*100:.0f}% (CCS {s['frac_ccs']*100:.0f}%, PCS {s['frac_pcs']*100:.0f}%), "
-                 f"chosen side minus the other {_pct(s['edge'])} (SE {_upct(s['edge_se'])})   "
+                 f"chosen side minus the other {_pct(s['edge'])} (SE {_upct(s['edge_se_cl'])}, naive {_upct(s['edge_se'])})   "
                  f"always CCS {_pct(s['ccs'])}   always PCS {_pct(s['pcs'])}   best in hindsight {_pct(s['best'])}")
         if spy and name in spy and spy[name] == spy[name]:
             L.append(f"         SPY over the same span {_pct(spy[name])} per {unit}; rule minus SPY {(s['rule']-spy[name])*100:+.1f} points (target +{hurdle_pts*100:.1f})")
         if name != "year":
-            g, rest = split_by_state(pooled[name])
+            g, rest = split_by_state(pooled[name], block_weeks=BLOCK_WEEKS[name])
             if g["n"] and rest["n"]:
                 L.append(f"         entered {DEEP*100:.0f}%+ below the 52-week high, n {g['n']:,}: {state_text(g)};   the rest, n {rest['n']:,}: {state_text(rest)}")
-    L.append("  (n counts stock-weeks: the same week on several names is correlated, so the SE is optimistic; "
-             "the year row cannot be more than a handful of observations per name)")
+    L.append("  (SE counts trades entered in the same week as one cluster, and for the month and year rows trades whose holding periods "
+             "overlap, because these names move together, and is never below naive, which treats every stock-week as independent. "
+             "The year row cannot be more than a handful of observations per name)")
     if any_unsold:
         L.append("  (unsellable: weeks with enough history for a verdict where the call or the put spread could not be sold, because no listed "
                  "strike near the target delta paid more than its costs, mostly at prices under about $10 where strikes are $0.50 apart, or because "
@@ -454,9 +494,10 @@ def test_block_html(b: dict, hurdle_pts: float) -> str:
         unit = "trade" if name != "year" else "week"
         unsold = (b.get("eligible") or {}).get(name, 0) - s["n"] if name != "year" else 0
         n_cell = f'{s["n"]:,}' + (f' <span class="se">+{unsold:,} unsellable</span>' if unsold > 0 else "")
-        out.append(f'<tr><td>{name} <span style="color:var(--muted)">per {unit}</span></td><td><b>{_pct(s["rule"])}</b> <span class="se">&plusmn;{_upct(s["se"])}</span></td><td>{n_cell}</td>'
+        out.append(f'<tr><td>{name} <span style="color:var(--muted)">per {unit}</span></td><td><b>{_pct(s["rule"])}</b> <span class="se">&plusmn;{_upct(s["se_cl"])} '
+                   f'<span title="naive: every stock-week treated as independent">(naive &plusmn;{_upct(s["se"])})</span></span></td><td>{n_cell}</td>'
                    f'<td>{(s["frac_ccs"]+s["frac_pcs"])*100:.0f}% <span class="se">({s["frac_ccs"]*100:.0f} / {s["frac_pcs"]*100:.0f})</span></td>'
-                   f'<td>{_pct(s["edge"])} <span class="se">&plusmn;{_upct(s["edge_se"])}</span></td>'
+                   f'<td>{_pct(s["edge"])} <span class="se">&plusmn;{_upct(s["edge_se_cl"])}</span></td>'
                    f'<td>{_pct(s["ccs"])}</td><td>{_pct(s["pcs"])}</td><td>{_pct(s["best"])}</td>'
                    f'<td>{_pct(spy) if has_spy else "n/a"}</td><td>{f"{diff*100:+.1f} pts" if has_spy else "n/a"}</td>'
                    + (f'<td class="{"ok" if ok else "no"}">{"&#10003; clears" if ok else "&#10007; below"} +{hurdle_pts*100:.1f}</td>' if has_spy else '<td style="color:var(--muted)">no SPY data</td>')
@@ -492,9 +533,10 @@ def render_page(cards: list[dict], blocks: list[dict], args) -> str:
                 'moves with the IV you type in. Hover a bar for its sample size and error bar; open "numbers behind this card" for the full text.</p>')
     else:
         note = ('<p class="note">Rule = what following the verdicts earned per unit of risk, weeks it stood aside counted as zero. "Chosen minus other" is the '
-                'clean measure of side-picking skill: zero within its error bar on a fair random walk. n counts stock-weeks, and the same week on several names is '
-                'correlated, so the standard errors are optimistic; the year row is a handful of observations per name. No free source has IV history, so every '
-                'block assumes IV = m times realized.</p>')
+                'clean measure of side-picking skill: zero within its error bar on a fair random walk. Each &plusmn; counts trades entered in the same week '
+                '(for the month and year rows, trades whose holding periods overlap) as one cluster, because these names move together; the naive figure '
+                'treats every stock-week as independent and is too small. The year row is a handful of observations per name. No free source has IV history, '
+                'so every block assumes IV = m times realized.</p>')
     return (f'<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
             f'<title>decide</title><style>{PAGE_CSS}</style></head><body><div class="wrap">{head}{body}{note}</div></body></html>')
 
@@ -536,14 +578,42 @@ def drop_shell_comment(tokens) -> list[str]:
     return out
 
 
+def _bare_number(tok: str) -> float | None:
+    try:
+        return float(tok.replace(" ", "").strip(",;:%"))
+    except ValueError:
+        return None
+
+
 def parse_tokens(tokens) -> list[tuple[str, float | None]]:
+    """Tickers with optional IVs: 'ASTS=105', or a bare number right after a ticker, 'RKLB 80'."""
     out = []
     for tok in drop_shell_comment(tokens):
+        x = _bare_number(tok)
+        if x is not None:
+            if out and out[-1][1] is None:
+                out[-1] = (out[-1][0], x / 100.0 if x > 3 else x)
+            else:
+                print(f"  skipping {tok!r}: a number needs a ticker in front of it, e.g. RKLB 80")
+            continue
         try:
             out.append(parse_ticker_token(tok))
         except ValueError as exc:
             print(f"  skipping {exc}")
     return out
+
+
+def prompt_tokens(line: str) -> tuple[list[str], bool]:
+    """One line typed or pasted at the prompt -> (tokens, quit). Pasted blocks may carry several lines and the terminal's
+    paste markers; q anywhere ends the session after the names before it have run."""
+    line = line.replace("\x1b[200~", " ").replace("\x1b[201~", " ").replace(",", " ")
+    toks, quit_ = [], False
+    for tok in line.split():
+        if tok.lower() in ("q", "quit", "exit"):
+            quit_ = True
+            break
+        toks.append(tok)
+    return toks, quit_
 
 
 def read_universe(path: str) -> list[str]:
@@ -664,8 +734,9 @@ def run_test(tickers: list[str], args) -> int:
         if args.why and per_name:
             print("\n".join(per_name))
         print()
-        blocks.append({"m": m, "names": len(frames), "scores": {k: score(v) for k, v in pooled.items()}, "spy": spy_means, "per_name": per_name_rows,
-                       "tickers": list(frames), "split": {k: split_by_state(pooled[k]) for k in ("week", "month")}, "eligible": dict(elig)})
+        blocks.append({"m": m, "names": len(frames), "scores": {k: score(v, BLOCK_WEEKS[k]) for k, v in pooled.items()}, "spy": spy_means,
+                       "per_name": per_name_rows, "tickers": list(frames), "eligible": dict(elig),
+                       "split": {k: split_by_state(pooled[k], block_weeks=BLOCK_WEEKS[k]) for k in ("week", "month")}})
     write_html(args, [], blocks)
     return 0
 
@@ -767,6 +838,40 @@ def selftest() -> int:
                              "split": {k: split_by_state(pooled2[k]) for k in ("week", "month")}}], argparse.Namespace(hurdle=2.5))
     check("the test page shows the state split", "By state at entry." in page and "below the 52-week high" in page)
 
+    print("Self-test 8: the clustered standard error")
+    from avgweek import _frame_from_close
+
+    def corr_paths(k, rho, n_days=5 * 252, vol=0.9):
+        dt = 7.0 / 365.0 / 5.0
+        f = rng.standard_normal(n_days)
+        out = []
+        for _ in range(k):
+            z = math.sqrt(rho) * f + math.sqrt(1.0 - rho) * rng.standard_normal(n_days)
+            out.append(_frame_from_close(1000.0 * np.exp(np.cumsum((0.04 - 0.5 * vol * vol) * dt + vol * math.sqrt(dt) * z)), 1000.0))
+        return out
+
+    def pooled_week(dailies):
+        rows = []
+        for d in dailies:
+            rows.extend(walk_forward(weekly_frame(d, drop_partial=False), nocost, 1.0, 0.0, 0.0)["week"])
+        return score(rows, 1)
+    s_ind, s_cor = pooled_week(corr_paths(12, 0.0)), pooled_week(corr_paths(12, 0.7))
+    check("12 independent names: clustered SE close to the naive one (never below it)", 1.0 <= s_ind["se_cl"] / s_ind["se"] < 1.4,
+          f"ratio {s_ind['se_cl'] / s_ind['se']:.2f}")
+    check("12 names that move together: clustered SE well above the naive one", s_cor["se_cl"] / s_cor["se"] > 1.6,
+          f"ratio {s_cor['se_cl'] / s_cor['se']:.2f}")
+    x = np.array([1.0, 1.0, -1.0, -1.0])
+    check("clustered SE on a hand example", abs(clustered_se(x, [0, 0, 1, 1]) - math.sqrt(8.0 * 2 / 1) / 4) < 1e-12 and abs(clustered_se(x, [0, 1, 2, 3]) - math.sqrt(4.0 * 4 / 3) / 4) < 1e-12)
+
+    print("Self-test 7: what the prompt accepts")
+    got = parse_tokens(["RKLB", "80", "ASTS=105", "HIMS", "70%", "onds=1.1", "90"])
+    check("'RKLB 80', 'ASTS=105', 'HIMS 70%' and 'onds=1.1' all parse; a stray number is skipped",
+          got == [("RKLB", 0.8), ("ASTS", 1.05), ("HIMS", 0.7), ("ONDS", 1.1)], str(got))
+    toks, quit_ = prompt_tokens("\x1b[200~ASTS 105\nRKLB=80, HIMS 70\nq\nONDS 110\x1b[201~")
+    check("a pasted block: paste markers stripped, names before q run, q ends it", toks == ["ASTS", "105", "RKLB=80", "HIMS", "70"] and quit_,
+          f"{toks} quit={quit_}")
+    check("an empty line does not end the session", prompt_tokens("   ") == ([], False))
+
     print("Self-test 6: a low-priced stock on the listed strike grid says why a side is n/a, and the test counts the weeks it could not sell")
     grid = replace(costs, strike_step=None)
     wk_g = weekly_frame(paths[0], drop_partial=False)
@@ -834,21 +939,22 @@ def main() -> int:
             print()
         write_html(args, cards, [], announce=True)
         return 0
-    print("ticker, or ticker=IV% (e.g. ASTS=105); q to quit")
+    print("type a ticker and its IV from your screener, e.g. ASTS 105, then Enter; several on one line is fine; q to finish")
     while True:
         try:
-            line = input("> ").strip()
+            line = input("> ")
         except (EOFError, KeyboardInterrupt):
             print()
             break
-        if not line or line.lower() in ("q", "quit", "exit"):
-            break
-        for t, iv in parse_tokens(line.replace(",", " ").split()):
+        toks, quit_ = prompt_tokens(line)
+        for t, iv in parse_tokens(toks):
             c = run_one(t, iv, args)
             if c:
                 cards.append(c)
                 write_html(args, cards, [])   # the page grows as you type; open it once and refresh
             print()
+        if quit_:
+            break
     write_html(args, cards, [], announce=True)
     return 0
 
