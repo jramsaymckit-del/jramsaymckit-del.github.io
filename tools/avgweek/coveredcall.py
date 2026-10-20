@@ -6,6 +6,7 @@ coveredcall.py  --  own the shares, sell a call above the price once a year: wha
   python3 coveredcall.py MSFT AAPL --target 10    # your own list, calls 10% out of the money
   python3 coveredcall.py --m-grid                 # premiums at IV = 0.9, 1.0 and 1.15 x realized vol
   python3 coveredcall.py --detail                 # every yearly cycle, name by name
+  python3 coveredcall.py --tenor 4 --delta 0.2    # monthly calls at 20 delta instead of a fixed distance
 
 Each cycle: hold the shares and sell one call expiring 52 weeks later, struck --target above the price (12% by default).
 At expiry the position is worth the lower of the price and the strike, plus the premium and the interest it earned; that
@@ -29,9 +30,10 @@ import numpy as np
 import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from avgweek import BENCHMARKS, _gbm_path, bs_call, bs_call_delta, drop_shell_comment, load_prices, weekly_series  # noqa: E402
+from avgweek import (BENCHMARKS, _gbm_path, bs_call, bs_call_delta, drop_shell_comment, load_prices,  # noqa: E402
+                     strike_for_call_delta, weekly_series)
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 GROUPS = {
     "Mag 7": ["AAPL", "MSFT", "GOOGL", "AMZN", "META", "NVDA", "TSLA"],
@@ -89,8 +91,8 @@ def one_cycle(close: pd.Series, wk: pd.DataFrame, pos: int, args) -> dict | None
         return None
     T = max((d1 - d0).days, 1) / 365.0
     r = rate_at(d0, args.rate)
-    K = S0 * (1.0 + args.target)
     iv = args.m * rv
+    K = strike_for_call_delta(S0, T, r, iv, args.delta) if getattr(args, "delta", None) else S0 * (1.0 + args.target)
     skew = args.skew if args.skew is not None else default_skew(rv)
     prem = call_premium(S0, K, T, r, iv, skew) * (1.0 - args.slip)
     cc_end = min(ST, K) + prem * (1.0 + r * T)
@@ -146,6 +148,10 @@ def _upct(x, d=1):
     return "n/a" if x is None or x != x else f"{x*100:.{d}f}%"
 
 
+def strike_text(args) -> str:
+    return f"a {args.delta:.2f}-delta call" if getattr(args, "delta", None) else f"a call {args.target*100:.0f}% above the price"
+
+
 COLS = ["group", "ticker", "CC total", "CC/yr", "B&H total", "B&H/yr", "diff/yr", "capped", "premium", "worst CC", "worst B&H", "CC ahead"]
 
 
@@ -155,7 +161,7 @@ def table_rows(results: list[dict]) -> list[list[str]]:
         rs = [r for r in results if r["group"] == g and r["sum"]["n"]]
         for r in rs:
             s, w = r["sum"], r["win"]
-            rows.append([g, r["ticker"] + ("" if s["n"] == r["want"] else f" ({s['n']}y)"), _pct(s["cc_total"]), _pct(s["cc_ann"], 1), _pct(s["bh_total"]),
+            rows.append([g, r["ticker"] + ("" if s["n"] == r["want"] else f" ({s['n']} of {r['want']})"), _pct(s["cc_total"]), _pct(s["cc_ann"], 1), _pct(s["bh_total"]),
                          _pct(s["bh_ann"], 1), f"{(s['cc_ann'] - s['bh_ann'])*100:+.1f} pts", f"{s['capped']} of {s['n']}", _upct(s["premium"]),
                          _pct(s["worst_cc"]), _pct(s["worst_bh"]), _upct(w["ahead"], 0)])
         if len(rs) > 1:
@@ -172,7 +178,7 @@ def render_text(results: list[dict], args, m: float, bench: dict | None) -> str:
         return "no name had enough history"
     first = min(r["sum"]["first"] for r in ok).date()
     last = max(r["sum"]["last"] for r in ok).date()
-    L = [f"Covered calls: own the shares, sell a call {args.target*100:.0f}% above the price every {args.tenor} weeks, IV = {m:.2f} x trailing one-year realized vol",
+    L = [f"Covered calls: own the shares, sell {strike_text(args)} every {args.tenor} weeks, IV = {m:.2f} x trailing one-year realized vol",
          f"{ok[0]['want']} cycles from {first} to {last}; a name with less history shows its cycle count. Total-return prices, premiums less {args.slip*100:.0f}% for the spread."]
     rows = [COLS] + table_rows(results)
     widths = [max(len(r[i]) for r in rows) for i in range(len(COLS))]
@@ -182,7 +188,7 @@ def render_text(results: list[dict], args, m: float, bench: dict | None) -> str:
             L.append("  " + "  ".join("-" * w for w in widths))
     if bench:
         L.append(f"  {bench['ticker']} buy and hold over the same span: {_pct(bench['total'])} total, {_pct(bench['ann'], 1)} a year")
-    L.append("  CC = covered call, B&H = buy and hold; /yr = compounded a year; diff = CC minus B&H; capped = years the stock finished above the "
+    L.append("  CC = covered call, B&H = buy and hold; /yr = compounded a year; diff = CC minus B&H; capped = cycles the stock finished above the "
              "strike; premium = average call premium as a share of the price; worst = worst single cycle; CC ahead = share of all one-year "
              "windows in the span, starting any week, where the covered call beat holding.")
     return "\n".join(L)
@@ -203,7 +209,7 @@ def render_detail(results: list[dict]) -> str:
 def render_page(blocks: list[dict], args) -> str:
     from decide import PAGE_CSS
     asof = pd.Timestamp.today().strftime("%Y-%m-%d")
-    out = [f'<header><h1>covered calls</h1><span class="meta">{asof} &middot; a call {args.target*100:.0f}% above the price, sold every {args.tenor} weeks '
+    out = [f'<header><h1>covered calls</h1><span class="meta">{asof} &middot; {_html.escape(strike_text(args))}, sold every {args.tenor} weeks '
            f'&middot; total-return prices</span></header>']
     for b in blocks:
         ok = [r for r in b["results"] if r["sum"]["n"]]
@@ -211,7 +217,7 @@ def render_page(blocks: list[dict], args) -> str:
             continue
         first, last = min(r["sum"]["first"] for r in ok).date(), max(r["sum"]["last"] for r in ok).date()
         out.append(f'<h2>IV assumed {b["m"]:.2f}&times; realized</h2><p class="sub">{ok[0]["want"]} cycles, {first} to {last}. '
-                   f'Each year the position is worth the lower of the price and the strike, plus the premium.</p>')
+                   f'At each expiry the position is worth the lower of the price and the strike, plus the premium.</p>')
         out.append('<div class="tablewrap"><table><tr>' + "".join(f"<th>{_html.escape(c)}</th>" for c in COLS) + "</tr>")
         for row in table_rows(b["results"]):
             avg = row[1] == "average"
@@ -229,7 +235,7 @@ def render_page(blocks: list[dict], args) -> str:
         if b.get("bench"):
             bb = b["bench"]
             out.append(f'<p class="sub">{_html.escape(bb["ticker"])} buy and hold over the same span: {_pct(bb["total"])} total, {_pct(bb["ann"], 1)} a year.</p>')
-    out.append('<p class="note">CC = covered call, B&amp;H = buy and hold. /yr is compounded a year; diff is CC minus B&amp;H; capped counts the years the '
+    out.append('<p class="note">CC = covered call, B&amp;H = buy and hold. /yr is compounded a year; diff is CC minus B&amp;H; capped counts the cycles the '
                'stock finished above the strike; premium is the average call premium as a share of the price; worst is the worst single cycle; CC ahead is '
                'the share of all one-year windows in the span, starting any week, where the covered call beat holding. Premiums are modelled with '
                'Black-Scholes at IV = m times realized vol, since no free source has option price history; real quotes can differ by 10 to 20%.</p>')
@@ -266,6 +272,7 @@ def main() -> int:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("tickers", nargs="*", help="tickers to test; none = the built-in Mag 7, mid-cap and high-beta lists")
     p.add_argument("--target", type=float, default=0.12, help="strike above the price at each sale: 0.12 or 12 for 12%% (default)")
+    p.add_argument("--delta", type=float, default=None, help="set each strike by call delta instead, e.g. 0.2 or 20 (overrides --target)")
     p.add_argument("--years", type=int, default=5, help="years of back-to-back cycles, ending at the last complete week (default 5)")
     p.add_argument("--tenor", type=int, default=52, help="weeks from sale to expiry (default 52)")
     p.add_argument("--m", type=float, default=1.0, help="IV as a multiple of trailing one-year realized vol (default 1.0)")
@@ -289,6 +296,10 @@ def main() -> int:
         return selftest()
     args.target = args.target / 100.0 if args.target >= 1.0 else args.target
     args.slip = args.slip / 100.0 if args.slip >= 1.0 else args.slip
+    if args.delta is not None:
+        args.delta = args.delta / 100.0 if args.delta >= 1.0 else args.delta
+        if not 0.0 < args.delta < 1.0:
+            raise SystemExit("--delta must be between 0 and 1, e.g. 0.2")
     toks = [t.strip(",;").upper() for t in drop_shell_comment(args.tickers) if t.strip(",;")]
     groups = {"Your list": toks} if toks else GROUPS
     n_cycles = max(1, int(round(args.years * 52 / args.tenor)))
@@ -341,7 +352,7 @@ def main() -> int:
 
 # ----------------------------------------------------------------------------------------------------- self-test
 def _ns(**kw):
-    base = dict(target=0.12, tenor=52, m=1.0, skew=None, rate=None, slip=0.03)
+    base = dict(target=0.12, delta=None, tenor=52, m=1.0, skew=None, rate=None, slip=0.03)
     base.update(kw)
     return argparse.Namespace(**base)
 
@@ -424,6 +435,15 @@ def selftest() -> int:
     ws = window_stats(d["close"], w, cyc[0]["pos"], _ns())
     check("one-year windows: every week inside the span is a start, and the shares come out between 0 and 1", ws["n"] == len(w) - 52 - cyc[0]["pos"]
           and 0.0 <= ws["ahead"] <= 1.0 and 0.0 <= ws["capped"] <= 1.0, f"n {ws['n']} ahead {ws['ahead']*100:.0f}% capped {ws['capped']*100:.0f}%")
+    print("Self-test 5: strikes set by delta")
+    w = weekly_series(d, drop_partial=False)
+    a20 = _ns(delta=0.20, tenor=4, rate=0.04)
+    c = one_cycle(d["close"], w, len(w) - 10, a20)
+    got = bs_call_delta(c["S0"], c["K"], c["years"], c["rate"], c["iv"])
+    check("a 0.20-delta monthly call is struck where its delta is 0.20", abs(got - 0.20) < 1e-6 and c["K"] > c["S0"], f"delta {got:.4f} strike {c['K']/c['S0']-1:+.1%}")
+    c30 = one_cycle(d["close"], w, len(w) - 10, _ns(delta=0.30, tenor=4, rate=0.04))
+    check("a higher delta means a closer strike and a bigger premium", c30["K"] < c["K"] and c30["premium"] > c["premium"],
+          f"0.30: {c30['K']/c30['S0']-1:+.1%}, {c30['premium']*100:.2f}%   0.20: {c['K']/c['S0']-1:+.1%}, {c['premium']*100:.2f}%")
     print(f"\nSelf-test {'PASSED' if fails == 0 else 'FAILED'} ({fails} failures)")
     return 1 if fails else 0
 
