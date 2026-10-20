@@ -130,6 +130,16 @@ Per name it prints the five-year total and the compounded yearly return for both
 
 No free source has option price history, so every call is priced with Black-Scholes at IV = m times the trailing one-year realized vol (m = 1; `--m-grid` adds 0.9 and 1.15), with the same wing skew as the other tools, approximate one-year Treasury yields by quarter (`--rate` fixes one), and 3% off each premium for the bid-ask spread (`--slip`). Real one-year quotes can differ by 10 to 20%. Prices are total-return, so dividends count for both; for dividend payers this slightly understates the covered call, which is negligible for the Mag 7. Early assignment and taxes are ignored. On a fair random walk the call changes nothing on average, which the self-test checks; the strategy wins when the stock goes sideways or down and loses when it rallies past the strike.
 
+
+## 0d. swing.py: can timing a high-beta name beat holding it?
+
+```
+python3 swing.py --universe universe_highbeta.txt
+python3 swing.py ASTS RKLB HIMS --years 5
+```
+
+Three timing rules against buy and hold, on weekly closes. Each decides on a Friday close and trades at the next week's open, paying 0.1% per trade (`--cost`), with cash earning approximate T-bill yields. The dip buyer buys when a stock is 50% or more below its 52-week high (`--dd`) and sells once it is up 100% from the buy (`--take`; `--stop` adds a stop-loss). The trend rule owns the stock while it is above its 30-week average (`--ma`). The cycle rule buys after a 30% rally off the low and sells after a 30% fall from the high (`--swing`), the same swings cycle.py counts. Per name it prints the compounded yearly return, the worst drawdown, the share of time invested and the number of trades for each rule, then how many names each rule beat buy and hold on. On a fair random walk no rule earns anything extra, which the self-test checks; on a market with clear cycles the dip buyer and the cycle rule win, which it also checks. The list is survivors only, which flatters the dip buyer most, and sitting in cash cuts volatility drag, so a rule can beat holding a very volatile, low-drift name just by being out of it.
+
 ---
 
 ## 1. Your framing questions, answered
@@ -291,6 +301,7 @@ A browser version was deliberately not built yet. Yahoo and Stooq do not send CO
 | `decide.py` | the one-screen verdict (CCS, PCS or NEITHER by week, month, year) with its walk-forward test and self-test |
 | `cycle.py` | run-up catalogue, waits between run-ups, grind context, and conditional base rates up and down, per name and pooled |
 | `coveredcall.py` | covered calls struck a set distance above the price, sold every year, against buy and hold |
+| `swing.py` | dip-buying, trend and cycle timing rules against buy and hold, per name and pooled |
 | `iv_snapshot.py` | daily chain logger |
 | `universe_highbeta.txt` | 37 long-history high-beta optionable names for `--universe`; survivorship caveat in its comments |
 | `README.md` | this document |

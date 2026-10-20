@@ -8,15 +8,12 @@ on:
       tool:
         description: "script to run"
         type: choice
-        options: [coveredcall.py, decide.py, cycle.py, avgweek.py]
+        options: [coveredcall.py, swing.py, decide.py, cycle.py, avgweek.py]
         default: coveredcall.py
       args:
-        description: "arguments, e.g. MSFT AAPL --target 20, or ASTS 105 RKLB 80 for decide.py"
+        description: "arguments, e.g. MSFT AAPL --target 20, --universe universe_highbeta.txt for swing.py, or ASTS 105 RKLB 80 for decide.py"
         required: false
         default: ""
-  push:
-    branches: [main]
-    paths: [".github/workflows/avgweek-tools.yml"]
 
 permissions:
   contents: read
