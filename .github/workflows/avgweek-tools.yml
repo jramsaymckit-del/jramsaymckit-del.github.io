@@ -1,0 +1,55 @@
+name: avgweek tools
+# Runs the research scripts in tools/avgweek on GitHub's servers, which can reach the price sources.
+# Start it from the Actions tab or the GitHub app: pick a script, add arguments, run. The results are at the end
+# of the log and in the "result" artifact.
+on:
+  workflow_dispatch:
+    inputs:
+      tool:
+        description: "script to run"
+        type: choice
+        options: [coveredcall.py, decide.py, cycle.py, avgweek.py]
+        default: coveredcall.py
+      args:
+        description: "arguments, e.g. MSFT AAPL --target 20, or ASTS 105 RKLB 80 for decide.py"
+        required: false
+        default: ""
+  push:
+    branches: [main]
+    paths: [".github/workflows/avgweek-tools.yml"]
+
+permissions:
+  contents: read
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: install
+        run: python -m pip install --quiet --disable-pip-version-check "pandas<3" "numpy<2.5" yfinance requests
+      - name: run
+        working-directory: tools/avgweek
+        env:
+          TOOL: ${{ github.event.inputs.tool }}
+          ARGS: ${{ github.event.inputs.args }}
+        run: |
+          set -f
+          if [ -z "$TOOL" ]; then
+            python coveredcall.py --m-grid --html coveredcall_grid.html 2>&1 | tee result.txt
+            python coveredcall.py --detail 2>&1 | tee -a result.txt
+          else
+            python "$TOOL" $ARGS 2>&1 | tee result.txt
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: result
+          path: |
+            tools/avgweek/result.txt
+            tools/avgweek/*.html
+          if-no-files-found: ignore
