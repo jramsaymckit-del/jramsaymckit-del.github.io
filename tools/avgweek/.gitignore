@@ -5,3 +5,6 @@ __pycache__/
 .cache/
 iv_log.csv
 *.pyc
+decide.html
+decide_test.html
+coveredcall.html

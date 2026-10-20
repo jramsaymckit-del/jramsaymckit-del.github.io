@@ -115,6 +115,21 @@ Per name:
 
 With `--universe` the waits, grind lines and base rates are pooled across the other names, which is where the statistics live: a single name has three to six episodes. A base rate close to the any-week rate means the depth of the drawdown carries no timing information; on a random walk the two are equal, up and down, which the self-test checks. Each horizon counts only weeks with a full forward window, so the sample, printed per horizon, shrinks with the horizon. The year line shows how concentrated the evidence is: when one bear market supplies a third of the weeks, the basket rows are closer to one episode than to thousands of independent weeks. The grind lines answer "how did legs that were already this deep finish", which is not the same as "is this one near its end": a leg that reached today's depth and troughed there counts as zero more weeks and zero further fall. Only finished legs count, so legs still running today are left out and long legs are under-represented. The universe is today's survivors, so legs that ended in a delisting are missing too; both make the further-fall numbers understate the downside.
 
+
+## 0c. coveredcall.py: own the shares, sell a call above the price once a year
+
+```
+python3 coveredcall.py
+python3 coveredcall.py MSFT AAPL NVDA --target 20
+python3 coveredcall.py --m-grid --detail
+```
+
+Each cycle holds the shares and sells one call expiring 52 weeks later, struck 12% above the price (`--target`). At expiry the position is worth the lower of the price and the strike, plus the premium and the interest it earned, and that amount rolls into the next cycle, so shares called away are bought back at the market. Buy and hold is the same shares with no call. With no tickers it runs the Mag 7, four highly traded mid caps (AAL, ETSY, ROKU, LYFT) and four highly traded high-beta names (PLTR, COIN, MSTR, RKLB) over the last five years, with SPY buy and hold as the reference line. `--years`, `--tenor` (weeks to expiry) and `--target` change the shape, so monthly calls 3% out of the money are `--tenor 4 --target 3`.
+
+Per name it prints the five-year total and the compounded yearly return for both, their difference, how many years the shares were called away, the average premium, the worst single year for each, and the share of all one-year windows in the span, starting any week, where the covered call beat holding. That last column guards against a lucky start date. The page `coveredcall.html` shows the same table.
+
+No free source has option price history, so every call is priced with Black-Scholes at IV = m times the trailing one-year realized vol (m = 1; `--m-grid` adds 0.9 and 1.15), with the same wing skew as the other tools, approximate one-year Treasury yields by quarter (`--rate` fixes one), and 3% off each premium for the bid-ask spread (`--slip`). Real one-year quotes can differ by 10 to 20%. Prices are total-return, so dividends count for both; for dividend payers this slightly understates the covered call, which is negligible for the Mag 7. Early assignment and taxes are ignored. On a fair random walk the call changes nothing on average, which the self-test checks; the strategy wins when the stock goes sideways or down and loses when it rallies past the strike.
+
 ---
 
 ## 1. Your framing questions, answered
@@ -275,6 +290,7 @@ A browser version was deliberately not built yet. Yahoo and Stooq do not send CO
 | `avgweek.py` | the tool: data, statistics, backtest, report, self-test, CLI |
 | `decide.py` | the one-screen verdict (CCS, PCS or NEITHER by week, month, year) with its walk-forward test and self-test |
 | `cycle.py` | run-up catalogue, waits between run-ups, grind context, and conditional base rates up and down, per name and pooled |
+| `coveredcall.py` | covered calls struck a set distance above the price, sold every year, against buy and hold |
 | `iv_snapshot.py` | daily chain logger |
 | `universe_highbeta.txt` | 37 long-history high-beta optionable names for `--universe`; survivorship caveat in its comments |
 | `README.md` | this document |
